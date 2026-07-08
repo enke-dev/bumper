@@ -1,0 +1,12 @@
+{
+  "name": "example-bun",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "bun@1.1.30",
+  "dependencies": {
+    "semver": "^7.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

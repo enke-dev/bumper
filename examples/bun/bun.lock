@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "example-bun",
+      "dependencies": {
+        "semver": "^7.6.0"
+      },
+      "devDependencies": {
+        "@types/node": "^20.0.0"
+      }
+    }
+  },
+  "packages": {}
+}

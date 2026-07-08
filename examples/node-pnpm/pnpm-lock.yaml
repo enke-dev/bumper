@@ -1,0 +1,16 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+  .:
+    dependencies:
+      semver:
+        specifier: ^7.6.0
+        version: 7.6.3
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.16.0

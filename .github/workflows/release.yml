@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# serialize releases per ref: two pushes to main must not run release-it in
+# parallel (tag/version race, double publish). Don't cancel an in-flight release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+    secrets: inherit
+
+  release:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
+      # npmjs auth for the `@enke.dev/bumper` publish (public scoped package).
+      # The @enke.dev/lint devDep is public on npmjs too — installs need no auth.
+      - name: Configure npm auth
+        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
+
+      # `bun install` runs the `prepare` script → builds dist/cli.mjs. npm re-runs
+      # `prepare` at publish/pack time too, so the tarball always contains the build.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Release
+        run: >
+          bunx \
+            -p release-it \
+            -p @release-it/conventional-changelog \
+            release-it \
+              --ci \
+              --npm.skipChecks \
+              --npm.publish \
+              --no-github.release \
+              --git.commitMessage='chore: release v${version}' \
+              --git.pushArgs=--follow-tags \
+              --plugins.@release-it/conventional-changelog.infile=CHANGELOG.md \
+              --plugins.@release-it/conventional-changelog.header='# @enke.dev/bumper' \
+              --plugins.@release-it/conventional-changelog.preset=angular
+
+      - name: Resolve released version
+        id: version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Released ${version} :rocket:" >> "$GITHUB_STEP_SUMMARY"

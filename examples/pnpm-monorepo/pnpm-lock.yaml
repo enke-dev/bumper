@@ -1,0 +1,14 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+  .: {}
+  packages/a:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.16.0
+  packages/b: {}

@@ -1,0 +1,248 @@
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+    padding: 20px 20px 60px;
+
+    font-family: system-ui, sans-serif;
+    font-size: 12px;
+  }
+
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    height: calc(100vh - 80px);
+
+    div {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+      width: auto;
+    }
+  }
+
+  img,
+  canvas,
+  svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: auto;
+    height: 100%;
+    object-fit: contain;
+    aspect-ratio: 1 / 1;
+    transform: translateX(-50%);
+
+    outline: 2px solid #ccc;
+    border-radius: 5px;
+  }
+
+  #colors {
+    position: fixed;
+    inset: auto 20px 20px auto;
+
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+
+    span {
+      width: 20px;
+      height: 20px;
+
+      border-radius: 50%;
+    }
+  }
+
+  #scale {
+    position: fixed;
+    inset: auto auto 20px 20px;
+
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+  }
+</style>
+
+<span id="colors">
+  <span style="background-color: #030303"></span>
+  <span style="background-color: #282b32"></span>
+  <span style="background-color: #47464e"></span>
+  <span style="background-color: #b55717"></span>
+  <span style="background-color: #e57524"></span>
+  <span style="background-color: #f99d59"></span>
+  <span style="background-color: #babfc2"></span>
+  <span style="background-color: #e5e9ec"></span>
+</span>
+
+<span id="scale">
+  <input type="range" min="5" max="100" value="57" step="1">
+  <span></span>
+</span>
+
+<section>
+  <div><img src="./pixelated.png"></div>
+  <div><canvas></canvas></div>
+  <div>
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+</section>
+
+<script>
+  const colors = document.querySelector('#colors');
+  const scale = document.querySelector('#scale input');
+  const img = document.querySelector('img');
+  const svg = document.querySelector('svg');
+  const canvas = document.querySelector('canvas');
+
+  function readScale() {
+    return parseInt(scale.value, 10);
+  }
+
+  function labelScale() {
+    const scaleValue = readScale() / 100;
+    const width = Math.floor(img.naturalWidth * scaleValue);
+    const height = Math.floor(img.naturalHeight * scaleValue);
+    const size = `${Math.floor(scaleValue * 100)} (${width} x ${height})`;
+    scale.nextElementSibling.textContent = size;
+  }
+
+  function readColors() {
+    return Array.from(colors.children).reduce((palette, el) => {
+      const style = getComputedStyle(el);
+      const color = style.backgroundColor;
+      const [r, g, b] = color.match(/\d+/g).map(Number);
+      palette.push({ r, g, b });
+      return palette;
+    }, []);
+  }
+
+  function readImage() {
+    const scale = readScale();
+    const read = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
+    const ctxRead = read.getContext('2d');
+    const draw = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
+    const ctxDraw = draw.getContext('2d');
+
+    // now got through the image data in scaled steps,
+    // read the average color from each block,
+    // find the closest color from the palette,
+    // and fill a rectangle with that color
+    ctxRead.drawImage(img, 0, 0);
+    const blockSize = Math.floor(read.width / scale);
+    const blockColors = readColors();
+    const imageData = ctxRead.getImageData(0, 0, read.width, read.height);
+    for (let y = 0; y < read.height; y += blockSize) {
+      for (let x = 0; x < read.width; x += blockSize) {
+        let r = 0,
+          g = 0,
+          b = 0,
+          a = 0,
+          count = 0;
+        for (let dy = 0; dy < blockSize; dy++) {
+          for (let dx = 0; dx < blockSize; dx++) {
+            const px = x + dx;
+            const py = y + dy;
+            if (px < read.width && py < read.height) {
+              const index = (py * imageData.width + px) * 4;
+              r += imageData.data[index];
+              g += imageData.data[index + 1];
+              b += imageData.data[index + 2];
+              a += imageData.data[index + 3];
+              count++;
+            }
+          }
+        }
+        r = Math.round(r / count);
+        g = Math.round(g / count);
+        b = Math.round(b / count);
+        a = Math.round(a / count);
+
+        // skip transparent blocks
+        if (a < 255) {
+          continue;
+        }
+
+        // find closest color from palette
+        let closestColor = blockColors[0];
+        let closestDistance = Number.MAX_VALUE;
+        for (const color of blockColors) {
+          const distance = Math.sqrt((r - color.r) ** 2 + (g - color.g) ** 2 + (b - color.b) ** 2);
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestColor = color;
+          }
+        }
+
+        // fill rectangle with closest color
+        ctxDraw.fillStyle = `rgb(${closestColor.r}, ${closestColor.g}, ${closestColor.b})`;
+        ctxDraw.fillRect(x, y, blockSize, blockSize);
+      }
+    }
+
+    return ctxDraw.getImageData(0, 0, draw.width, draw.height);
+  }
+
+  function rasterizeImage(imageData) {
+    // one <path> per color, each block a unit-square subpath;
+    // same-color blocks merge into one combined fill
+    const blockSize = Math.floor(imageData.width / readScale());
+    const cols = Math.ceil(imageData.width / blockSize);
+    const rows = Math.ceil(imageData.height / blockSize);
+    svg.setAttribute('viewBox', `0 0 ${cols} ${rows}`);
+
+    const paths = new Map();
+    for (let y = 0; y < imageData.height; y += blockSize) {
+      for (let x = 0; x < imageData.width; x += blockSize) {
+        const index = (y * imageData.width + x) * 4;
+        const r = imageData.data[index];
+        const g = imageData.data[index + 1];
+        const b = imageData.data[index + 2];
+        const a = imageData.data[index + 3];
+        // skip transparent blocks
+        if (a < 255) {
+          continue;
+        }
+        const fill = `rgb(${r}, ${g}, ${b})`;
+        const gx = x / blockSize;
+        const gy = y / blockSize;
+        paths.set(fill, (paths.get(fill) ?? '') + `M${gx} ${gy}h1v1h-1z`);
+      }
+    }
+
+    let markup = '';
+    for (const [fill, d] of paths) {
+      markup += `<path fill="${fill}" d="${d}"></path>`;
+    }
+    svg.innerHTML = markup;
+  }
+
+  function drawImage() {
+    canvas.height = Math.floor(img.naturalHeight);
+    canvas.width = Math.floor(img.naturalWidth);
+    const image = readImage();
+
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.putImageData(image, 0, 0);
+
+    rasterizeImage(image);
+  }
+
+  img.addEventListener('load', () => {
+    drawImage();
+    labelScale();
+  });
+
+  scale.addEventListener('input', () => {
+    labelScale();
+  });
+
+  scale.addEventListener('change', () => {
+    drawImage();
+    labelScale();
+  });
+</script>

@@ -1,0 +1,137 @@
+# bumper
+
+Central, module-based repo updater that detects a repo's runtime + package manager and bumps everything: Node LTS,
+`@types/node`, all dependencies, the package manager itself, GitHub Actions pins, and Node
+versions in Docker/Compose files.
+
+## tl;dr
+
+```sh
+# run bumper in the current repo, auto-detecting everything
+npx @enke.dev/bumper update         # with npm
+pnpm dlx @enke.dev/bumper update    # with pnpm
+bunx --bun @enke.dev/bumper update  # with Bun, no Node needed
+```
+
+Works across **node/pnpm**, **node/npm** and **bun** repos, single-package or monorepo.
+
+Dependencies are bumped by resolving each package's latest version via the repo's own package
+manager (`pnpm view` / `npm view`, so private scoped registries + `.npmrc` auth just work),
+rewriting `package.json` specs (preserving `^`/`~`), then letting the package manager reinstall.
+
+Bumps are **peer-aware**: before rewriting, bumper reads the `peerDependencies` of every
+installed dependency (from `node_modules`) and caps each shared dependency to the newest version
+still satisfying every declared peer range. So a preset that peer-pins `typescript` to `6.0.3`
+(e.g. [`@enke.dev/lint`](https://www.npmjs.com/package/@enke.dev/lint)) holds `typescript` at
+`6.0.3` instead of jumping to a newer major that would break the preset — no per-repo config
+needed, the declaration lives in the dependency itself.
+
+> **Note** — network runs through subprocesses (`curl` for the Node dist index, `pnpm`/`npm view`
+> for versions, `actions-up` via `bunx`), so private-registry auth is handled by the tools that
+> own it — the repo's own `.npmrc` just works.
+
+## Install
+
+Published publicly to [npm](https://www.npmjs.com/package/@enke.dev/bumper) as `@enke.dev/bumper`.
+The bin is a single bundled JS file (`dist/cli.mjs`) — no platform binaries — so it runs on
+**Node ≥22** _or_ **Bun**.
+
+### Run without installing
+
+Use your package manager's runner to fetch + execute the latest version on the fly:
+
+```sh
+npx           @enke.dev/bumper …   # npm
+pnpm dlx      @enke.dev/bumper …   # pnpm
+bunx --bun    @enke.dev/bumper …   # bun (--bun forces the Bun runtime, no Node needed)
+```
+
+### Install globally
+
+```sh
+npm  install -g @enke.dev/bumper
+pnpm add     -g @enke.dev/bumper
+bun  add     -g @enke.dev/bumper
+```
+
+Then invoke `bumper` (or `bmpr`) directly.
+
+### From source
+
+Requires [Bun](https://bun.sh) to build.
+
+```sh
+bun install        # installs deps + builds ./dist/cli.mjs (prepare hook)
+bun run dev …      # run the CLI straight from source, no build needed
+```
+
+To get a global `bumper` on your `PATH` from the working tree (e.g. to dogfood it in other
+repos), build and link once:
+
+```sh
+bun run build      # refresh ./dist/cli.mjs
+bun link           # symlinks it into ~/.bun/bin (on PATH for a standard Bun install)
+```
+
+The link tracks `dist/cli.mjs` live — re-run `bun run build` to update what `bumper` executes;
+no need to link again. `bun link` writes the platform-appropriate shim, so this works on Windows too.
+
+## Usage
+
+```sh
+bumper                       # no command → shows help
+bumper help                  # show help (also: bumper --help)
+bumper detect                # show context + applicable modules for the cwd
+bumper detect /path --json   # machine-readable detection
+bumper update                # run every applicable module, in order
+bumper update --dry-run      # print intended steps, change nothing
+bumper update --only node,pnpm
+bumper update --skip github-actions
+```
+
+## Modules
+
+Each concern is a self-detecting, self-updating unit behind a common `Module` interface, in one of
+three families (mirrored by the `modules/` folder layout): **runtimes**, **package-managers** and
+**features**. The update procedure just runs every module whose detector matches, in registry order
+— runtimes first (pin versions), then dependency-pinning features, then package managers install,
+then the remaining file-rewriting features:
+
+| id               | kind            | detects                         | does                                                    |
+| ---------------- | --------------- | ------------------------------- | ------------------------------------------------------- |
+| `node`           | runtime         | node runtime / `.node-version`  | install latest LTS via fnm/asdf, write `.node-version`  |
+| `types-node`     | feature         | `@types/node` in any package    | pin spec to Node LTS major                              |
+| `bun`            | package-manager | bun packageManager / lockfile   | self-upgrade, bump specs, pin `.bun-version`, reinstall |
+| `npm`            | package-manager | npm packageManager / lockfile   | bump specs to latest, clean reinstall                   |
+| `pnpm`           | package-manager | pnpm packageManager / lockfile  | self-update, bump specs to latest, clean reinstall      |
+| `docker`         | feature         | `Dockerfile*` / `compose*.yaml` | align `node:<ver>` / `NODE_VERSION=` to LTS             |
+| `github-actions` | feature         | `.github/workflows/*.y{a,}ml`   | pin actions via `actions-up`                            |
+
+Adding a concern = adding one module (`*.runtime.ts` / `*.package-manager.ts` / `*.feature.ts`)
+implementing the `Module` interface and registering it. `bumper detect` exposes per-module
+detection, so a later multi-step CLI or GUI can build on top of the same registry.
+
+## Config (`~/.bumperrc`)
+
+Path-scoped overrides. Running in an unknown repo auto-detects everything and persists a default
+(`mode: auto`) entry, so the next run is already scoped:
+
+```jsonc
+{
+  "repos": {
+    "/absolute/path/to/repository": {
+      "mode": "auto", // auto = re-detect; manual = respect stored toggles
+      "exclude": ["packages/vendored-pkg"], // repo-relative dirs skipped in workspace ops
+      "modules": { "docker": false }, // explicit per-module on/off overrides, keyed by module id
+    },
+  },
+}
+```
+
+```sh
+bumper config list
+bumper config get  /path/to/repo
+bumper config set  /path/to/repo exclude packages/a,packages/b
+bumper config set  /path/to/repo modules.docker false
+bumper config set  /path/to/repo mode manual
+```

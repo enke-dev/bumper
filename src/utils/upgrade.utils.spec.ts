@@ -1,0 +1,262 @@
+// Runtime-agnostic test (see spec.utils.spec.ts): runs under both `bun test` and `node --test`.
+// Registry lookups are injected (see `RegistryLookups`), so the orchestrator runs offline
+// without module mocking. fs stays real, backed by a tmpdir.
+import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, test } from 'node:test';
+
+import type { ModuleContext } from '../context/context.types.js';
+import { PackageManager } from '../context/context.types.js';
+import { readPackageJson } from './fs.utils.js';
+import type { PackageJson } from './package.types.js';
+import type { RegistryLookups } from './upgrade.utils.js';
+import { upgradeAllWorkspaces } from './upgrade.utils.js';
+
+let dir: string;
+let latest: Record<string, string | null>;
+let inRange: Record<string, string | null>;
+
+/** Offline stand-in for the network-backed registry lookups, fed by the `latest`/`inRange` maps. */
+const lookups: RegistryLookups = {
+  latestVersion: async pkg => latest[pkg] ?? null,
+  latestVersionInRange: async pkg => inRange[pkg] ?? null,
+};
+
+function ctx(overrides: Partial<ModuleContext> = {}): ModuleContext {
+  return {
+    cwd: dir,
+    workspaces: [dir],
+    packageManager: PackageManager.Npm,
+    dryRun: false,
+    ...overrides,
+  } as ModuleContext;
+}
+
+async function writePkg(pkg: PackageJson): Promise<void> {
+  await writeFile(join(dir, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
+}
+
+/** Swap `process.stdout.write` for a buffer; runtime-agnostic (no bun/jest spy API). */
+function captureStdout(): { output: () => string; restore: () => void } {
+  const original = process.stdout.write.bind(process.stdout);
+  let buffer = '';
+  process.stdout.write = ((chunk: unknown) => {
+    buffer += String(chunk);
+    return true;
+  }) as typeof process.stdout.write;
+  return {
+    output: () => buffer,
+    restore: () => {
+      process.stdout.write = original;
+    },
+  };
+}
+
+beforeEach(async () => {
+  dir = await mkdtemp(join(tmpdir(), 'bumper-upgrade-'));
+  latest = {};
+  inRange = {};
+});
+
+afterEach(async () => {
+  await rm(dir, { recursive: true, force: true });
+});
+
+describe('upgradeAllWorkspaces', () => {
+  test('rewrites pinnable specs to latest, preserving the ^/~ operator', async () => {
+    latest = { lit: '3.2.0', typescript: '5.9.0' };
+    await writePkg({
+      name: 'root',
+      dependencies: { lit: '^3.0.0' },
+      devDependencies: { typescript: '~5.0.0' },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.dependencies?.['lit'], '^3.2.0');
+    assert.equal(pkg?.devDependencies?.['typescript'], '~5.9.0');
+  });
+
+  test('leaves non-pinnable specs (ranges, protocols, tags) untouched', async () => {
+    latest = { lit: '3.2.0' };
+    await writePkg({
+      name: 'root',
+      dependencies: { lit: '3.0.0', foo: 'workspace:*', bar: '>=1 <2', baz: 'latest' },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.deepEqual(pkg?.dependencies, {
+      lit: '3.2.0',
+      foo: 'workspace:*',
+      bar: '>=1 <2',
+      baz: 'latest',
+    });
+  });
+
+  test('caps a pinnable spec to the manifest-declared range for the same package', async () => {
+    // `foo` is pinnable in deps but range-declared in peers → cap to the range's newest
+    latest = { foo: '3.9.9' };
+    inRange = { foo: '2.5.0' };
+    await writePkg({
+      name: 'root',
+      dependencies: { foo: '^1.0.0' },
+      peerDependencies: { foo: '>=1 <3' },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.dependencies?.['foo'], '^2.5.0');
+    // the range declaration itself is never rewritten
+    assert.equal(pkg?.peerDependencies?.['foo'], '>=1 <3');
+  });
+
+  test("caps a spec to an installed dependency's peerDependencies range", async () => {
+    // an installed dep (@enke.dev/lint) peer-pins typescript to 6.0.3; global latest is 7.x
+    latest = { typescript: '7.1.0', lit: '3.2.0' };
+    inRange = { typescript: '6.0.3' };
+    await writeFile(
+      join(dir, 'package.json'),
+      `${JSON.stringify(
+        {
+          name: 'root',
+          dependencies: { lit: '^3.0.0' },
+          devDependencies: { '@enke.dev/lint': '0.13.1', typescript: '6.0.3' },
+        },
+        null,
+        2
+      )}\n`
+    );
+    const lintDir = join(dir, 'node_modules', '@enke.dev', 'lint');
+    await mkdir(lintDir, { recursive: true });
+    await writeFile(
+      join(lintDir, 'package.json'),
+      `${JSON.stringify({
+        name: '@enke.dev/lint',
+        peerDependencies: { typescript: '6.0.3' },
+        peerDependenciesMeta: { typescript: { optional: true } },
+      })}\n`
+    );
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    // typescript held at the peer-pinned 6.0.3, not bumped to 7.x
+    assert.equal(pkg?.devDependencies?.['typescript'], '6.0.3');
+    // unconstrained deps still bump to latest
+    assert.equal(pkg?.dependencies?.['lit'], '^3.2.0');
+  });
+
+  test('a peer cap never overrides a module-managed dependency', async () => {
+    latest = { '@types/node': '24.0.0' };
+    inRange = { '@types/node': '22.0.0' };
+    await writeFile(
+      join(dir, 'package.json'),
+      `${JSON.stringify(
+        { name: 'root', devDependencies: { '@enke.dev/lint': '0.13.1', '@types/node': '24' } },
+        null,
+        2
+      )}\n`
+    );
+    const lintDir = join(dir, 'node_modules', '@enke.dev', 'lint');
+    await mkdir(lintDir, { recursive: true });
+    await writeFile(
+      join(lintDir, 'package.json'),
+      `${JSON.stringify({ name: '@enke.dev/lint', peerDependencies: { '@types/node': '>=20 <23' } })}\n`
+    );
+
+    await upgradeAllWorkspaces(ctx({ managedDependencies: new Set(['@types/node']) }), lookups);
+
+    // types-node owns @types/node, so the peer cap leaves it entirely alone
+    assert.equal((await readPackageJson(dir))?.devDependencies?.['@types/node'], '24');
+  });
+
+  test('skips module-managed dependencies', async () => {
+    latest = { lit: '3.2.0', typescript: '5.9.0' };
+    await writePkg({
+      name: 'root',
+      dependencies: { lit: '^3.0.0', typescript: '5.0.0' },
+    });
+
+    await upgradeAllWorkspaces(ctx({ managedDependencies: new Set(['typescript']) }), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.dependencies?.['lit'], '^3.2.0');
+    assert.equal(pkg?.dependencies?.['typescript'], '5.0.0');
+  });
+
+  test('leaves a spec untouched when the version is unresolvable', async () => {
+    latest = { lit: null };
+    await writePkg({ name: 'root', dependencies: { lit: '^3.0.0' } });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.dependencies?.['lit'], '^3.0.0');
+  });
+
+  test('bumps the root packageManager field to latest', async () => {
+    latest = { pnpm: '9.1.0' };
+    await writePkg({ name: 'root', packageManager: 'pnpm@8.0.0' });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.packageManager, 'pnpm@9.1.0');
+  });
+
+  test('leaves the packageManager field untouched when latest is unresolvable', async () => {
+    latest = { pnpm: null };
+    await writePkg({ name: 'root', packageManager: 'pnpm@8.0.0' });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    assert.equal((await readPackageJson(dir))?.packageManager, 'pnpm@8.0.0');
+  });
+
+  test('rewrites specs across every workspace member', async () => {
+    latest = { lit: '3.2.0' };
+    const memberA = await mkdtemp(join(tmpdir(), 'bumper-ws-a-'));
+    const memberB = await mkdtemp(join(tmpdir(), 'bumper-ws-b-'));
+    try {
+      await writeFile(
+        join(memberA, 'package.json'),
+        `${JSON.stringify({ name: 'a', dependencies: { lit: '^3.0.0' } }, null, 2)}\n`
+      );
+      await writeFile(
+        join(memberB, 'package.json'),
+        `${JSON.stringify({ name: 'b', dependencies: { lit: '~3.1.0' } }, null, 2)}\n`
+      );
+
+      await upgradeAllWorkspaces(ctx({ workspaces: [memberA, memberB] }), lookups);
+
+      assert.equal((await readPackageJson(memberA))?.dependencies?.['lit'], '^3.2.0');
+      assert.equal((await readPackageJson(memberB))?.dependencies?.['lit'], '~3.2.0');
+    } finally {
+      await rm(memberA, { recursive: true, force: true });
+      await rm(memberB, { recursive: true, force: true });
+    }
+  });
+
+  test('dry-run reports intended work without mutating any manifest', async () => {
+    latest = { lit: '3.2.0' };
+    const original = `${JSON.stringify({ name: 'root', dependencies: { lit: '^3.0.0' } }, null, 2)}\n`;
+    await writeFile(join(dir, 'package.json'), original);
+
+    const out = captureStdout();
+    try {
+      await upgradeAllWorkspaces(ctx({ dryRun: true }), lookups);
+    } finally {
+      out.restore();
+    }
+
+    // manifest is unchanged and the plan is announced
+    assert.equal(await readFile(join(dir, 'package.json'), 'utf8'), original);
+    assert.ok(out.output().includes('resolve latest for 1 dependency(ies)'));
+  });
+});
