@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.0.5](https://github.com/enke-dev/bumper/compare/0.0.4...0.0.5) (2026-07-13)
+
+
+### Bug Fixes
+
+* resolve peer deps post update ([1374bac](https://github.com/enke-dev/bumper/commit/1374bacd37b0889e0fb0a46cee71a9bfb79b6fb8))
+
 ## [0.0.4](https://github.com/enke-dev/bumper/compare/0.0.3...0.0.4) (2026-07-13)
 
 
