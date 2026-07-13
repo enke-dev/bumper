@@ -1,8 +1,13 @@
 // Runtime-agnostic test (see spec.utils.spec.ts): runs under both `bun test` and `node --test`.
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
 
 import type { ModuleContext } from '../context/context.types.js';
+import { PackageManager } from '../context/context.types.js';
 import { cleanInstall, selfUpdate } from './deps.utils.js';
 
 function ctx(overrides: Partial<ModuleContext> = {}): ModuleContext {
@@ -29,11 +34,27 @@ let out: ReturnType<typeof captureStdout>;
 afterEach(() => out?.restore());
 
 describe('cleanInstall', () => {
-  test('dry-run plans the removal and install without touching the fs', async () => {
+  test('dry-run plans removing node_modules + the lockfile and the install, without touching the fs', async () => {
     out = captureStdout();
-    await cleanInstall(ctx(), ['npm', 'install']);
+    await cleanInstall(ctx({ packageManager: PackageManager.Npm }), ['npm', 'install']);
     assert.ok(out.output().includes('rm -rf node_modules'));
+    assert.ok(out.output().includes('package-lock.json'));
     assert.ok(out.output().includes('npm install'));
+  });
+
+  test('removes the stale lockfile before reinstalling (real fs, no-op install)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'bumper-clean-'));
+    try {
+      const lockfile = join(dir, 'package-lock.json');
+      await writeFile(lockfile, '{"lockfileVersion":3}\n');
+      // `true` is a real, always-present binary → the install step is a harmless no-op.
+      await cleanInstall(ctx({ dryRun: false, cwd: dir, packageManager: PackageManager.Npm }), [
+        'true',
+      ]);
+      assert.equal(existsSync(lockfile), false, 'stale package-lock.json is removed');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 
