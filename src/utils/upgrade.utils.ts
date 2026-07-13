@@ -285,13 +285,19 @@ async function rewriteSpecs(
       if (!version) {
         return acc;
       }
-      // Never downgrade on the plain-latest path: the `latest` dist-tag can be *lower* than a
-      // pinned prerelease (e.g. `vitepress@2.0.0-alpha.13` while `latest` is `1.6.4`, the alpha
-      // living under the `next` tag). Bumping to `latest` would walk the pin back. A peer cap may
-      // still legitimately lower a version to satisfy a constraint, so this guard is latest-only.
+      // Never walk a pin *backwards* when the current version is already acceptable:
+      //  - plain path: the `latest` dist-tag can trail a pinned prerelease (e.g.
+      //    `vitepress@2.0.0-alpha.13` while `latest` is `1.6.4`, the alpha under the `next` tag).
+      //  - capped path: a peer cap must only lower a version that *violates* the peer ranges. A
+      //    pin still satisfying them — typically a prerelease the stable-only cap resolution
+      //    skipped — must be kept, not downgraded to the newest stable.
       const current = spec.replace(/^[\^~]/, '');
-      if (!capped_ && semver.valid(current) && semver.lt(version, current)) {
-        return acc;
+      if (semver.valid(current) && semver.lt(version, current)) {
+        const currentViolatesCaps =
+          capped_ && !(capRanges.get(name) ?? []).every(range => semver.satisfies(current, range));
+        if (!currentViolatesCaps) {
+          return acc;
+        }
       }
       const next = `${operatorOf(spec)}${version}`;
       if (next === spec) {

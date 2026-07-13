@@ -32,6 +32,7 @@ const lookups: RegistryLookups = {
   latestVersion: async pkg => latest[pkg] ?? null,
   maxSatisfyingRanges: async (pkg, ranges) =>
     (versions[pkg] ?? [])
+      .filter(v => semver.prerelease(v) === null) // mirror the real impl: stable versions only
       .filter(v => ranges.every(range => semver.satisfies(v, range)))
       .sort(semver.rcompare)[0] ?? null,
   peerDependencies: async pkg => peers[pkg] ?? {},
@@ -109,6 +110,41 @@ describe('upgradeAllWorkspaces', () => {
     const pkg = await readPackageJson(dir);
     assert.equal(pkg?.devDependencies?.['vitepress'], '2.0.0-alpha.13', 'prerelease left intact');
     assert.equal(pkg?.devDependencies?.['lit'], '^3.2.0', 'normal dep still bumps');
+  });
+
+  test('a peer cap never downgrades a pinned prerelease that still satisfies the peer range', async () => {
+    // Regression (lit-utils): vitepress is pinned to a `next` prerelease and peer-capped by
+    // vitepress-plugin-pagefind (`^1.0.0-0 || ^2.0.0-0`, which the alpha satisfies). The cap
+    // resolves to the newest *stable* (1.6.4) — but must NOT downgrade the still-valid alpha pin.
+    latest = { vitepress: '1.6.4', 'vitepress-plugin-pagefind': '0.4.22' };
+    versions = { vitepress: ['1.6.4', '2.0.0-alpha.18'] }; // stable-only filter leaves 1.6.4
+    peers = { 'vitepress-plugin-pagefind': { vitepress: '^1.0.0-0 || ^2.0.0-0' } };
+    await writePkg({
+      name: 'root',
+      devDependencies: { vitepress: '2.0.0-alpha.13', 'vitepress-plugin-pagefind': '0.4.22' },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.devDependencies?.['vitepress'], '2.0.0-alpha.13', 'prerelease pin kept');
+  });
+
+  test('a peer cap still downgrades a version that VIOLATES the peer range', async () => {
+    // The guard must not over-protect: a pin outside every peer range is genuinely broken and
+    // must be capped down. foo@3.9.9 violates the peer `>=1 <3` → capped to the newest in-range.
+    latest = { foo: '3.9.9', 'peer-pkg': '1.0.0' };
+    versions = { foo: ['1.0.0', '2.5.0', '3.9.9'] };
+    peers = { 'peer-pkg': { foo: '>=1 <3' } };
+    await writePkg({
+      name: 'root',
+      devDependencies: { foo: '3.9.9', 'peer-pkg': '1.0.0' },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.devDependencies?.['foo'], '2.5.0', 'violating pin capped down to in-range');
   });
 
   test('leaves non-pinnable specs (ranges, protocols, tags) untouched', async () => {
