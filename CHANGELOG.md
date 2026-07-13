@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.0.9](https://github.com/enke-dev/bumper/compare/0.0.8...0.0.9) (2026-07-13)
+
+
+### Bug Fixes
+
+* never downgrade a pin ([67204d4](https://github.com/enke-dev/bumper/commit/67204d4e5543bef5578a8ee875e466d1278926c0))
+
 ## [0.0.8](https://github.com/enke-dev/bumper/compare/0.0.7...0.0.8) (2026-07-13)
 
 
