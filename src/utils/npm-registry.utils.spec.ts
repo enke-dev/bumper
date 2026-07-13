@@ -6,7 +6,13 @@ import { describe, test } from 'node:test';
 
 import { PackageManager } from '../context/context.types.js';
 import type { ExecResult } from './exec.utils.js';
-import { curlJson, latestVersion, latestVersionInRange, viewTool } from './npm-registry.utils.js';
+import {
+  curlJson,
+  latestVersion,
+  latestVersionInRange,
+  peerDependenciesOf,
+  viewTool,
+} from './npm-registry.utils.js';
 
 const ok = (stdout: string): ExecResult => ({ exitCode: 0, stdout, stderr: '' });
 const fail = (): ExecResult => ({ exitCode: 1, stdout: '', stderr: 'boom' });
@@ -100,5 +106,40 @@ describe('latestVersionInRange', () => {
       throw new Error('spawn error');
     });
     assert.equal(version, null);
+  });
+});
+
+describe('peerDependenciesOf', () => {
+  test('parses the peerDependencies JSON object for a version', async () => {
+    const peers = await peerDependenciesOf('@enke.dev/lint', '0.13.1', 'npm', '/repo', async () =>
+      ok('{"typescript":"6.0.3","eslint":"^10.7.0"}\n')
+    );
+    assert.deepEqual(peers, { typescript: '6.0.3', eslint: '^10.7.0' });
+  });
+
+  test('returns an empty object when the version declares no peers (empty stdout)', async () => {
+    const peers = await peerDependenciesOf('lit', '3.2.0', 'npm', '/repo', async () => ok('\n'));
+    assert.deepEqual(peers, {});
+  });
+
+  test('returns an empty object on a non-zero exit', async () => {
+    assert.deepEqual(
+      await peerDependenciesOf('lit', '3.2.0', 'npm', '/repo', async () => fail()),
+      {}
+    );
+  });
+
+  test('returns an empty object when stdout is not a JSON object (e.g. an array)', async () => {
+    const peers = await peerDependenciesOf('lit', '3.2.0', 'npm', '/repo', async () =>
+      ok('["a","b"]')
+    );
+    assert.deepEqual(peers, {});
+  });
+
+  test('returns an empty object when exec throws', async () => {
+    const peers = await peerDependenciesOf('lit', '3.2.0', 'npm', '/repo', async () => {
+      throw new Error('spawn error');
+    });
+    assert.deepEqual(peers, {});
   });
 });

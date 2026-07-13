@@ -2,7 +2,12 @@ import { join } from 'node:path';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { allDependencies, readPackageJson, writePackageJson } from './fs.utils.js';
-import { latestVersion, latestVersionInRange, viewTool } from './npm-registry.utils.js';
+import {
+  latestVersion,
+  latestVersionInRange,
+  peerDependenciesOf,
+  viewTool,
+} from './npm-registry.utils.js';
 import { planLine } from './output.utils.js';
 import type { PackageJson } from './package.types.js';
 import { isPinnable, isVersionRange, operatorOf } from './spec.utils.js';
@@ -29,9 +34,19 @@ export interface RegistryLookups {
     tool: string,
     cwd: string
   ) => Promise<string | null>;
+  peerDependencies: (
+    pkg: string,
+    version: string,
+    tool: string,
+    cwd: string
+  ) => Promise<Record<string, string>>;
 }
 
-const defaultLookups: RegistryLookups = { latestVersion, latestVersionInRange };
+const defaultLookups: RegistryLookups = {
+  latestVersion,
+  latestVersionInRange,
+  peerDependencies: peerDependenciesOf,
+};
 
 async function collectPackages(ctx: ModuleContext): Promise<Map<string, PackageJson>> {
   const entries = await Promise.all(
@@ -55,27 +70,52 @@ function collectDependencyNames(pkgs: Map<string, PackageJson>): string[] {
 }
 
 /**
- * Version caps declared by installed dependencies' `peerDependencies`. A package the repo
- * depends on may constrain a shared dependency — e.g. `@enke.dev/lint` peer-pins `typescript`
- * to `6.0.3` — and bumping that dependency past the peer range would break the installed
- * package. So we cap the bump to the newest version satisfying *every* such peer range,
- * intersecting multiple constraints (semver AND, space-joined). Read from the manifests
- * actually installed under `node_modules`, i.e. the versions in play this run. Managed peers
- * (owned by another module, e.g. `@types/node`) and non-version specs (`*`, tags, protocols)
- * are ignored.
+ * The version a direct dependency is moving to this run: the freshly-resolved `latest` when the
+ * dependency is being bumped, otherwise the version currently installed under `node_modules`
+ * (unchanged deps still declare peers in play). Null when neither is known — e.g. `latest` was
+ * unresolvable, or the dep isn't installed.
+ */
+async function targetVersion(
+  cwd: string,
+  dep: string,
+  latest: Map<string, string | null>
+): Promise<string | null> {
+  if (latest.has(dep)) {
+    return latest.get(dep) ?? null;
+  }
+  return (await readPackageJson(join(cwd, 'node_modules', dep)))?.version ?? null;
+}
+
+/**
+ * Version caps declared by dependencies' `peerDependencies`. A package the repo depends on may
+ * constrain a shared dependency — e.g. `@enke.dev/lint` peer-pins `typescript` to `6.0.3` — and
+ * bumping that dependency past the peer range would break the package. So we cap the bump to the
+ * newest version satisfying *every* such peer range, intersecting multiple constraints (semver
+ * AND, space-joined).
+ *
+ * Crucially, peers are read from the registry for the version each dependency is being bumped
+ * *to* (see {@link targetVersion}), NOT from the stale manifest installed under `node_modules`.
+ * A dep that grows a new peer in the version being installed (e.g. `@enke.dev/lint` adding a
+ * `typescript@6.0.3` peer across a bump) is honored in the same run — otherwise the rewrite and
+ * the subsequent install disagree and only a second run would converge. Managed peers (owned by
+ * another module, e.g. `@types/node`) and non-version specs (`*`, tags, protocols) are ignored.
  */
 async function collectPeerCaps(
   cwd: string,
   depNames: string[],
-  managed: ReadonlySet<string>
+  latest: Map<string, string | null>,
+  managed: ReadonlySet<string>,
+  tool: string,
+  lookups: RegistryLookups
 ): Promise<Map<string, string>> {
   const collected = new Map<string, Set<string>>();
   await Promise.all(
     depNames.map(async dep => {
-      const peers = (await readPackageJson(join(cwd, 'node_modules', dep)))?.peerDependencies;
-      if (!peers) {
+      const version = await targetVersion(cwd, dep, latest);
+      if (!version) {
         return;
       }
+      const peers = await lookups.peerDependencies(dep, version, tool, cwd);
       Object.entries(peers).forEach(([peer, range]) => {
         if (managed.has(peer) || (!isPinnable(range) && !isVersionRange(range))) {
           return;
@@ -148,10 +188,17 @@ export async function upgradeAllWorkspaces(
   }
 
   const tool = viewTool(ctx.packageManager);
-  const [latest, peerCaps] = await Promise.all([
-    resolveLatest(names, tool, ctx.cwd, lookups),
-    collectPeerCaps(ctx.cwd, collectDependencyNames(pkgs), managed),
-  ]);
+  // Sequential: peer caps are read for the versions we're bumping *to*, so latest must resolve
+  // first. A dep that adds a peer in its new version is then honored in this same run.
+  const latest = await resolveLatest(names, tool, ctx.cwd, lookups);
+  const peerCaps = await collectPeerCaps(
+    ctx.cwd,
+    collectDependencyNames(pkgs),
+    latest,
+    managed,
+    tool,
+    lookups
+  );
 
   await Promise.all(
     [...pkgs].map(async ([dir, pkg]) => {

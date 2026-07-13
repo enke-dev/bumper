@@ -17,11 +17,17 @@ import { upgradeAllWorkspaces } from './upgrade.utils.js';
 let dir: string;
 let latest: Record<string, string | null>;
 let inRange: Record<string, string | null>;
+let peers: Record<string, Record<string, string>>;
 
-/** Offline stand-in for the network-backed registry lookups, fed by the `latest`/`inRange` maps. */
+/**
+ * Offline stand-in for the network-backed registry lookups, fed by the `latest`/`inRange`/`peers`
+ * maps. `peers` is keyed by package name and stands for the peers of the version being bumped *to*
+ * (the real lookup queries `pkg@<target>`), so tests can assert post-bump peer handling.
+ */
 const lookups: RegistryLookups = {
   latestVersion: async pkg => latest[pkg] ?? null,
   latestVersionInRange: async pkg => inRange[pkg] ?? null,
+  peerDependencies: async pkg => peers[pkg] ?? {},
 };
 
 function ctx(overrides: Partial<ModuleContext> = {}): ModuleContext {
@@ -58,6 +64,7 @@ beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'bumper-upgrade-'));
   latest = {};
   inRange = {};
+  peers = {};
 });
 
 afterEach(async () => {
@@ -116,32 +123,16 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.peerDependencies?.['foo'], '>=1 <3');
   });
 
-  test("caps a spec to an installed dependency's peerDependencies range", async () => {
-    // an installed dep (@enke.dev/lint) peer-pins typescript to 6.0.3; global latest is 7.x
-    latest = { typescript: '7.1.0', lit: '3.2.0' };
+  test("caps a spec to a dependency's peerDependencies range", async () => {
+    // a dep (@enke.dev/lint) peer-pins typescript to 6.0.3; global latest is 7.x
+    latest = { typescript: '7.1.0', lit: '3.2.0', '@enke.dev/lint': '0.13.1' };
     inRange = { typescript: '6.0.3' };
-    await writeFile(
-      join(dir, 'package.json'),
-      `${JSON.stringify(
-        {
-          name: 'root',
-          dependencies: { lit: '^3.0.0' },
-          devDependencies: { '@enke.dev/lint': '0.13.1', typescript: '6.0.3' },
-        },
-        null,
-        2
-      )}\n`
-    );
-    const lintDir = join(dir, 'node_modules', '@enke.dev', 'lint');
-    await mkdir(lintDir, { recursive: true });
-    await writeFile(
-      join(lintDir, 'package.json'),
-      `${JSON.stringify({
-        name: '@enke.dev/lint',
-        peerDependencies: { typescript: '6.0.3' },
-        peerDependenciesMeta: { typescript: { optional: true } },
-      })}\n`
-    );
+    peers = { '@enke.dev/lint': { typescript: '6.0.3' } };
+    await writePkg({
+      name: 'root',
+      dependencies: { lit: '^3.0.0' },
+      devDependencies: { '@enke.dev/lint': '0.13.1', typescript: '6.0.3' },
+    });
 
     await upgradeAllWorkspaces(ctx(), lookups);
 
@@ -152,23 +143,41 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.dependencies?.['lit'], '^3.2.0');
   });
 
-  test('a peer cap never overrides a module-managed dependency', async () => {
-    latest = { '@types/node': '24.0.0' };
-    inRange = { '@types/node': '22.0.0' };
-    await writeFile(
-      join(dir, 'package.json'),
-      `${JSON.stringify(
-        { name: 'root', devDependencies: { '@enke.dev/lint': '0.13.1', '@types/node': '24' } },
-        null,
-        2
-      )}\n`
-    );
+  test('honors a peer introduced by the version being bumped to (not the installed one)', async () => {
+    // Regression (lit-utils ERESOLVE): the installed @enke.dev/lint has no typescript peer, but
+    // the version being bumped to adds `typescript@6.0.3`. Peers must be read from the target
+    // version so typescript is raised in the SAME run — not left stale for a second run to fix.
+    latest = { typescript: '7.1.0', '@enke.dev/lint': '0.13.1' };
+    inRange = { typescript: '6.0.3' };
+    peers = { '@enke.dev/lint': { typescript: '6.0.3' } }; // peer of the *target* 0.13.1
+    await writePkg({
+      name: 'root',
+      devDependencies: { '@enke.dev/lint': '0.11.25', typescript: '5.9.3' },
+    });
+    // stale installed manifest: old lint, no typescript peer at all
     const lintDir = join(dir, 'node_modules', '@enke.dev', 'lint');
     await mkdir(lintDir, { recursive: true });
     await writeFile(
       join(lintDir, 'package.json'),
-      `${JSON.stringify({ name: '@enke.dev/lint', peerDependencies: { '@types/node': '>=20 <23' } })}\n`
+      `${JSON.stringify({ name: '@enke.dev/lint', version: '0.11.25' })}\n`
     );
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    // typescript raised to satisfy the target lint's peer, not held at 5.9.3 or bumped to 7.x
+    assert.equal(pkg?.devDependencies?.['typescript'], '6.0.3');
+    assert.equal(pkg?.devDependencies?.['@enke.dev/lint'], '0.13.1');
+  });
+
+  test('a peer cap never overrides a module-managed dependency', async () => {
+    latest = { '@types/node': '24.0.0', '@enke.dev/lint': '0.13.1' };
+    inRange = { '@types/node': '22.0.0' };
+    peers = { '@enke.dev/lint': { '@types/node': '>=20 <23' } };
+    await writePkg({
+      name: 'root',
+      devDependencies: { '@enke.dev/lint': '0.13.1', '@types/node': '24' },
+    });
 
     await upgradeAllWorkspaces(ctx({ managedDependencies: new Set(['@types/node']) }), lookups);
 

@@ -19,12 +19,15 @@ Dependencies are bumped by resolving each package's latest version via the repo'
 manager (`pnpm view` / `npm view`, so private scoped registries + `.npmrc` auth just work),
 rewriting `package.json` specs (preserving `^`/`~`), then letting the package manager reinstall.
 
-Bumps are **peer-aware**: before rewriting, bumper reads the `peerDependencies` of every
-installed dependency (from `node_modules`) and caps each shared dependency to the newest version
-still satisfying every declared peer range. So a preset that peer-pins `typescript` to `6.0.3`
+Bumps are **peer-aware**: before rewriting, bumper reads the `peerDependencies` of every direct
+dependency — for the version it's about to bump _to_, resolved from the registry rather than the
+stale one in `node_modules` — and caps each shared dependency to the newest version still
+satisfying every declared peer range. So a preset that peer-pins `typescript` to `6.0.3`
 (e.g. [`@enke.dev/lint`](https://www.npmjs.com/package/@enke.dev/lint)) holds `typescript` at
 `6.0.3` instead of jumping to a newer major that would break the preset — no per-repo config
-needed, the declaration lives in the dependency itself.
+needed, the declaration lives in the dependency itself. Because the peers are read for the target
+version, a peer newly introduced (or changed) by that bump is honored in the **same run** — no
+second pass needed to converge.
 
 > **Note** — network runs through subprocesses (`curl` for the Node dist index, `pnpm`/`npm view`
 > for versions, `actions-up` via `bunx`), so private-registry auth is handled by the tools that
