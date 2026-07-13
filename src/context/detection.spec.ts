@@ -95,3 +95,26 @@ describe('detection: pnpm monorepo', () => {
     assert.ok(used.has('pnpm'));
   });
 });
+
+describe('detectWorkspaces: git-ignored members', () => {
+  const cwd = join(EXAMPLES, 'pnpm-monorepo');
+
+  test('drops a member whose package.json is git-ignored (never bump an untracked, generated pkg)', async () => {
+    const ignoredManifest = join(cwd, 'packages', 'b', 'package.json');
+    // stub `git check-ignore`: exit 0 + the ignored manifest listed on stdout
+    const run = async () => ({ exitCode: 0, stdout: `${ignoredManifest}\n`, stderr: '' });
+    const { workspaces } = await detectWorkspaces(cwd, PackageManager.Pnpm, run);
+    assert.ok(!workspaces.some(w => w.endsWith(join('packages', 'b'))), 'ignored member dropped');
+    assert.ok(
+      workspaces.some(w => w.endsWith(join('packages', 'a'))),
+      'tracked member kept'
+    );
+    assert.ok(workspaces.includes(cwd), 'repo root is always kept');
+  });
+
+  test('keeps every member when git cannot run (not a repo / git absent)', async () => {
+    const run = async () => ({ exitCode: 128, stdout: '', stderr: 'fatal: not a git repository' });
+    const { workspaces } = await detectWorkspaces(cwd, PackageManager.Pnpm, run);
+    assert.equal(workspaces.length, 3);
+  });
+});

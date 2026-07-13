@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join, matchesGlob, relative } from 'node:path';
 
+import { exec } from '../../utils/exec.utils.js';
 import { globFiles, pathExists, readPackageJson } from '../../utils/fs.utils.js';
 import { PackageManager } from '../context.types.js';
 
@@ -8,6 +9,38 @@ export interface WorkspaceInfo {
   isMonorepo: boolean;
   /** Absolute package dirs, repo root first. */
   workspaces: string[];
+}
+
+/**
+ * Drop member dirs whose `package.json` is git-ignored. A git-ignored workspace package is
+ * externally managed — generated or vendored (e.g. a wrapper around an upstream lib) — and its
+ * manifest is never committed. Bumping its specs would rewrite a file git doesn't track while the
+ * bumped versions leak into the *tracked* lockfile, so CI regenerates the manifest at the old
+ * versions and `--frozen-lockfile` fails with a manifest/lockfile mismatch. Best-effort: if git is
+ * absent or this isn't a repo, every member is kept (the check simply doesn't apply). `run` is
+ * injected in tests. */
+async function withoutIgnored(
+  cwd: string,
+  dirs: string[],
+  run: typeof exec = exec
+): Promise<string[]> {
+  if (dirs.length === 0) {
+    return dirs;
+  }
+  const manifestOf = (dir: string): string => join(dir, 'package.json');
+  const { exitCode, stdout } = await run(['git', 'check-ignore', ...dirs.map(manifestOf)], { cwd });
+  // 0 = some paths ignored (listed on stdout); 1 = none ignored. Anything else (128 = not a git
+  // repo, ENOENT = git missing) means the check couldn't run → keep every member.
+  if (exitCode !== 0 && exitCode !== 1) {
+    return dirs;
+  }
+  const ignored = new Set(
+    stdout
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+  );
+  return dirs.filter(dir => !ignored.has(manifestOf(dir)));
 }
 
 /** Extract the `packages:` list from a `pnpm-workspace.yaml` body. */
@@ -55,8 +88,13 @@ async function readWorkspaceGlobs(cwd: string, pm: PackageManager): Promise<stri
   return [];
 }
 
-/** Resolve workspace member dirs by expanding globs, honoring `!` negations. */
-export async function detectWorkspaces(cwd: string, pm: PackageManager): Promise<WorkspaceInfo> {
+/** Resolve workspace member dirs by expanding globs, honoring `!` negations. `run` is injected
+ * in tests (defaults to the real `exec`, used to consult `git check-ignore`). */
+export async function detectWorkspaces(
+  cwd: string,
+  pm: PackageManager,
+  run: typeof exec = exec
+): Promise<WorkspaceInfo> {
   const globs = await readWorkspaceGlobs(cwd, pm);
   const positives = globs.filter(g => !g.startsWith('!'));
   const negatives = globs.filter(g => g.startsWith('!')).map(g => g.slice(1));
@@ -73,6 +111,6 @@ export async function detectWorkspaces(cwd: string, pm: PackageManager): Promise
       .map(match => dirname(match))
       .filter(dir => !negatives.some(neg => matchesGlob(relative(cwd, dir), neg)))
   );
-  const members = [...found].sort();
+  const members = await withoutIgnored(cwd, [...found].sort(), run);
   return { isMonorepo: members.length > 0, workspaces: [cwd, ...members] };
 }
