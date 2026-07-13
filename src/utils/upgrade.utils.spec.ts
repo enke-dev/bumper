@@ -94,6 +94,23 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.devDependencies?.['typescript'], '~5.9.0');
   });
 
+  test('never downgrades a pinned prerelease to a lower `latest` dist-tag', async () => {
+    // Regression (estino/ui): `vitepress` pinned to a `next` prerelease while the `latest`
+    // dist-tag is an older stable — `latestVersion` returns the stable, which must NOT overwrite
+    // the newer prerelease pin.
+    latest = { vitepress: '1.6.4', lit: '3.2.0' };
+    await writePkg({
+      name: 'root',
+      devDependencies: { vitepress: '2.0.0-alpha.13', lit: '^3.0.0' },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.devDependencies?.['vitepress'], '2.0.0-alpha.13', 'prerelease left intact');
+    assert.equal(pkg?.devDependencies?.['lit'], '^3.2.0', 'normal dep still bumps');
+  });
+
   test('leaves non-pinnable specs (ranges, protocols, tags) untouched', async () => {
     latest = { lit: '3.2.0' };
     await writePkg({

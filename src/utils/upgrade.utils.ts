@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 
+import semver from 'semver';
+
 import type { ModuleContext } from '../context/context.types.js';
 import { allDependencies, readPackageJson, writePackageJson } from './fs.utils.js';
 import {
@@ -278,8 +280,17 @@ async function rewriteSpecs(
       if (managed.has(name) || !isPinnable(spec)) {
         return acc;
       }
-      const version = capRanges.has(name) ? capped.get(name) : latest.get(name);
+      const capped_ = capRanges.has(name);
+      const version = capped_ ? capped.get(name) : latest.get(name);
       if (!version) {
+        return acc;
+      }
+      // Never downgrade on the plain-latest path: the `latest` dist-tag can be *lower* than a
+      // pinned prerelease (e.g. `vitepress@2.0.0-alpha.13` while `latest` is `1.6.4`, the alpha
+      // living under the `next` tag). Bumping to `latest` would walk the pin back. A peer cap may
+      // still legitimately lower a version to satisfy a constraint, so this guard is latest-only.
+      const current = spec.replace(/^[\^~]/, '');
+      if (!capped_ && semver.valid(current) && semver.lt(version, current)) {
         return acc;
       }
       const next = `${operatorOf(spec)}${version}`;
