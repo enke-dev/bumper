@@ -13,7 +13,7 @@ import type { ModuleContext, NodeLts } from '../context/context.types.js';
 import { PackageManager, Runtime, VersionManager } from '../context/context.types.js';
 import { readPackageJson } from '../utils/fs.utils.js';
 import { dockerFeature } from './features/docker/docker.feature.js';
-import { typesNodeFeature } from './features/types-node/types-node.feature.js';
+import { updateTypesNode } from './features/types-node/types-node.feature.js';
 import { nodeRuntime } from './runtimes/node/node.runtime.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -67,17 +67,21 @@ describe('node runtime feature', () => {
 });
 
 describe('types-node feature', () => {
-  test('pins @types/node to the LTS major', async () => {
+  // Offline stub for the registry lookup: the newest @types/node in the LTS major line.
+  const resolveInRange = async () => `${LTS.major}.9.3`;
+
+  test('pins @types/node to the exact LTS-major version, preserving the range operator', async () => {
     await withFixture('node-npm', async dir => {
-      await typesNodeFeature.update(contextFor(dir));
+      await updateTypesNode(contextFor(dir), resolveInRange);
       const pkg = await readPackageJson(dir);
-      assert.equal(pkg?.devDependencies?.['@types/node'], String(LTS.major));
+      // fixture spec is `^20.0.0` → caret preserved, pinned to the resolved full version.
+      assert.equal(pkg?.devDependencies?.['@types/node'], `^${LTS.major}.9.3`);
     });
   });
 
   test('dry-run leaves the spec untouched', async () => {
     await withFixture('node-npm', async dir => {
-      await typesNodeFeature.update(contextFor(dir, true));
+      await updateTypesNode(contextFor(dir, true), resolveInRange);
       const pkg = await readPackageJson(dir);
       assert.equal(pkg?.devDependencies?.['@types/node'], '^20.0.0');
     });

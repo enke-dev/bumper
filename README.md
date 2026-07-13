@@ -122,7 +122,7 @@ then the remaining file-rewriting features:
 | id               | kind            | detects                         | does                                                    |
 | ---------------- | --------------- | ------------------------------- | ------------------------------------------------------- |
 | `node`           | runtime         | node runtime / `.node-version`  | install latest LTS via fnm/asdf, write `.node-version`  |
-| `types-node`     | feature         | `@types/node` in any package    | pin spec to Node LTS major                              |
+| `types-node`     | feature         | `@types/node` in any package    | pin spec to exact latest in the Node LTS major line     |
 | `bun`            | package-manager | bun packageManager / lockfile   | self-upgrade, bump specs, pin `.bun-version`, reinstall |
 | `npm`            | package-manager | npm packageManager / lockfile   | bump specs to latest, clean reinstall                   |
 | `pnpm`           | package-manager | pnpm packageManager / lockfile  | self-update, bump specs to latest, clean reinstall      |
