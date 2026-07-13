@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
+import semver from 'semver';
+
 import type { ModuleContext } from '../context/context.types.js';
 import { PackageManager } from '../context/context.types.js';
 import { readPackageJson } from './fs.utils.js';
@@ -16,17 +18,22 @@ import { upgradeAllWorkspaces } from './upgrade.utils.js';
 
 let dir: string;
 let latest: Record<string, string | null>;
-let inRange: Record<string, string | null>;
+let versions: Record<string, string[]>;
 let peers: Record<string, Record<string, string>>;
 
 /**
- * Offline stand-in for the network-backed registry lookups, fed by the `latest`/`inRange`/`peers`
- * maps. `peers` is keyed by package name and stands for the peers of the version being bumped *to*
- * (the real lookup queries `pkg@<target>`), so tests can assert post-bump peer handling.
+ * Offline stand-in for the network-backed registry lookups. `latest` feeds the global-latest
+ * lookup; `peers` (keyed by package name) stands for the peers of the version being bumped *to*;
+ * `versions` is the candidate pool `maxSatisfyingRanges` filters. That lookup runs the *real*
+ * `semver.satisfies` intersection here — order-independent, `||` honored — so the tests exercise
+ * the actual cap algebra rather than a hard-coded answer.
  */
 const lookups: RegistryLookups = {
   latestVersion: async pkg => latest[pkg] ?? null,
-  latestVersionInRange: async pkg => inRange[pkg] ?? null,
+  maxSatisfyingRanges: async (pkg, ranges) =>
+    (versions[pkg] ?? [])
+      .filter(v => ranges.every(range => semver.satisfies(v, range)))
+      .sort(semver.rcompare)[0] ?? null,
   peerDependencies: async pkg => peers[pkg] ?? {},
 };
 
@@ -63,7 +70,7 @@ function captureStdout(): { output: () => string; restore: () => void } {
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'bumper-upgrade-'));
   latest = {};
-  inRange = {};
+  versions = {};
   peers = {};
 });
 
@@ -108,7 +115,7 @@ describe('upgradeAllWorkspaces', () => {
   test('caps a pinnable spec to the manifest-declared range for the same package', async () => {
     // `foo` is pinnable in deps but range-declared in peers → cap to the range's newest
     latest = { foo: '3.9.9' };
-    inRange = { foo: '2.5.0' };
+    versions = { foo: ['1.0.0', '2.5.0', '3.9.9'] };
     await writePkg({
       name: 'root',
       dependencies: { foo: '^1.0.0' },
@@ -126,7 +133,7 @@ describe('upgradeAllWorkspaces', () => {
   test("caps a spec to a dependency's peerDependencies range", async () => {
     // a dep (@enke.dev/lint) peer-pins typescript to 6.0.3; global latest is 7.x
     latest = { typescript: '7.1.0', lit: '3.2.0', '@enke.dev/lint': '0.13.1' };
-    inRange = { typescript: '6.0.3' };
+    versions = { typescript: ['5.9.3', '6.0.3', '7.1.0'] };
     peers = { '@enke.dev/lint': { typescript: '6.0.3' } };
     await writePkg({
       name: 'root',
@@ -143,12 +150,44 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.dependencies?.['lit'], '^3.2.0');
   });
 
+  test('intersects OR-ranges from multiple peers correctly, order-independent', async () => {
+    // Regression (estino/ui non-idempotent run): two deps peer `release-it` with OR-ranges.
+    //   release-it-pnpm   → ^17 || ^18 || ^19   (forbids 20)
+    //   conventional-...  → ^18 || ^19 || ^20
+    // Correct intersection is ^18 || ^19 → max 19.x. String-joining these flips with operand
+    // order and would let release-it jump to 20.2.1, breaking release-it-pnpm's peer.
+    latest = {
+      'release-it': '20.2.1',
+      'release-it-pnpm': '4.6.6',
+      '@release-it/conventional-changelog': '11.0.1',
+    };
+    versions = { 'release-it': ['19.2.4', '20.2.1'] };
+    peers = {
+      'release-it-pnpm': { 'release-it': '^17.0.0 || ^18.0.0 || ^19.0.0' },
+      '@release-it/conventional-changelog': { 'release-it': '^18.0.0 || ^19.0.0 || ^20.0.0' },
+    };
+    await writePkg({
+      name: 'root',
+      devDependencies: {
+        'release-it': '19.2.4',
+        'release-it-pnpm': '4.6.6',
+        '@release-it/conventional-changelog': '11.0.1',
+      },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    // held at 19.x — the only version satisfying BOTH peers — never bumped to the forbidden 20.2.1
+    assert.equal(pkg?.devDependencies?.['release-it'], '19.2.4');
+  });
+
   test('honors a peer introduced by the version being bumped to (not the installed one)', async () => {
     // Regression (lit-utils ERESOLVE): the installed @enke.dev/lint has no typescript peer, but
     // the version being bumped to adds `typescript@6.0.3`. Peers must be read from the target
     // version so typescript is raised in the SAME run — not left stale for a second run to fix.
     latest = { typescript: '7.1.0', '@enke.dev/lint': '0.13.1' };
-    inRange = { typescript: '6.0.3' };
+    versions = { typescript: ['5.9.3', '6.0.3', '7.1.0'] };
     peers = { '@enke.dev/lint': { typescript: '6.0.3' } }; // peer of the *target* 0.13.1
     await writePkg({
       name: 'root',
@@ -172,7 +211,7 @@ describe('upgradeAllWorkspaces', () => {
 
   test('a peer cap never overrides a module-managed dependency', async () => {
     latest = { '@types/node': '24.0.0', '@enke.dev/lint': '0.13.1' };
-    inRange = { '@types/node': '22.0.0' };
+    versions = { '@types/node': ['22.0.0', '24.0.0'] };
     peers = { '@enke.dev/lint': { '@types/node': '>=20 <23' } };
     await writePkg({
       name: 'root',

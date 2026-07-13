@@ -10,6 +10,7 @@ import {
   curlJson,
   latestVersion,
   latestVersionInRange,
+  maxSatisfyingRanges,
   peerDependenciesOf,
   viewTool,
 } from './npm-registry.utils.js';
@@ -103,6 +104,80 @@ describe('latestVersionInRange', () => {
 
   test('returns null when exec throws', async () => {
     const version = await latestVersionInRange('lit', '>=1 <2', 'npm', '/repo', async () => {
+      throw new Error('spawn error');
+    });
+    assert.equal(version, null);
+  });
+});
+
+describe('maxSatisfyingRanges', () => {
+  const VERSIONS = '["17.0.0","18.5.0","19.2.4","20.2.1","6.0.0-beta.1"]';
+  const A = '^17.0.0 || ^18.0.0 || ^19.0.0'; // forbids 20
+  const B = '^18.0.0 || ^19.0.0 || ^20.0.0';
+
+  test('intersects OR-ranges correctly (highest satisfying ALL), order-independent', async () => {
+    const forward = await maxSatisfyingRanges('release-it', [A, B], 'npm', '/repo', async () =>
+      ok(VERSIONS)
+    );
+    const reversed = await maxSatisfyingRanges('release-it', [B, A], 'npm', '/repo', async () =>
+      ok(VERSIONS)
+    );
+    // both orders yield 19.2.4 — the string-join bug would let one order pick the forbidden 20.2.1
+    assert.equal(forward, '19.2.4');
+    assert.equal(reversed, '19.2.4');
+  });
+
+  test('returns the single highest version satisfying one range', async () => {
+    const version = await maxSatisfyingRanges('release-it', [B], 'npm', '/repo', async () =>
+      ok(VERSIONS)
+    );
+    assert.equal(version, '20.2.1');
+  });
+
+  test('excludes prereleases', async () => {
+    const version = await maxSatisfyingRanges('pkg', ['>=6.0.0-0 <7'], 'npm', '/repo', async () =>
+      ok('["6.0.0-beta.1","6.0.0"]')
+    );
+    assert.equal(version, '6.0.0');
+  });
+
+  test('handles a package with a single published version (bare string, not array)', async () => {
+    const version = await maxSatisfyingRanges('pkg', ['^4.0.0'], 'npm', '/repo', async () =>
+      ok('"4.6.6"')
+    );
+    assert.equal(version, '4.6.6');
+  });
+
+  test('returns null when nothing satisfies every range', async () => {
+    const version = await maxSatisfyingRanges(
+      'pkg',
+      ['^17.0.0', '^20.0.0'],
+      'npm',
+      '/repo',
+      async () => ok(VERSIONS)
+    );
+    assert.equal(version, null);
+  });
+
+  test('returns null for an empty range list without querying', async () => {
+    let called = false;
+    const version = await maxSatisfyingRanges('pkg', [], 'npm', '/repo', async () => {
+      called = true;
+      return ok(VERSIONS);
+    });
+    assert.equal(version, null);
+    assert.equal(called, false);
+  });
+
+  test('returns null on a non-zero exit', async () => {
+    assert.equal(
+      await maxSatisfyingRanges('pkg', ['^1'], 'npm', '/repo', async () => fail()),
+      null
+    );
+  });
+
+  test('returns null when exec throws', async () => {
+    const version = await maxSatisfyingRanges('pkg', ['^1'], 'npm', '/repo', async () => {
       throw new Error('spawn error');
     });
     assert.equal(version, null);

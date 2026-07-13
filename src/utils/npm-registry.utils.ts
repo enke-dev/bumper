@@ -1,3 +1,5 @@
+import semver from 'semver';
+
 import { PackageManager } from '../context/context.types.js';
 import { exec, execOk } from './exec.utils.js';
 
@@ -95,6 +97,52 @@ export async function latestVersionInRange(
     const last = stdout.trim().split('\n').pop()?.trim();
     const version = last?.replace(/.*@/, '').replace(/['" ].*/, '');
     return version && /^\d/.test(version) ? version : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Highest published, non-prerelease version of a package satisfying *every* range in `ranges`
+ * (semver AND) — the correct intersection of multiple peer constraints. It fetches the full
+ * version list (`<tool> view <pkg> versions --json`) and filters with `semver.satisfies` per
+ * range, because ranges cannot be intersected by string-joining: a peer like `^17 || ^18 || ^19`
+ * space-joined with another OR-range produces a *different* range depending on operand order
+ * (`A B || C` parses as `A AND B, OR C`), silently allowing versions every peer forbids. Checking
+ * each candidate against each range independently is order-independent and honors `||`. Null when
+ * nothing satisfies all ranges, `ranges` is empty, or on error.
+ */
+export async function maxSatisfyingRanges(
+  pkg: string,
+  ranges: readonly string[],
+  tool: string,
+  cwd: string,
+  run: typeof exec = exec
+): Promise<string | null> {
+  if (ranges.length === 0) {
+    return null;
+  }
+  try {
+    const { exitCode, stdout } = await run([tool, 'view', pkg, 'versions', '--json'], { cwd });
+    if (exitCode !== 0) {
+      return null;
+    }
+    const trimmed = stdout.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const parsed: unknown = JSON.parse(trimmed);
+    // A package with a single published version prints a bare string, not an array.
+    const versions = Array.isArray(parsed)
+      ? (parsed as string[])
+      : typeof parsed === 'string'
+        ? [parsed]
+        : [];
+    const match = versions
+      .filter(v => semver.valid(v) && semver.prerelease(v) === null)
+      .filter(v => ranges.every(range => semver.satisfies(v, range)))
+      .sort(semver.rcompare)[0];
+    return match ?? null;
   } catch {
     return null;
   }

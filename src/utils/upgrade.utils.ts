@@ -4,7 +4,7 @@ import type { ModuleContext } from '../context/context.types.js';
 import { allDependencies, readPackageJson, writePackageJson } from './fs.utils.js';
 import {
   latestVersion,
-  latestVersionInRange,
+  maxSatisfyingRanges,
   peerDependenciesOf,
   viewTool,
 } from './npm-registry.utils.js';
@@ -28,9 +28,9 @@ const CONCURRENCY = 8;
  */
 export interface RegistryLookups {
   latestVersion: (pkg: string, tool: string, cwd: string) => Promise<string | null>;
-  latestVersionInRange: (
+  maxSatisfyingRanges: (
     pkg: string,
-    range: string,
+    ranges: readonly string[],
     tool: string,
     cwd: string
   ) => Promise<string | null>;
@@ -44,7 +44,7 @@ export interface RegistryLookups {
 
 const defaultLookups: RegistryLookups = {
   latestVersion,
-  latestVersionInRange,
+  maxSatisfyingRanges,
   peerDependencies: peerDependenciesOf,
 };
 
@@ -90,8 +90,11 @@ async function targetVersion(
  * Version caps declared by dependencies' `peerDependencies`. A package the repo depends on may
  * constrain a shared dependency — e.g. `@enke.dev/lint` peer-pins `typescript` to `6.0.3` — and
  * bumping that dependency past the peer range would break the package. So we cap the bump to the
- * newest version satisfying *every* such peer range, intersecting multiple constraints (semver
- * AND, space-joined).
+ * newest version satisfying *every* such peer range. The ranges are kept as a **list** (not joined
+ * into one string): a peer like `^17 || ^18 || ^19` cannot be intersected with another OR-range by
+ * space-joining — `A B || C` parses as `(A AND B) OR C`, so the result flips with operand order and
+ * silently admits versions a peer forbids. {@link RegistryLookups.maxSatisfyingRanges} intersects
+ * them correctly (AND across the list, `||` honored within each).
  *
  * Crucially, peers are read from the registry for the version each dependency is being bumped
  * *to* (see {@link targetVersion}), NOT from the stale manifest installed under `node_modules`.
@@ -107,7 +110,7 @@ async function collectPeerCaps(
   managed: ReadonlySet<string>,
   tool: string,
   lookups: RegistryLookups
-): Promise<Map<string, string>> {
+): Promise<Map<string, string[]>> {
   const collected = new Map<string, Set<string>>();
   await Promise.all(
     depNames.map(async dep => {
@@ -124,7 +127,7 @@ async function collectPeerCaps(
       });
     })
   );
-  return new Map([...collected].map(([peer, ranges]) => [peer, [...ranges].join(' ')]));
+  return new Map([...collected].map(([peer, ranges]) => [peer, [...ranges]]));
 }
 
 /**
@@ -233,33 +236,35 @@ function cappedRanges(pkg: PackageJson, managed: ReadonlySet<string>): Map<strin
 }
 
 /** Rewrite every bumpable, unmanaged spec in `pkg` to its resolved target — global latest,
- * or the newest version within a capping range when one applies. A cap is either a range the
- * manifest itself declares for the package or a `peerCaps` constraint from an installed
- * dependency; when both exist they are intersected (semver AND). Returns true if anything
- * changed. `reduce` (not `some`) so every bucket + entry is visited. */
+ * or the newest version satisfying its capping ranges when any apply. Caps are a range the
+ * manifest itself declares for the package plus every `peerCaps` constraint from a dependency;
+ * all are intersected (semver AND) by {@link RegistryLookups.maxSatisfyingRanges}. Returns true
+ * if anything changed. `reduce` (not `some`) so every bucket + entry is visited. */
 async function rewriteSpecs(
   pkg: PackageJson,
   managed: ReadonlySet<string>,
   latest: Map<string, string | null>,
-  peerCaps: ReadonlyMap<string, string>,
+  peerCaps: ReadonlyMap<string, string[]>,
   tool: string,
   cwd: string,
   lookups: RegistryLookups
 ): Promise<boolean> {
   const present = allDependencies(pkg);
-  const caps = cappedRanges(pkg, managed);
-  peerCaps.forEach((range, name) => {
+  // Collect every capping range per package as a list — never joined into one string (see
+  // collectPeerCaps): the manifest's own self-declared range plus each dependency's peer range.
+  const capRanges = new Map<string, string[]>();
+  cappedRanges(pkg, managed).forEach((range, name) => capRanges.set(name, [range]));
+  peerCaps.forEach((ranges, name) => {
     if (!(name in present)) {
       return;
     }
-    const own = caps.get(name);
-    caps.set(name, own ? `${own} ${range}` : range);
+    capRanges.set(name, [...new Set([...(capRanges.get(name) ?? []), ...ranges])]);
   });
   const capped = new Map(
     await Promise.all(
-      [...caps].map(
-        async ([name, range]) =>
-          [name, await lookups.latestVersionInRange(name, range, tool, cwd)] as const
+      [...capRanges].map(
+        async ([name, ranges]) =>
+          [name, await lookups.maxSatisfyingRanges(name, ranges, tool, cwd)] as const
       )
     )
   );
@@ -273,7 +278,7 @@ async function rewriteSpecs(
       if (managed.has(name) || !isPinnable(spec)) {
         return acc;
       }
-      const version = caps.has(name) ? capped.get(name) : latest.get(name);
+      const version = capRanges.has(name) ? capped.get(name) : latest.get(name);
       if (!version) {
         return acc;
       }
