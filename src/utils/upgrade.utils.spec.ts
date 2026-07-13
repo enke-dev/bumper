@@ -219,6 +219,15 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal((await readPackageJson(dir))?.packageManager, 'pnpm@8.0.0');
   });
 
+  test('never registry-bumps an npm packageManager field (owned by the npm module, tied to Node)', async () => {
+    latest = { npm: '12.0.1' };
+    await writePkg({ name: 'root', packageManager: 'npm@10.9.2' });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    assert.equal((await readPackageJson(dir))?.packageManager, 'npm@10.9.2');
+  });
+
   test('rewrites specs across every workspace member', async () => {
     latest = { lit: '3.2.0' };
     const memberA = await mkdtemp(join(tmpdir(), 'bumper-ws-a-'));

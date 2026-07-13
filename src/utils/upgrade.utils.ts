@@ -108,7 +108,9 @@ async function resolveLatest(
   return new Map(await Promise.all(resolved));
 }
 
-/** Bump the root `packageManager` field (e.g. `pnpm@x`, `bun@x`) to latest. */
+/** Bump the root `packageManager` field (e.g. `pnpm@x`, `bun@x`) to latest. npm is excluded:
+ * it isn't published/installed independently of Node, so its field is aligned to the npm that
+ * ships with the pinned Node LTS by the npm package-manager module, not to registry-latest. */
 async function bumpPackageManagerField(
   ctx: ModuleContext,
   root: PackageJson | undefined,
@@ -116,7 +118,7 @@ async function bumpPackageManagerField(
 ): Promise<void> {
   const match = root?.packageManager?.match(/^([a-z]+)@(.+)$/);
   const name = match?.[1];
-  if (!root || !name) {
+  if (!root || !name || name === 'npm') {
     return;
   }
   const version = await lookups.latestVersion(name, viewTool(ctx.packageManager), ctx.cwd);

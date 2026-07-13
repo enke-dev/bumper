@@ -27,6 +27,9 @@ export interface NodeLts {
   version: string;
   /** Major version, e.g. `22`. */
   major: number;
+  /** npm version bundled with this Node release, e.g. `11.16.0`. Absent for very old releases
+   * (or offline stubs); the npm `packageManager` field is only aligned when present. */
+  npm?: string;
 }
 
 /**
