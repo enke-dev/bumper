@@ -84,9 +84,31 @@ bumper help                  # show help (also: bumper --help)
 bumper detect                # show context + applicable modules for the cwd
 bumper detect /path --json   # machine-readable detection
 bumper update                # run every applicable module, in order
-bumper update --dry-run      # print intended steps, change nothing
-bumper update --only node,pnpm
-bumper update --skip github-actions
+bumper update /path/to/repo  # target another repo (defaults to cwd)
+```
+
+### Flags
+
+All flags apply to `bumper update` (except `--json`, on `detect`). Repeatable flags can be given
+several times or comma-separated in one value.
+
+| Flag               | Repeatable | What it does                                                                                 |
+| ------------------ | :--------: | -------------------------------------------------------------------------------------------- |
+| `--dry-run`        |     no     | Print every intended step, change nothing on disk.                                           |
+| `--only <id>`      |    yes     | Run **only** the named module(s); everything else is skipped.                                |
+| `--skip <id>`      |    yes     | Run everything **except** the named module(s).                                               |
+| `--exclude <path>` |    yes     | Skip a repo-relative path this run only, without editing config (see [Excludes](#excludes)). |
+| `--json`           |     no     | `detect` only — emit machine-readable detection output.                                      |
+
+`--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `types-node`,
+`bun`, `npm`, `pnpm`, `docker`, `github-actions`).
+
+```sh
+bumper update --dry-run                    # preview, no writes
+bumper update --only node,pnpm             # just the Node runtime + pnpm modules
+bumper update --skip github-actions        # everything but the actions pinner
+bumper update --exclude examples           # skip a path this run, without editing config
+bumper update --exclude examples,fixtures  # repeat the flag or comma-separate several
 ```
 
 ## Modules
@@ -121,7 +143,7 @@ Path-scoped overrides. Running in an unknown repo auto-detects everything and pe
   "repos": {
     "/absolute/path/to/repository": {
       "mode": "auto", // auto = re-detect; manual = respect stored toggles
-      "exclude": ["packages/vendored-pkg"], // repo-relative dirs skipped in workspace ops
+      "exclude": ["packages/vendored-pkg"], // repo-relative paths skipped everywhere (see below)
       "modules": { "docker": false }, // explicit per-module on/off overrides, keyed by module id
     },
   },
@@ -135,3 +157,25 @@ bumper config set  /path/to/repo exclude packages/a,packages/b
 bumper config set  /path/to/repo modules.docker false
 bumper config set  /path/to/repo mode manual
 ```
+
+### Excludes
+
+`exclude` is a list of repo-relative paths (an exact dir/file or any descendant) that bumper
+leaves alone. It applies **uniformly**:
+
+- workspace members under an excluded path are dropped from every workspace operation, and
+- every file-discovering module (e.g. `docker`, which globs `**/Dockerfile*`) skips matches under
+  an excluded path — so vendored packages, fixtures, or example projects used for testing are
+  never rewritten.
+
+Persist it with `config set … exclude`, or pass `--exclude <path>` on a single `update` run to add
+paths for that run only (repeatable, comma-separated, merged with the stored list, not saved). The
+common case: a repo whose own `examples/` are self-applied test fixtures —
+
+```sh
+bumper config set /path/to/repo exclude examples   # always skip
+bumper update --exclude examples                    # skip just this run
+```
+
+> Modules that read a single fixed file at the repo root (`github-actions`, the package managers)
+> are unaffected — `exclude` targets subpaths, and the root is never excluded.

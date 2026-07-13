@@ -8,6 +8,7 @@ export const cliOptions = {
   'dry-run': { type: 'boolean' },
   only: { type: 'string', multiple: true },
   skip: { type: 'string', multiple: true },
+  exclude: { type: 'string', multiple: true },
   help: { type: 'boolean', short: 'h' },
 } as const;
 

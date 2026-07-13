@@ -1,6 +1,5 @@
-import { relative } from 'node:path';
-
 import { resolveForPath } from '../config/config.js';
+import { isExcluded } from '../utils/fs.utils.js';
 import type { ModuleContext } from './context.types.js';
 import { detectPackageManager } from './detectors/package-manager.detector.js';
 import { detectRuntime } from './detectors/runtime.detector.js';
@@ -9,12 +8,8 @@ import { detectWorkspaces } from './detectors/workspace.detector.js';
 
 export interface BuildContextOptions {
   dryRun?: boolean;
-}
-
-/** Whether a workspace dir is excluded by any repo-relative exclude entry. */
-function isExcluded(cwd: string, dir: string, exclude: string[]): boolean {
-  const rel = relative(cwd, dir);
-  return exclude.some(entry => rel === entry || rel.startsWith(`${entry}/`));
+  /** Extra excludes (e.g. from `--exclude`), merged with the persisted list for this run only. */
+  exclude?: string[];
 }
 
 /** Run all detectors + resolve config into a single {@link ModuleContext}. */
@@ -22,7 +17,11 @@ export async function buildContext(
   cwd: string,
   options: BuildContextOptions = {}
 ): Promise<{ ctx: ModuleContext; configCreated: boolean }> {
-  const { config, created } = await resolveForPath(cwd);
+  const { config: stored, created } = await resolveForPath(cwd);
+  // fold ephemeral CLI excludes into the persisted list; every exclude consumer (workspace
+  // filter + file-based features via ctx.config) then sees one merged list, nothing is saved.
+  const exclude = [...new Set([...stored.exclude, ...(options.exclude ?? [])])];
+  const config = { ...stored, exclude };
   const [runtime, packageManager] = await Promise.all([
     detectRuntime(cwd),
     detectPackageManager(cwd),
@@ -35,7 +34,7 @@ export async function buildContext(
     runtime,
     packageManager,
     isMonorepo,
-    workspaces: workspaces.filter(dir => !isExcluded(cwd, dir, config.exclude)),
+    workspaces: workspaces.filter(dir => !isExcluded(cwd, dir, exclude)),
     versionManager,
     config,
     dryRun: options.dryRun ?? false,

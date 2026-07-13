@@ -1,5 +1,5 @@
 import { access, glob, readFile, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative as relativePath, resolve, sep } from 'node:path';
 
 import type { PackageJson } from './package.types.js';
 
@@ -32,6 +32,32 @@ export async function globFiles(cwd: string, pattern: string): Promise<string[]>
     absolute.map(async path => ((await stat(path)).isFile() ? path : null))
   );
   return files.filter((path): path is string => path !== null);
+}
+
+/**
+ * Whether `path` (abs or repo-relative) falls under any repo-relative `exclude`
+ * entry — an exact match or a descendant. Shared by the workspace filter and by
+ * every file-discovering feature so `exclude` means the same thing everywhere.
+ */
+export function isExcluded(cwd: string, path: string, exclude: string[]): boolean {
+  const rel = relativePath(cwd, resolve(cwd, path));
+  return exclude.some(entry => rel === entry || rel.startsWith(`${entry}/`));
+}
+
+/**
+ * Discover files under `cwd` matching `pattern`, honoring the repo's `exclude`
+ * list and always skipping `node_modules`. Every file-based feature should route
+ * its discovery through here so `exclude` is respected uniformly, not per-module.
+ */
+export async function collectFiles(
+  cwd: string,
+  pattern: string,
+  exclude: string[] = []
+): Promise<string[]> {
+  const matches = await globFiles(cwd, pattern);
+  return matches.filter(
+    match => !match.split(sep).includes('node_modules') && !isExcluded(cwd, match, exclude)
+  );
 }
 
 /** Read + parse a repo's `package.json`, or `null` if absent/invalid. */

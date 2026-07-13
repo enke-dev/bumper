@@ -1,7 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { relative, sep } from 'node:path';
+import { relative } from 'node:path';
 
-import { globFiles } from '../../../utils/fs.utils.js';
+import type { ModuleContext } from '../../../context/context.types.js';
+import { collectFiles } from '../../../utils/fs.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
 import type { Module } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
@@ -10,10 +11,9 @@ import { ensureNodeLts } from '../../runtimes/node/node-lts.utils.js';
 const DOCKER_GLOB =
   '**/{Dockerfile*,docker-compose*.yaml,docker-compose*.yml,compose*.yaml,compose*.yml}';
 
-/** Locate Docker/compose files, skipping dependency dirs. */
-async function findDockerFiles(cwd: string): Promise<string[]> {
-  const matches = await globFiles(cwd, DOCKER_GLOB);
-  return matches.filter(match => !match.split(sep).includes('node_modules'));
+/** Locate Docker/compose files, honoring `exclude` and skipping dependency dirs. */
+function findDockerFiles(ctx: ModuleContext): Promise<string[]> {
+  return collectFiles(ctx.cwd, DOCKER_GLOB, ctx.config.exclude);
 }
 
 export const dockerFeature: Module = {
@@ -25,11 +25,11 @@ export const dockerFeature: Module = {
     if (toggle !== undefined) {
       return toggle;
     }
-    return (await findDockerFiles(ctx.cwd)).length > 0;
+    return (await findDockerFiles(ctx)).length > 0;
   },
   async update(ctx) {
     const { version } = await ensureNodeLts(ctx);
-    const files = await findDockerFiles(ctx.cwd);
+    const files = await findDockerFiles(ctx);
     await Promise.all(
       files.map(async file => {
         const label = relative(ctx.cwd, file);
