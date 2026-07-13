@@ -1,5 +1,13 @@
 # @enke.dev/bumper
 
+## [0.0.8](https://github.com/enke-dev/bumper/compare/0.0.7...0.0.8) (2026-07-13)
+
+
+### Bug Fixes
+
+* never downgrade a pinned prerelease ([76a8673](https://github.com/enke-dev/bumper/commit/76a86739ef82ff790b31352688f5c57ece90c6d9))
+* skip git-ignored workspace members ([e348125](https://github.com/enke-dev/bumper/commit/e348125881785997ae0d5a4c681ef6812f0b383b))
+
 ## [0.0.7](https://github.com/enke-dev/bumper/compare/0.0.6...0.0.7) (2026-07-13)
 
 
