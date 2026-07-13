@@ -1,5 +1,13 @@
 # @enke.dev/bumper
 
+## [0.0.4](https://github.com/enke-dev/bumper/compare/0.0.3...0.0.4) (2026-07-13)
+
+
+### Bug Fixes
+
+* ignore change log in linter ([f4f31ac](https://github.com/enke-dev/bumper/commit/f4f31ac91b9478ff33851d339ed14bcb72924fb5))
+* self update npm only to node lts ([8af50e5](https://github.com/enke-dev/bumper/commit/8af50e517ea6787f5bff65e08886e5e40d93b067))
+
 ## [0.0.3](https://github.com/enke-dev/bumper/compare/0.0.2...0.0.3) (2026-07-13)
 
 
