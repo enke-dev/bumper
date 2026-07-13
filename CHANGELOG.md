@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.0.6](https://github.com/enke-dev/bumper/compare/0.0.5...0.0.6) (2026-07-13)
+
+
+### Bug Fixes
+
+* remove stale lock files before update ([3698d3e](https://github.com/enke-dev/bumper/commit/3698d3e8c49975ddb2790e801de18d1d0844bdda))
+
 ## [0.0.5](https://github.com/enke-dev/bumper/compare/0.0.4...0.0.5) (2026-07-13)
 
 
