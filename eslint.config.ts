@@ -3,5 +3,5 @@ import { defineConfig } from 'eslint/config';
 
 export default defineConfig([
   ...nodeLibrary,
-  { ignores: ['dist/', 'examples/**/*.{yml,yaml,json}'] },
+  { ignores: ['CHANGELOG.md', 'dist/', 'examples/**/*.{yml,yaml,json}'] },
 ]);
