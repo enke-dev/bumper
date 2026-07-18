@@ -9,6 +9,7 @@ export const cliOptions = {
   only: { type: 'string', multiple: true },
   skip: { type: 'string', multiple: true },
   exclude: { type: 'string', multiple: true },
+  'ignore-config': { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
 } as const;
 

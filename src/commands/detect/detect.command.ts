@@ -8,7 +8,8 @@ import type { Command, CommandContext } from '../command.types.js';
 async function run({ values, positionals }: CommandContext): Promise<void> {
   const cwd = resolve(positionals[0] ?? process.cwd());
   const json = values.json ?? false;
-  const { ctx, configCreated } = await buildContext(cwd);
+  const ignoreConfig = values['ignore-config'] ?? false;
+  const { ctx, configCreated } = await buildContext(cwd, { ignoreConfig });
   const modules = await detectModules(ctx);
 
   if (json) {
@@ -54,8 +55,11 @@ export const detectCommand: Command = {
   name: 'detect',
   run,
   help: () => ({
-    usage: ['bumper detect [path] [--json]'],
+    usage: ['bumper detect [path] [--json] [--ignore-config]'],
     summary: 'Show resolved context + which modules apply',
-    options: ['--json         Machine-readable detect output'],
+    options: [
+      '--json          Machine-readable detect output',
+      '--ignore-config Ignore ~/.bumperrc; show pure auto-detection',
+    ],
   }),
 };

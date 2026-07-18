@@ -1,4 +1,4 @@
-import { resolveForPath } from '../config/config.js';
+import { defaultRepoConfig, resolveForPath } from '../config/config.js';
 import { isExcluded } from '../utils/fs.utils.js';
 import type { ModuleContext } from './context.types.js';
 import { detectPackageManager } from './detectors/package-manager.detector.js';
@@ -10,6 +10,8 @@ export interface BuildContextOptions {
   dryRun?: boolean;
   /** Extra excludes (e.g. from `--exclude`), merged with the persisted list for this run only. */
   exclude?: string[];
+  /** Skip reading/writing `~/.bumperrc` entirely; run with pure auto-detection. */
+  ignoreConfig?: boolean;
 }
 
 /** Run all detectors + resolve config into a single {@link ModuleContext}. */
@@ -17,7 +19,9 @@ export async function buildContext(
   cwd: string,
   options: BuildContextOptions = {}
 ): Promise<{ ctx: ModuleContext; configCreated: boolean }> {
-  const { config: stored, created } = await resolveForPath(cwd);
+  const { config: stored, created } = options.ignoreConfig
+    ? { config: defaultRepoConfig(), created: false }
+    : await resolveForPath(cwd);
   // fold ephemeral CLI excludes into the persisted list; every exclude consumer (workspace
   // filter + file-based features via ctx.config) then sees one merged list, nothing is saved.
   const exclude = [...new Set([...stored.exclude, ...(options.exclude ?? [])])];

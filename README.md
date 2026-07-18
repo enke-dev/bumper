@@ -92,8 +92,8 @@ bumper update /path/to/repo  # target another repo (defaults to cwd)
 
 ### Flags
 
-All flags apply to `bumper update` (except `--json`, on `detect`). Repeatable flags can be given
-several times or comma-separated in one value.
+All flags apply to `bumper update`; `--json` is `detect`-only and `--ignore-config` applies to
+both. Repeatable flags can be given several times or comma-separated in one value.
 
 | Flag               | Repeatable | What it does                                                                                 |
 | ------------------ | :--------: | -------------------------------------------------------------------------------------------- |
@@ -101,6 +101,7 @@ several times or comma-separated in one value.
 | `--only <id>`      |    yes     | Run **only** the named module(s); everything else is skipped.                                |
 | `--skip <id>`      |    yes     | Run everything **except** the named module(s).                                               |
 | `--exclude <path>` |    yes     | Skip a repo-relative path this run only, without editing config (see [Excludes](#excludes)). |
+| `--ignore-config`  |     no     | Ignore `~/.bumperrc` for this run — auto-detect everything, read + write nothing.            |
 | `--json`           |     no     | `detect` only — emit machine-readable detection output.                                      |
 
 `--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `types-node`,
@@ -112,7 +113,12 @@ bumper update --only node,pnpm             # just the Node runtime + pnpm module
 bumper update --skip github-actions        # everything but the actions pinner
 bumper update --exclude examples           # skip a path this run, without editing config
 bumper update --exclude examples,fixtures  # repeat the flag or comma-separate several
+bumper update --ignore-config              # ignore stored excludes/toggles, pure auto-detect
 ```
+
+`--ignore-config` bypasses `~/.bumperrc` completely: no entry is read for the target repo and, for
+an unknown repo, none is written. Stored excludes and module toggles are skipped — use it to run
+exactly what auto-detection finds, or to preview a repo without persisting a default entry.
 
 ## Modules
 
