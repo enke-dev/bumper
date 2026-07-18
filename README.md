@@ -168,6 +168,11 @@ bumper config set /path/to/repo exclude packages/a packages/b
 bumper config set /path/to/repo modules.docker false
 ```
 
+`bumper detect` marks anything the config drives — a forced module shows `(config: on|off)`, a
+stored `exclude` shows `(config)` — with a footer pointing at the `config set` to change it and
+`--ignore-config` to bypass. Run `bumper detect --ignore-config` to see what pure auto-detection
+would do.
+
 ### Excludes
 
 `exclude` is a list of repo-relative paths (an exact dir/file or any descendant) that bumper

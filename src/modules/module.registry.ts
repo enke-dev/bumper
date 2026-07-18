@@ -30,6 +30,8 @@ export interface ModuleStatus {
   id: string;
   title: string;
   used: boolean;
+  /** `true` when `used` is forced by a `~/.bumperrc` toggle rather than auto-detection. */
+  forced: boolean;
 }
 
 export interface RunOptions {
@@ -74,8 +76,11 @@ export async function runUpdate(ctx: ModuleContext, options: RunOptions = {}): P
 /** Report per-module detection results (foundation for a CLI/GUI layer). */
 export async function detectModules(ctx: ModuleContext): Promise<ModuleStatus[]> {
   return Promise.all(
-    MODULES.map(async module => {
-      return { id: module.id, title: module.title, used: await module.isUsed(ctx) };
-    })
+    MODULES.map(async module => ({
+      id: module.id,
+      title: module.title,
+      used: await module.isUsed(ctx),
+      forced: ctx.config.modules[module.id] !== undefined,
+    }))
   );
 }
