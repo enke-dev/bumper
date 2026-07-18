@@ -1,5 +1,5 @@
 import { PackageManager } from '../../../context/context.types.js';
-import { cleanInstall } from '../../../utils/deps.utils.js';
+import { approveScripts, cleanInstall } from '../../../utils/deps.utils.js';
 import { readPackageJson, writePackageJson } from '../../../utils/fs.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
 import { upgradeAllWorkspaces } from '../../../utils/upgrade.utils.js';
@@ -45,5 +45,6 @@ export const npmPackageManager: Module = {
     await upgradeAllWorkspaces(ctx);
     await alignNpmToNodeLts(ctx);
     await cleanInstall(ctx, ['npm', 'install']);
+    await approveScripts(ctx, ['npm', 'approve-scripts', '--all']);
   },
 };

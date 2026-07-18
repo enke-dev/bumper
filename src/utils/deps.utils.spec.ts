@@ -1,14 +1,14 @@
 // Runtime-agnostic test (see spec.utils.spec.ts): runs under both `bun test` and `node --test`.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { PackageManager } from '../context/context.types.js';
-import { cleanInstall, selfUpdate } from './deps.utils.js';
+import { approveScripts, cleanInstall, selfUpdate } from './deps.utils.js';
 
 function ctx(overrides: Partial<ModuleContext> = {}): ModuleContext {
   return { cwd: '/nonexistent-bumper-cwd', dryRun: true, ...overrides } as ModuleContext;
@@ -40,6 +40,8 @@ describe('cleanInstall', () => {
     assert.ok(out.output().includes('rm -rf node_modules'));
     assert.ok(out.output().includes('package-lock.json'));
     assert.ok(out.output().includes('npm install'));
+    // the second, convergence pass is signposted so the plan doesn't read as a single install
+    assert.ok(out.output().includes('twice'));
   });
 
   test('removes the stale lockfile before reinstalling (real fs, no-op install)', async () => {
@@ -55,6 +57,47 @@ describe('cleanInstall', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  test('runs the install twice so a from-scratch resolve settles the lockfile', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'bumper-clean-twice-'));
+    try {
+      // an install script that appends one line per invocation; the file's line count is the count.
+      const counter = join(dir, 'runs');
+      const script = join(dir, 'install.sh');
+      await writeFile(script, `#!/bin/sh\necho run >> "${counter}"\n`);
+      await chmod(script, 0o755);
+      await cleanInstall(ctx({ dryRun: false, cwd: dir, packageManager: PackageManager.Npm }), [
+        script,
+      ]);
+      const runs = (await readFile(counter, 'utf8')).trim().split('\n');
+      assert.equal(runs.length, 2, 'install command runs exactly twice');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('approveScripts', () => {
+  test('dry-run plans the command', async () => {
+    out = captureStdout();
+    await approveScripts(ctx(), ['npm', 'approve-scripts', '--all']);
+    assert.ok(out.output().includes('npm approve-scripts --all'));
+  });
+
+  test('is a no-op for an empty command (managers without a bulk-approve command, e.g. bun)', async () => {
+    out = captureStdout();
+    assert.equal(await approveScripts(ctx({ dryRun: false }), []), undefined);
+    assert.equal(out.output(), '');
+  });
+
+  test('is a no-op for a missing binary (non-fatal)', async () => {
+    out = captureStdout();
+    assert.equal(
+      await approveScripts(ctx({ dryRun: false }), ['this-binary-does-not-exist-xyz', '--all']),
+      undefined
+    );
+    assert.equal(out.output(), '');
   });
 });
 
