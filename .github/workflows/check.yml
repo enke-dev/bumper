@@ -47,7 +47,6 @@ jobs:
         with:
           report_paths: reports/junit.*.xml
           check_name: test report
-          # detailed table only for failures; passing runs show just the summary line
+          # always show the counts summary; list individual tests only when they fail
           detailed_summary: true
           include_passed: false
-          skip_success_summary: true
