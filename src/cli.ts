@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 
+import pkg from '../package.json';
 import { findCommand } from './commands/command.registry.js';
 import { cliOptions } from './commands/command.types.js';
 import { commandHelp } from './commands/help/help.command.js';
+import { DIM, RESET } from './utils/output.utils.js';
 
 // Node flags `fs.glob` as experimental and prints a warning on every use. We depend
 // on it deliberately (the one glob API portable across Node + Bun), so silence just
@@ -24,6 +26,11 @@ async function main(): Promise<void> {
     allowPositionals: true,
     options: cliOptions,
   });
+
+  // single-line version banner; skipped for --json so machine output stays clean
+  if (!values.json) {
+    process.stdout.write(`${DIM}bumper v${pkg.version}${RESET}\n`);
+  }
 
   const [name, ...rest] = positionals;
   if (values.help || name === undefined || name === 'help') {
