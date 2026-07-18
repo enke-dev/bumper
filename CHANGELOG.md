@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.0.10](https://github.com/enke-dev/bumper/compare/0.0.9...0.0.10) (2026-07-18)
+
+
+### Bug Fixes
+
+* make clean install idempotent ([17bafed](https://github.com/enke-dev/bumper/commit/17bafed796a10c8a2e2f4b4fde5cc8786e2c8600))
+
 ## [0.0.9](https://github.com/enke-dev/bumper/compare/0.0.8...0.0.9) (2026-07-13)
 
 
