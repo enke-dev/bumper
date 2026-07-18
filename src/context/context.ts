@@ -18,7 +18,7 @@ export interface BuildContextOptions {
 export async function buildContext(
   cwd: string,
   options: BuildContextOptions = {}
-): Promise<{ ctx: ModuleContext; configCreated: boolean }> {
+): Promise<{ ctx: ModuleContext; configCreated: boolean; configExclude: string[] }> {
   const { config: stored, created } = options.ignoreConfig
     ? { config: defaultRepoConfig(), created: false }
     : await resolveForPath(cwd);
@@ -43,5 +43,5 @@ export async function buildContext(
     config,
     dryRun: options.dryRun ?? false,
   };
-  return { ctx, configCreated: created };
+  return { ctx, configCreated: created, configExclude: stored.exclude };
 }
