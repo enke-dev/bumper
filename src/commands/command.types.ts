@@ -10,6 +10,7 @@ export const cliOptions = {
   skip: { type: 'string', multiple: true },
   exclude: { type: 'string', multiple: true },
   'ignore-config': { type: 'boolean' },
+  'skip-update-check': { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
 } as const;
 

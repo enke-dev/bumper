@@ -8,5 +8,10 @@ export interface RepoConfig {
 
 /** Shape of `~/.bumperrc`. */
 export interface BumperConfig {
+  /**
+   * Global: skip the `update` self-version check (the newer-bumper hint). Absent = check
+   * (the default). Overridden per run by `--skip-update-check`.
+   */
+  skipVersionCheck?: boolean;
   repos: Record<string, RepoConfig>;
 }

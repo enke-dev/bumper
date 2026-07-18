@@ -90,6 +90,13 @@ bumper update                 # run every applicable module, in order
 bumper update /path/to/repo   # target another repo (defaults to cwd)
 ```
 
+Every invocation prints a one-line `bumper v<version>` banner (suppressed under `--json`). During
+`update`, bumper also checks the registry for a newer release of itself — the lookup runs
+concurrently with the module work, so it adds no perceptible latency — and, if one exists, prints a
+hint with the install command afterwards. The check is silent when offline/unresolvable. Skip it
+for a single run with `--skip-update-check`, or disable it globally by setting `skipVersionCheck`
+in `~/.bumperrc` (top level, next to `repos`).
+
 ### Flags
 
 All flags apply to `bumper update`; `--json` is `detect`-only and `--ignore-config` applies to
@@ -149,6 +156,7 @@ entry, so the next run is already scoped:
 
 ```jsonc
 {
+  "skipVersionCheck": true, // global: silence the update self-version check (default: check)
   "repos": {
     "/absolute/path/to/repository": {
       "exclude": ["packages/vendored-pkg"], // repo-relative paths skipped everywhere (see below)

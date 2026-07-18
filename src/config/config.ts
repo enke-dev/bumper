@@ -28,7 +28,13 @@ function normalize(entry: Partial<RepoConfig>): RepoConfig {
 export async function loadConfig(): Promise<BumperConfig> {
   try {
     const parsed = JSON.parse(await readFile(CONFIG_PATH, 'utf8')) as BumperConfig;
-    return { repos: parsed.repos ?? {} };
+    // keep the global flag ahead of `repos` in the file; drop it when unset to avoid noise
+    return {
+      ...(parsed.skipVersionCheck !== undefined
+        ? { skipVersionCheck: parsed.skipVersionCheck }
+        : {}),
+      repos: parsed.repos ?? {},
+    };
   } catch {
     return { repos: {} };
   }

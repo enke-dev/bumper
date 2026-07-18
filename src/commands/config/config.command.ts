@@ -7,7 +7,7 @@ import type { Command, CommandContext } from '../command.types.js';
 /**
  * The single source of truth for `config set` keys. Both the "was the path omitted?"
  * disambiguation and the value dispatch below read this, so a new key is added in one place —
- * add a case here and its clause in `applyKey` and both stay in sync. Keys are a closed set and
+ * add a case here and its clause in the dispatch and both stay in sync. Keys are a closed set and
  * never valid repo paths, which is what lets a leading key mean "the path was omitted, use cwd".
  */
 type ConfigKey = { field: 'exclude' } | { field: 'module'; id: string };
