@@ -11,6 +11,7 @@ export const cliOptions = {
   exclude: { type: 'string', multiple: true },
   'ignore-config': { type: 'boolean' },
   'skip-update-check': { type: 'boolean' },
+  commit: { type: 'boolean', short: 'c' },
   help: { type: 'boolean', short: 'h' },
 } as const;
 

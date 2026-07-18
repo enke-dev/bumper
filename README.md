@@ -105,6 +105,7 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | Flag               | Repeatable | What it does                                                                                 |
 | ------------------ | :--------: | -------------------------------------------------------------------------------------------- |
 | `--dry-run`        |     no     | Print every intended step, change nothing on disk.                                           |
+| `--commit`, `-c`   |     no     | After updating, commit the changes as `chore: update dependencies` with a summary.           |
 | `--only <id>`      |    yes     | Run **only** the named module(s); everything else is skipped.                                |
 | `--skip <id>`      |    yes     | Run everything **except** the named module(s).                                               |
 | `--exclude <path>` |    yes     | Skip a repo-relative path this run only, without editing config (see [Excludes](#excludes)). |
@@ -121,7 +122,15 @@ bumper update --skip github-actions                   # everything but the actio
 bumper update --exclude examples                      # skip a path this run, without editing config
 bumper update --exclude examples --exclude fixtures   # repeat the flag for several
 bumper update --ignore-config                         # ignore stored excludes/toggles, pure auto-detect
+bumper update --commit                                # update, then commit with a summary
 ```
+
+With `--commit` (`-c`), bumper stages everything and commits as `chore: update dependencies` once
+the run finishes, with a markdown body grouping what changed — dependency specs (`old → new`), the
+`packageManager` field, the Node/Bun version pins, and GitHub Action pins, with any other touched
+files listed by path. The changes are read back from git after the run, so the summary reflects
+exactly what landed. Skipped (with a note) when the target isn't a git repo, when nothing changed,
+or under `--dry-run`.
 
 `--ignore-config` bypasses `~/.bumperrc` completely: no entry is read for the target repo and, for
 an unknown repo, none is written. Stored excludes and module toggles are skipped — use it to run
