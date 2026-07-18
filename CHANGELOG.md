@@ -1,5 +1,18 @@
 # @enke.dev/bumper
 
+# [0.1.0](https://github.com/enke-dev/bumper/compare/0.0.10...0.1.0) (2026-07-18)
+
+
+### Bug Fixes
+
+* **detect:** honor --exclude and mark exclude provenance ([f3fdbbd](https://github.com/enke-dev/bumper/commit/f3fdbbde9d00ed29b0197617074d66f307aa7811))
+
+
+### Features
+
+* **cli:** add --ignore-config flag ([56f2631](https://github.com/enke-dev/bumper/commit/56f26314cee6a9768c826cdf4e8d9a6cad940620))
+* **detect:** surface config-driven module + exclude state ([e11c878](https://github.com/enke-dev/bumper/commit/e11c8781a1965331b848a558b9a6de0aaaca89b0))
+
 ## [0.0.10](https://github.com/enke-dev/bumper/compare/0.0.9...0.0.10) (2026-07-18)
 
 
