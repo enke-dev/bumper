@@ -1,5 +1,13 @@
 # @enke.dev/bumper
 
+# [0.2.0](https://github.com/enke-dev/bumper/compare/0.1.1...0.2.0) (2026-07-18)
+
+
+### Features
+
+* **cli:** print version banner on every run ([b175e9b](https://github.com/enke-dev/bumper/commit/b175e9bfbf4cf4961910489cfa9bd7ffffc3cb04))
+* **update:** hint when a newer bumper is published ([ddb234c](https://github.com/enke-dev/bumper/commit/ddb234c0ea23a09324a0138bbd4dba7607bd3ff0))
+
 ## [0.1.1](https://github.com/enke-dev/bumper/compare/0.1.0...0.1.1) (2026-07-18)
 
 # [0.1.0](https://github.com/enke-dev/bumper/compare/0.0.10...0.1.0) (2026-07-18)
