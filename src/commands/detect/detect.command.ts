@@ -40,10 +40,10 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
   const val = (v: string | number | boolean): string => `${GREEN}${v}${RESET}`;
   const pkgCount = ctx.workspaces.length;
   const pkgLabel = pkgCount === 1 ? 'package' : 'packages';
-  process.stdout.write(`  runtime         ${val(ctx.runtime)}\n`);
-  process.stdout.write(`  packageManager  ${val(ctx.packageManager)}\n`);
-  process.stdout.write(`  monorepo        ${val(ctx.isMonorepo)} (${pkgCount} ${pkgLabel})\n`);
-  process.stdout.write(`  versionManager  ${val(ctx.versionManager)}\n`);
+  process.stdout.write(`  runtime           ${val(ctx.runtime)}\n`);
+  process.stdout.write(`  package manager   ${val(ctx.packageManager)}\n`);
+  process.stdout.write(`  is monorepo       ${val(ctx.isMonorepo)} (${pkgCount} ${pkgLabel})\n`);
+  process.stdout.write(`  version manager   ${val(ctx.versionManager)}\n`);
   if (ctx.config.exclude.length > 0) {
     const rows = ctx.config.exclude.map(path => {
       const fromConfig = !ignoreConfig && configExclude.includes(path);
@@ -85,9 +85,9 @@ export const detectCommand: Command = {
     usage: ['bumper detect [path] [--json] [--exclude path]... [--ignore-config]'],
     summary: 'Show resolved context + which modules apply',
     options: [
-      '--json          Machine-readable detect output',
-      '--exclude path  Add a repo-relative exclude for this preview (repeat for several)',
-      '--ignore-config Ignore ~/.bumperrc; show pure auto-detection',
+      '--json               Machine-readable detect output',
+      '--exclude, -e path   Add a repo-relative exclude for this preview (repeat for several)',
+      '--ignore-config      Ignore ~/.bumperrc; show pure auto-detection',
     ],
   }),
 };

@@ -102,15 +102,15 @@ in `~/.bumperrc` (top level, next to `repos`).
 All flags apply to `bumper update`; `--json` is `detect`-only and `--ignore-config` applies to
 both. Repeatable flags are given several times — one value each, no comma-separated lists.
 
-| Flag               | Repeatable | What it does                                                                                 |
-| ------------------ | :--------: | -------------------------------------------------------------------------------------------- |
-| `--dry-run`        |     no     | Print every intended step, change nothing on disk.                                           |
-| `--commit`, `-c`   |     no     | After updating, commit the changes as `chore: update dependencies` with a summary.           |
-| `--only <id>`      |    yes     | Run **only** the named module(s); everything else is skipped.                                |
-| `--skip <id>`      |    yes     | Run everything **except** the named module(s).                                               |
-| `--exclude <path>` |    yes     | Skip a repo-relative path this run only, without editing config (see [Excludes](#excludes)). |
-| `--ignore-config`  |     no     | Ignore `~/.bumperrc` for this run — auto-detect everything, read + write nothing.            |
-| `--json`           |     no     | `detect` only — emit machine-readable detection output.                                      |
+| Flag                     | Repeatable | What it does                                                                                 |
+| ------------------------ | :--------: | -------------------------------------------------------------------------------------------- |
+| `--dry-run`              |     no     | Print every intended step, change nothing on disk.                                           |
+| `--commit`, `-c`         |     no     | After updating, commit the changes as `chore: update dependencies` with a summary.           |
+| `--only <id>`            |    yes     | Run **only** the named module(s); everything else is skipped.                                |
+| `--skip <id>`            |    yes     | Run everything **except** the named module(s).                                               |
+| `--exclude`, `-e <path>` |    yes     | Skip a repo-relative path this run only, without editing config (see [Excludes](#excludes)). |
+| `--ignore-config`        |     no     | Ignore `~/.bumperrc` for this run — auto-detect everything, read + write nothing.            |
+| `--json`                 |     no     | `detect` only — emit machine-readable detection output.                                      |
 
 `--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `types-node`,
 `bun`, `npm`, `pnpm`, `docker`, `github-actions`).

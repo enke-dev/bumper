@@ -8,7 +8,7 @@ export const cliOptions = {
   'dry-run': { type: 'boolean' },
   only: { type: 'string', multiple: true },
   skip: { type: 'string', multiple: true },
-  exclude: { type: 'string', multiple: true },
+  exclude: { type: 'string', multiple: true, short: 'e' },
   'ignore-config': { type: 'boolean' },
   'skip-update-check': { type: 'boolean' },
   commit: { type: 'boolean', short: 'c' },

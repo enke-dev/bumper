@@ -82,7 +82,7 @@ export const updateCommand: Command = {
       '--commit, -c    Commit the changes as "chore: update dependencies" with a summary',
       '--only id       Module id to run exclusively (repeat for several)',
       '--skip id       Module id to skip (repeat for several)',
-      '--exclude path  Repo-relative path skipped this run, not persisted (repeat for several)',
+      '--exclude, -e path  Repo-relative path skipped this run, not persisted (repeat for several)',
       '--ignore-config Ignore ~/.bumperrc; auto-detect everything, read + write nothing',
       '--skip-update-check  Skip the newer-bumper check for this run',
     ],
