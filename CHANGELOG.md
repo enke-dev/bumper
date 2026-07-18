@@ -1,5 +1,13 @@
 # @enke.dev/bumper
 
+# [0.3.0](https://github.com/enke-dev/bumper/compare/0.2.0...0.3.0) (2026-07-18)
+
+
+### Features
+
+* **cli:** add -e shorthand for --exclude ([a87288d](https://github.com/enke-dev/bumper/commit/a87288d7ed224e89f0af50070eba11bf280787e9))
+* **update:** --commit to commit the run with a summary ([4802209](https://github.com/enke-dev/bumper/commit/4802209e820621fc44a6b0fa6d1eb4bccd2ea2cc))
+
 # [0.2.0](https://github.com/enke-dev/bumper/compare/0.1.1...0.2.0) (2026-07-18)
 
 
