@@ -163,13 +163,17 @@ files exist, `true` forces it on. Modules with no entry fall back to auto-detect
 
 ```sh
 bumper config list
-bumper config get /path/to/repo
-bumper config set /path/to/repo exclude packages/a packages/b
+bumper config get                              # current repo (path defaults to cwd)
+bumper config get /path/to/repo                # another repo
+bumper config set exclude packages/a packages/b  # current repo
 bumper config set /path/to/repo modules.docker false
 ```
 
+`get` and `set` default the path to the current repo — omit it to configure where you're standing.
+For `set` a leading config key (`exclude`, `modules.<id>`) is what signals the path was omitted.
+
 `bumper detect` marks anything the config drives — a forced module shows `(config: on|off)`, a
-stored `exclude` shows `(config)` — with a footer pointing at the `config set` to change it and
+stored `exclude` shows `(from config)` — with a footer pointing at the `config set` to change it and
 `--ignore-config` to bypass. Run `bumper detect --ignore-config` to see what pure auto-detection
 would do.
 
