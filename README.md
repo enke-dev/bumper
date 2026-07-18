@@ -139,13 +139,12 @@ detection, so a later multi-step CLI or GUI can build on top of the same registr
 ## Config (`~/.bumperrc`)
 
 Path-scoped overrides. Running in an unknown repo auto-detects everything and persists a default
-(`mode: auto`) entry, so the next run is already scoped:
+entry, so the next run is already scoped:
 
 ```jsonc
 {
   "repos": {
     "/absolute/path/to/repository": {
-      "mode": "auto", // auto = re-detect; manual = respect stored toggles
       "exclude": ["packages/vendored-pkg"], // repo-relative paths skipped everywhere (see below)
       "modules": { "docker": false }, // explicit per-module on/off overrides, keyed by module id
     },
@@ -153,12 +152,14 @@ Path-scoped overrides. Running in an unknown repo auto-detects everything and pe
 }
 ```
 
+A stored `modules` toggle is authoritative: `docker: false` disables that module even where its
+files exist, `true` forces it on. Modules with no entry fall back to auto-detection.
+
 ```sh
 bumper config list
 bumper config get  /path/to/repo
 bumper config set  /path/to/repo exclude packages/a,packages/b
 bumper config set  /path/to/repo modules.docker false
-bumper config set  /path/to/repo mode manual
 ```
 
 ### Excludes

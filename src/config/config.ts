@@ -3,7 +3,6 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import type { BumperConfig, RepoConfig } from './config.types.js';
-import { ConfigMode } from './config.types.js';
 
 const CONFIG_PATH = join(homedir(), '.bumperrc');
 
@@ -14,13 +13,12 @@ export function configPath(): string {
 
 /** Default entry for a freshly discovered repo: fully auto-detected. */
 export function defaultRepoConfig(): RepoConfig {
-  return { mode: ConfigMode.Auto, exclude: [], modules: {} };
+  return { exclude: [], modules: {} };
 }
 
 /** Fill in any missing fields on a stored entry. */
 function normalize(entry: Partial<RepoConfig>): RepoConfig {
   return {
-    mode: entry.mode ?? ConfigMode.Auto,
     exclude: entry.exclude ?? [],
     modules: entry.modules ?? {},
   };
@@ -43,7 +41,7 @@ export async function saveConfig(config: BumperConfig): Promise<void> {
 
 /**
  * Resolve the config entry for `repoPath`. Unknown paths are auto-detected and
- * persisted with the default (`mode: auto`) entry, so the next run is scoped.
+ * persisted with a default entry, so the next run is scoped.
  */
 export async function resolveForPath(
   repoPath: string

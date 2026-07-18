@@ -2,7 +2,6 @@ import { resolve } from 'node:path';
 
 import { loadConfig, resolveForPath, setRepoConfig } from '../../config/config.js';
 import type { RepoConfig } from '../../config/config.types.js';
-import { ConfigMode } from '../../config/config.types.js';
 import type { Command, CommandContext } from '../command.types.js';
 
 async function run({ positionals }: CommandContext): Promise<void> {
@@ -31,12 +30,7 @@ async function run({ positionals }: CommandContext): Promise<void> {
     const { config } = await resolveForPath(abs);
     const next: RepoConfig = { ...config, modules: { ...config.modules } };
 
-    if (key === 'mode') {
-      if (value !== ConfigMode.Auto && value !== ConfigMode.Manual) {
-        throw new Error(`mode must be '${ConfigMode.Auto}' or '${ConfigMode.Manual}'`);
-      }
-      next.mode = value;
-    } else if (key === 'exclude') {
+    if (key === 'exclude') {
       next.exclude = value
         .split(',')
         .map(part => part.trim())
@@ -69,7 +63,7 @@ export const configCommand: Command = {
     extra: [
       {
         title: 'Config keys (config set)',
-        lines: ['mode <auto|manual>      exclude <a,b,c>      modules.<id> <true|false>'],
+        lines: ['exclude <a,b,c>      modules.<id> <true|false>'],
       },
     ],
   }),

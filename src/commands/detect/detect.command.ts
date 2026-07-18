@@ -32,14 +32,13 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
     return;
   }
 
-  process.stdout.write(`${BOLD}${CYAN}${ctx.cwd}${RESET}\n`);
+  process.stdout.write(`${BOLD}${CYAN}${ctx.cwd}${RESET}${configCreated ? ' (new)' : ''}\n`);
   process.stdout.write(`  runtime         ${ctx.runtime}\n`);
   process.stdout.write(`  packageManager  ${ctx.packageManager}\n`);
   process.stdout.write(
     `  monorepo        ${ctx.isMonorepo} (${ctx.workspaces.length} package(s))\n`
   );
   process.stdout.write(`  versionManager  ${ctx.versionManager}\n`);
-  process.stdout.write(`  config mode     ${ctx.config.mode}${configCreated ? ' (new)' : ''}\n`);
   if (ctx.config.exclude.length > 0) {
     process.stdout.write(`  excludes        ${ctx.config.exclude.join(', ')}\n`);
   }
