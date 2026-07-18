@@ -5,7 +5,7 @@ import type { RepoConfig } from '../../config/config.types.js';
 import type { Command, CommandContext } from '../command.types.js';
 
 async function run({ positionals }: CommandContext): Promise<void> {
-  const [sub, repoPath, key, value] = positionals;
+  const [sub, repoPath, key, ...rest] = positionals;
 
   if (sub === 'list' || sub === undefined) {
     const config = await loadConfig();
@@ -23,21 +23,21 @@ async function run({ positionals }: CommandContext): Promise<void> {
   }
 
   if (sub === 'set') {
-    if (!repoPath || !key || value === undefined) {
-      throw new Error('config set requires <path> <key> <value>');
+    if (!repoPath || !key || rest.length === 0) {
+      throw new Error('config set requires <path> <key> <value...>');
     }
     const abs = resolve(repoPath);
     const { config } = await resolveForPath(abs);
     const next: RepoConfig = { ...config, modules: { ...config.modules } };
 
     if (key === 'exclude') {
-      next.exclude = value
-        .split(',')
-        .map(part => part.trim())
-        .filter(Boolean);
+      next.exclude = rest.map(part => part.trim()).filter(Boolean);
     } else if (key.startsWith('modules.')) {
+      if (rest.length > 1) {
+        throw new Error(`modules.${key.slice('modules.'.length)} takes a single true|false value`);
+      }
       const id = key.slice('modules.'.length);
-      next.modules[id] = value === 'true';
+      next.modules[id] = rest[0] === 'true';
     } else {
       throw new Error(`unknown config key: ${key}`);
     }
@@ -57,13 +57,13 @@ export const configCommand: Command = {
     usage: [
       'bumper config list',
       'bumper config get <path>',
-      'bumper config set <path> <key> <value>',
+      'bumper config set <path> <key> <value...>',
     ],
     summary: 'Inspect or edit ~/.bumperrc',
     extra: [
       {
         title: 'Config keys (config set)',
-        lines: ['exclude <a,b,c>      modules.<id> <true|false>'],
+        lines: ['exclude <path...>      modules.<id> <true|false>'],
       },
     ],
   }),

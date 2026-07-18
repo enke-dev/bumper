@@ -64,16 +64,16 @@ Then invoke `bumper` (or `bmpr`) directly.
 Requires [Bun](https://bun.sh) to build.
 
 ```sh
-bun install        # installs deps + builds ./dist/cli.mjs (prepare hook)
-bun run dev …      # run the CLI straight from source, no build needed
+bun install     # installs deps + builds ./dist/cli.mjs (prepare hook)
+bun run dev …   # run the CLI straight from source, no build needed
 ```
 
 To get a global `bumper` on your `PATH` from the working tree (e.g. to dogfood it in other
 repos), build and link once:
 
 ```sh
-bun run build      # refresh ./dist/cli.mjs
-bun link           # symlinks it into ~/.bun/bin (on PATH for a standard Bun install)
+bun run build   # refresh ./dist/cli.mjs
+bun link        # symlinks it into ~/.bun/bin (on PATH for a standard Bun install)
 ```
 
 The link tracks `dist/cli.mjs` live — re-run `bun run build` to update what `bumper` executes;
@@ -82,12 +82,12 @@ no need to link again. `bun link` writes the platform-appropriate shim, so this 
 ## Usage
 
 ```sh
-bumper                       # no command → shows help
-bumper help                  # show help (also: bumper --help)
-bumper detect                # show context + applicable modules for the cwd
-bumper detect /path --json   # machine-readable detection
-bumper update                # run every applicable module, in order
-bumper update /path/to/repo  # target another repo (defaults to cwd)
+bumper                        # no command → shows help
+bumper help                   # show help (also: bumper --help)
+bumper detect                 # show context + applicable modules for the cwd
+bumper detect /path --json    # machine-readable detection
+bumper update                 # run every applicable module, in order
+bumper update /path/to/repo   # target another repo (defaults to cwd)
 ```
 
 ### Flags
@@ -108,12 +108,12 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 `bun`, `npm`, `pnpm`, `docker`, `github-actions`).
 
 ```sh
-bumper update --dry-run                              # preview, no writes
-bumper update --only node,pnpm                       # just the Node runtime + pnpm modules
-bumper update --skip github-actions                  # everything but the actions pinner
-bumper update --exclude examples                     # skip a path this run, without editing config
-bumper update --exclude examples --exclude fixtures  # repeat the flag for several
-bumper update --ignore-config                        # ignore stored excludes/toggles, pure auto-detect
+bumper update --dry-run                               # preview, no writes
+bumper update --only node,pnpm                        # just the Node runtime + pnpm modules
+bumper update --skip github-actions                   # everything but the actions pinner
+bumper update --exclude examples                      # skip a path this run, without editing config
+bumper update --exclude examples --exclude fixtures   # repeat the flag for several
+bumper update --ignore-config                         # ignore stored excludes/toggles, pure auto-detect
 ```
 
 `--ignore-config` bypasses `~/.bumperrc` completely: no entry is read for the target repo and, for
@@ -163,9 +163,9 @@ files exist, `true` forces it on. Modules with no entry fall back to auto-detect
 
 ```sh
 bumper config list
-bumper config get  /path/to/repo
-bumper config set  /path/to/repo exclude packages/a,packages/b
-bumper config set  /path/to/repo modules.docker false
+bumper config get /path/to/repo
+bumper config set /path/to/repo exclude packages/a packages/b
+bumper config set /path/to/repo modules.docker false
 ```
 
 ### Excludes
@@ -178,14 +178,14 @@ leaves alone. It applies **uniformly**:
   an excluded path — so vendored packages, fixtures, or example projects used for testing are
   never rewritten.
 
-Persist it with `config set … exclude` (comma-separated list in one value), or pass `--exclude
-<path>` on a single `update` run to add paths for that run only (repeat the flag for several,
-merged with the stored list, not saved). The common case: a repo whose own `examples/` are
+Persist it with `config set … exclude` (space-separated paths, replacing the stored list), or pass
+`--exclude <path>` on a single `update` run to add paths for that run only (repeat the flag for
+several, merged with the stored list, not saved). The common case: a repo whose own `examples/` are
 self-applied test fixtures —
 
 ```sh
 bumper config set /path/to/repo exclude examples   # always skip
-bumper update --exclude examples                    # skip just this run
+bumper update --exclude examples                   # skip just this run
 ```
 
 > Modules that read a single fixed file at the repo root (`github-actions`, the package managers)
