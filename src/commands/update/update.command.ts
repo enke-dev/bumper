@@ -10,10 +10,7 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
   const cwd = resolve(positionals[0] ?? process.cwd());
   const dryRun = values['dry-run'] ?? false;
   const ignoreConfig = values['ignore-config'] ?? false;
-  const exclude = (values.exclude ?? [])
-    .flatMap(entry => entry.split(','))
-    .map(entry => entry.trim())
-    .filter(Boolean);
+  const exclude = (values.exclude ?? []).map(entry => entry.trim()).filter(Boolean);
   const { ctx, configCreated } = await buildContext(cwd, { dryRun, exclude, ignoreConfig });
   if (configCreated) {
     process.stdout.write(`${DIM}Discovered new repo, wrote entry to ${configPath()}${RESET}\n`);
@@ -34,7 +31,7 @@ export const updateCommand: Command = {
       '--dry-run       Print intended steps without changing anything',
       '--only id       Module id to run exclusively (repeat for several)',
       '--skip id       Module id to skip (repeat for several)',
-      '--exclude path  Repo-relative path skipped this run, not persisted (repeat or comma-separate)',
+      '--exclude path  Repo-relative path skipped this run, not persisted (repeat for several)',
       '--ignore-config Ignore ~/.bumperrc; auto-detect everything, read + write nothing',
     ],
   }),

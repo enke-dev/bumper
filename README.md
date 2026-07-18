@@ -93,7 +93,7 @@ bumper update /path/to/repo  # target another repo (defaults to cwd)
 ### Flags
 
 All flags apply to `bumper update`; `--json` is `detect`-only and `--ignore-config` applies to
-both. Repeatable flags can be given several times or comma-separated in one value.
+both. Repeatable flags are given several times — one value each, no comma-separated lists.
 
 | Flag               | Repeatable | What it does                                                                                 |
 | ------------------ | :--------: | -------------------------------------------------------------------------------------------- |
@@ -108,12 +108,12 @@ both. Repeatable flags can be given several times or comma-separated in one valu
 `bun`, `npm`, `pnpm`, `docker`, `github-actions`).
 
 ```sh
-bumper update --dry-run                    # preview, no writes
-bumper update --only node,pnpm             # just the Node runtime + pnpm modules
-bumper update --skip github-actions        # everything but the actions pinner
-bumper update --exclude examples           # skip a path this run, without editing config
-bumper update --exclude examples,fixtures  # repeat the flag or comma-separate several
-bumper update --ignore-config              # ignore stored excludes/toggles, pure auto-detect
+bumper update --dry-run                              # preview, no writes
+bumper update --only node,pnpm                       # just the Node runtime + pnpm modules
+bumper update --skip github-actions                  # everything but the actions pinner
+bumper update --exclude examples                     # skip a path this run, without editing config
+bumper update --exclude examples --exclude fixtures  # repeat the flag for several
+bumper update --ignore-config                        # ignore stored excludes/toggles, pure auto-detect
 ```
 
 `--ignore-config` bypasses `~/.bumperrc` completely: no entry is read for the target repo and, for
@@ -178,9 +178,10 @@ leaves alone. It applies **uniformly**:
   an excluded path — so vendored packages, fixtures, or example projects used for testing are
   never rewritten.
 
-Persist it with `config set … exclude`, or pass `--exclude <path>` on a single `update` run to add
-paths for that run only (repeatable, comma-separated, merged with the stored list, not saved). The
-common case: a repo whose own `examples/` are self-applied test fixtures —
+Persist it with `config set … exclude` (comma-separated list in one value), or pass `--exclude
+<path>` on a single `update` run to add paths for that run only (repeat the flag for several,
+merged with the stored list, not saved). The common case: a repo whose own `examples/` are
+self-applied test fixtures —
 
 ```sh
 bumper config set /path/to/repo exclude examples   # always skip
