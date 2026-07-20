@@ -40,6 +40,9 @@ describe('cleanInstall', () => {
     assert.ok(out.output().includes('rm -rf node_modules'));
     assert.ok(out.output().includes('package-lock.json'));
     assert.ok(out.output().includes('npm install'));
+    // lifecycle scripts are skipped: only the resolved lockfile matters, and prepare/postinstall
+    // hooks routinely fail in a bare CI checkout (missing tokens, unbuilt dist)
+    assert.ok(out.output().includes('--ignore-scripts'));
     // the second, convergence pass is signposted so the plan doesn't read as a single install
     assert.ok(out.output().includes('twice'));
   });

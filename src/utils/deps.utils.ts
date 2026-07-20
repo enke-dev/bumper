@@ -28,18 +28,24 @@ const LOCKFILES: Record<PackageManager, readonly string[]> = {
  * second pass settles the tree, so the committed lockfile matches a subsequent install and
  * `bumper update` leaves no follow-up churn. pnpm/bun converge in one pass, but a second install
  * against a satisfied lockfile is a cheap no-op, so the loop is uniform across managers.
+ *
+ * The install runs with `--ignore-scripts` (supported by npm/pnpm/bun alike). Only the resolved
+ * lockfile matters here, and lifecycle scripts (`prepare`/`postinstall`: codegen, workspace
+ * builds) don't affect it — but they routinely fail in a bare CI checkout (missing tokens,
+ * unbuilt `dist`, nested package-manager version churn), which would abort the bump for no reason.
  */
 export async function cleanInstall(ctx: ModuleContext, installCmd: string[]): Promise<void> {
   const lockfiles = LOCKFILES[ctx.packageManager] ?? [];
+  const cmd = [...installCmd, '--ignore-scripts'];
   if (ctx.dryRun) {
     planLine(['rm -rf', 'node_modules', ...lockfiles].join(' '));
-    planLine(`${installCmd.join(' ')} (run twice to settle the lockfile)`);
+    planLine(`${cmd.join(' ')} (run twice to settle the lockfile)`);
     return;
   }
   await rm(join(ctx.cwd, 'node_modules'), { recursive: true, force: true });
   await Promise.all(lockfiles.map(file => rm(join(ctx.cwd, file), { force: true })));
-  await execOk(installCmd, { cwd: ctx.cwd });
-  await execOk(installCmd, { cwd: ctx.cwd });
+  await execOk(cmd, { cwd: ctx.cwd });
+  await execOk(cmd, { cwd: ctx.cwd });
 }
 
 /**
