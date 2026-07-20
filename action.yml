@@ -94,6 +94,9 @@ runs:
         COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
       run: |
         corepack enable
+        # persist for later steps: bumper bumps the packageManager field mid-run, so its
+        # `pnpm install` downloads the *new* pinned version — which must not prompt either
+        echo "COREPACK_ENABLE_DOWNLOAD_PROMPT=0" >> "$GITHUB_ENV"
         if node -e "process.exit(require('./package.json').packageManager ? 0 : 1)" 2>/dev/null; then
           corepack prepare --activate
         fi
