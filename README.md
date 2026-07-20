@@ -1,4 +1,8 @@
-# bumper
+<p align="center">
+  <img src="https://cdn.jsdelivr.net/npm/@enke.dev/bumper/assets/icon/icon.png" alt="bumper" width="128" />
+</p>
+
+# Bumper
 
 Central, module-based repo updater that detects a repo's runtime + package manager and bumps everything: Node LTS,
 `@types/node`, all dependencies, the package manager itself, GitHub Actions pins, and Node

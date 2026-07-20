@@ -22,7 +22,8 @@
     "bumper": "./dist/cli.mjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "assets/icon/icon.png"
   ],
   "engines": {
     "node": ">=22"
