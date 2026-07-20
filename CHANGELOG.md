@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.4.2](https://github.com/enke-dev/bumper/compare/0.4.1...0.4.2) (2026-07-20)
+
+
+### Bug Fixes
+
+* **gh:** don't let a missing PR label abort the run ([7267617](https://github.com/enke-dev/bumper/commit/72676176da34dfd3fee076667f18364241dba006))
+
 ## [0.4.1](https://github.com/enke-dev/bumper/compare/0.4.0...0.4.1) (2026-07-20)
 
 
