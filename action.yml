@@ -153,7 +153,11 @@ runs:
 
     - name: Run bumper update
       shell: bash
-      run: bunx --bun @enke.dev/bumper update --commit ${{ steps.flags.outputs.args }}
+      # No --bun: that flag makes Bun shim `node` in PATH for child processes too, so
+      # the package manager bumper spawns (e.g. pnpm v11, which requires node:sqlite)
+      # would run under Bun and crash ("No such built-in module: node:sqlite"). Plain
+      # bunx runs bumper while letting spawned pnpm/npm/yarn use the real Node set up above.
+      run: bunx @enke.dev/bumper update --commit ${{ steps.flags.outputs.args }}
 
     - name: Check for changes
       id: changed
