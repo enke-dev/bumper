@@ -23,6 +23,9 @@ jobs:
         uses: ./
         with:
           base: main
+          # the action runs with --ignore-config, so ~/.bumperrc excludes don't
+          # apply in CI — mirror this repo's stored exclude explicitly
+          exclude: examples
 
   # run check/lint/test on the bumped branch. The bot-opened PR won't trigger
   # check.yml's pull_request event (GITHUB_TOKEN-authored PRs don't), so we call
