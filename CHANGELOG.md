@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.4.8](https://github.com/enke-dev/bumper/compare/0.4.7...0.4.8) (2026-07-20)
+
+
+### Bug Fixes
+
+* **gh:** set up Node + Corepack so pnpm/yarn repos work ([a952621](https://github.com/enke-dev/bumper/commit/a952621ba7a9b86bf783e46b108b7477f8e78913))
+
 ## [0.4.7](https://github.com/enke-dev/bumper/compare/0.4.6...0.4.7) (2026-07-20)
 
 ## [0.4.6](https://github.com/enke-dev/bumper/compare/0.4.5...0.4.6) (2026-07-20)
