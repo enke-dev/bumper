@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.4.3](https://github.com/enke-dev/bumper/compare/0.4.2...0.4.3) (2026-07-20)
+
+
+### Bug Fixes
+
+* **gh:** surface the "Actions can't create PRs" setting clearly ([a74fd7f](https://github.com/enke-dev/bumper/commit/a74fd7f2b140e5db200041349625b44644bcee09))
+
 ## [0.4.2](https://github.com/enke-dev/bumper/compare/0.4.1...0.4.2) (2026-07-20)
 
 
