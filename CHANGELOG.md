@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.4.11](https://github.com/enke-dev/bumper/compare/0.4.10...0.4.11) (2026-07-20)
+
+
+### Bug Fixes
+
+* **gh:** drop --bun so spawned package managers run under real Node ([0df77dd](https://github.com/enke-dev/bumper/commit/0df77dd6995f9fb9d6019cfd4316cb758c893ffb))
+
 ## [0.4.10](https://github.com/enke-dev/bumper/compare/0.4.9...0.4.10) (2026-07-20)
 
 
