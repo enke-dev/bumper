@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.4.12](https://github.com/enke-dev/bumper/compare/0.4.11...0.4.12) (2026-07-20)
+
+
+### Bug Fixes
+
+* run the reinstall with --ignore-scripts ([da943d8](https://github.com/enke-dev/bumper/commit/da943d8e585851ec70a23d21e60e9eb69604aa04))
+
 ## [0.4.11](https://github.com/enke-dev/bumper/compare/0.4.10...0.4.11) (2026-07-20)
 
 
