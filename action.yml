@@ -75,6 +75,18 @@ runs:
         # not latest — avoids lockfile churn from CI running ahead of the repo
         bun-version-file: package.json
 
+    - name: Set up Node
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: 22
+
+    - name: Enable Corepack
+      # Node ships npm and Bun is set up above; Corepack adds pnpm/yarn, pinned to
+      # the version in the target repo's packageManager field. Without this, bumper's
+      # `pnpm`/`yarn` subprocess calls fail with "Executable not found in $PATH".
+      shell: bash
+      run: corepack enable
+
     - name: Configure git identity
       shell: bash
       run: |
