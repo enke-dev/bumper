@@ -84,8 +84,19 @@ runs:
       # Node ships npm and Bun is set up above; Corepack adds pnpm/yarn, pinned to
       # the version in the target repo's packageManager field. Without this, bumper's
       # `pnpm`/`yarn` subprocess calls fail with "Executable not found in $PATH".
+      #
+      # `corepack enable` only installs shims — the pinned PM is downloaded lazily on
+      # first use, which fails in CI ("ENOENT .../corepack/v1/pnpm") unless we both
+      # disable the interactive download prompt and pre-activate the pinned version.
+      # Guarded on a packageManager field so npm-only repos (which have none) don't error.
       shell: bash
-      run: corepack enable
+      env:
+        COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      run: |
+        corepack enable
+        if node -e "process.exit(require('./package.json').packageManager ? 0 : 1)" 2>/dev/null; then
+          corepack prepare --activate
+        fi
 
     - name: Configure git identity
       shell: bash
