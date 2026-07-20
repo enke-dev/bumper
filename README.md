@@ -158,6 +158,113 @@ Adding a concern = adding one module (`*.runtime.ts` / `*.package-manager.ts` / 
 implementing the `Module` interface and registering it. `bumper detect` exposes per-module
 detection, so a later multi-step CLI or GUI can build on top of the same registry.
 
+## GitHub Action
+
+The composite action at the repo root runs `bumper update --commit`, pushes the result to a
+dedicated branch, and opens (or updates) a pull request — no local installation needed. Drop it
+into a scheduled workflow in any target repo.
+
+### Minimal setup
+
+Create `.github/workflows/update-dependencies.yml` in your repo:
+
+```yaml
+name: update dependencies
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # every Monday at 06:00 UTC
+  workflow_dispatch: # also allow manual runs
+
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the update branch
+      pull-requests: write # open the PR
+    steps:
+      - uses: enke-dev/bumper@main
+        with:
+          base: main
+```
+
+The job needs `contents: write` (to push the update branch) and `pull-requests: write` (to open
+the PR), as shown above.
+
+### Inputs
+
+All inputs are optional.
+
+| Input       | Default                      | Description                                                                                                  |
+| ----------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `base`      | repository default branch    | Base branch for the PR.                                                                                      |
+| `branch`    | `chore/bumper-update`        | Branch name used for the update commit and PR.                                                               |
+| `pr-title`  | `chore: update dependencies` | Title of the created or updated PR.                                                                          |
+| `pr-labels` | _(none)_                     | Comma-separated labels to apply to the PR (labels must already exist in the repo).                           |
+| `only`      | _(all modules)_              | Run only the listed module ids (comma-separated, e.g. `node,pnpm`).                                          |
+| `skip`      | _(none)_                     | Skip the listed module ids (comma-separated, e.g. `docker`).                                                 |
+| `exclude`   | _(none)_                     | Space-separated repo-relative paths to exclude (e.g. `examples fixtures`).                                   |
+| `token`     | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows). |
+
+Module ids are the values from the `id` column in the [Modules](#modules) table.
+
+### Outputs
+
+| Output      | Description                                                      |
+| ----------- | ---------------------------------------------------------------- |
+| `updated`   | `"true"` when bumper produced a new commit, otherwise `"false"`. |
+| `branch`    | The update branch name.                                          |
+| `base`      | The resolved base branch.                                        |
+| `pr-number` | The created or updated PR number (empty when nothing changed).   |
+
+### Running steps afterwards
+
+Because it's a step-level action, add your own steps in the same job — they run after the PR is
+created. Use the outputs to gate them:
+
+```yaml
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: bump
+        uses: enke-dev/bumper@main
+        with:
+          base: main
+      - if: steps.bump.outputs.updated == 'true'
+        run: echo "Opened PR #${{ steps.bump.outputs.pr-number }}"
+```
+
+### Full example
+
+```yaml
+name: update dependencies
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: enke-dev/bumper@main
+        with:
+          base: main
+          branch: chore/bumper-update
+          pr-title: 'chore: update dependencies'
+          pr-labels: 'dependencies,automated'
+          skip: docker
+          exclude: examples fixtures
+```
+
 ## Config (`~/.bumperrc`)
 
 Path-scoped overrides. Running in an unknown repo auto-detects everything and persists a default
