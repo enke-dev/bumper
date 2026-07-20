@@ -1,0 +1,40 @@
+name: update dependencies
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # every Monday at 06:00 UTC
+  workflow_dispatch: # also allow manual runs
+
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the update branch
+      pull-requests: write # open the PR
+    outputs:
+      updated: ${{ steps.bump.outputs.updated }}
+      branch: ${{ steps.bump.outputs.branch }}
+    steps:
+      # check out so the local composite action (./) is available to the runner
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # dogfood our own action to bump this repo
+      - id: bump
+        uses: ./
+        with:
+          base: main
+          pr-labels: dependencies
+
+  # run check/lint/test on the bumped branch. The bot-opened PR won't trigger
+  # check.yml's pull_request event (GITHUB_TOKEN-authored PRs don't), so we call
+  # the reusable check here against the update branch — results attach to the
+  # branch head, which is the PR head commit.
+  check:
+    needs: update-dependencies
+    if: needs.update-dependencies.outputs.updated == 'true'
+    uses: ./.github/workflows/check.yml
+    permissions:
+      contents: read
+      checks: write
+    with:
+      ref: ${{ needs.update-dependencies.outputs.branch }}

@@ -4,8 +4,13 @@ on:
   # run only on pull requests, as the trunk is covered by the release.yml already
   pull_request:
     branches: ['*']
-  # reused by release.yml
+  # reused by release.yml and update-dependencies.yml
   workflow_call:
+    inputs:
+      ref:
+        description: Git ref to check out and test (defaults to the triggering ref)
+        type: string
+        default: ''
 
 jobs:
   check:
@@ -17,6 +22,9 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # empty ref → checkout's default (the triggering ref); set by callers to test a branch
+          ref: ${{ inputs.ref }}
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
