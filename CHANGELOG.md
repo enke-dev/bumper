@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.4.10](https://github.com/enke-dev/bumper/compare/0.4.9...0.4.10) (2026-07-20)
+
+
+### Bug Fixes
+
+* **gh:** persist COREPACK_ENABLE_DOWNLOAD_PROMPT to later steps ([6d7bda7](https://github.com/enke-dev/bumper/commit/6d7bda7b9e4b1985bacd048185fc9c1a5358ec80))
+
 ## [0.4.9](https://github.com/enke-dev/bumper/compare/0.4.8...0.4.9) (2026-07-20)
 
 
