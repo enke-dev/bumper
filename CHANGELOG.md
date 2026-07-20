@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+# [0.4.0](https://github.com/enke-dev/bumper/compare/0.3.0...0.4.0) (2026-07-20)
+
+
+### Features
+
+* **gh:** add reusable bumper update action and README docs ([c36f4b2](https://github.com/enke-dev/bumper/commit/c36f4b21c4d8177c318995fbe03f1dcedfc53b6e))
+
 # [0.3.0](https://github.com/enke-dev/bumper/compare/0.2.0...0.3.0) (2026-07-18)
 
 
