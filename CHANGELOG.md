@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.4.1](https://github.com/enke-dev/bumper/compare/0.4.0...0.4.1) (2026-07-20)
+
+
+### Bug Fixes
+
+* **gha:** correct setup-bun pin in the composite action ([d837b36](https://github.com/enke-dev/bumper/commit/d837b36bdb6293c015a742418c54234901e923fe))
+
 # [0.4.0](https://github.com/enke-dev/bumper/compare/0.3.0...0.4.0) (2026-07-20)
 
 
