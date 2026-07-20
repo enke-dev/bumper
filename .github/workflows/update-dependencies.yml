@@ -23,7 +23,6 @@ jobs:
         uses: ./
         with:
           base: main
-          pr-labels: dependencies
 
   # run check/lint/test on the bumped branch. The bot-opened PR won't trigger
   # check.yml's pull_request event (GITHUB_TOKEN-authored PRs don't), so we call
