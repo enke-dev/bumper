@@ -62,14 +62,14 @@ runs:
   using: composite
   steps:
     - name: Check out repo
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         # full history so bumper can commit and the push isn't rejected
         fetch-depth: 0
         token: ${{ inputs.token }}
 
     - name: Set up Bun
-      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b4c # v2.0.2
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version: latest
 
