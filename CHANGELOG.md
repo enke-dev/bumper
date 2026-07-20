@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.4.9](https://github.com/enke-dev/bumper/compare/0.4.8...0.4.9) (2026-07-20)
+
+
+### Bug Fixes
+
+* **gh:** actually provision pnpm/yarn via Corepack in CI ([7c18b67](https://github.com/enke-dev/bumper/commit/7c18b678cf462915c17b0b30379bb789a4369cc6))
+
 ## [0.4.8](https://github.com/enke-dev/bumper/compare/0.4.7...0.4.8) (2026-07-20)
 
 
