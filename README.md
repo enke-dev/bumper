@@ -158,6 +158,74 @@ Adding a concern = adding one module (`*.runtime.ts` / `*.package-manager.ts` / 
 implementing the `Module` interface and registering it. `bumper detect` exposes per-module
 detection, so a later multi-step CLI or GUI can build on top of the same registry.
 
+## GitHub Actions
+
+The shared workflow at `.github/workflows/bumper.yml` is designed to be called from a scheduled
+workflow in any target repo. It runs `bumper update --commit`, pushes the result to a dedicated
+branch, and opens (or updates) a pull request — no local installation needed.
+
+### Minimal setup
+
+Create `.github/workflows/bumper.yml` in your repo:
+
+```yaml
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # every Monday at 06:00 UTC
+  workflow_dispatch:       # also allow manual runs
+
+jobs:
+  bumper:
+    uses: enke-dev/bumper/.github/workflows/bumper.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+    secrets: inherit
+```
+
+The workflow needs `contents: write` (to push the update branch) and `pull-requests: write` (to
+open the PR). Both are granted as shown above.
+
+### Inputs
+
+All inputs are optional.
+
+| Input        | Default                          | Description                                                                              |
+| ------------ | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `base`       | repository default branch        | Base branch for the PR.                                                                  |
+| `branch`     | `chore/bumper-update`            | Branch name used for the update commit and PR.                                           |
+| `pr-title`   | `chore: update dependencies`     | Title of the created or updated PR.                                                      |
+| `pr-labels`  | _(none)_                         | Comma-separated labels to apply to the PR (labels must already exist in the repo).       |
+| `only`       | _(all modules)_                  | Run only the listed module ids (comma-separated, e.g. `node,pnpm`).                     |
+| `skip`       | _(none)_                         | Skip the listed module ids (comma-separated, e.g. `docker`).                            |
+| `exclude`    | _(none)_                         | Space-separated repo-relative paths to exclude (e.g. `examples fixtures`).              |
+
+Module ids are the values from the `id` column in the [Modules](#modules) table.
+
+### Full example
+
+```yaml
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  bumper:
+    uses: enke-dev/bumper/.github/workflows/bumper.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      base: main
+      branch: chore/bumper-update
+      pr-title: 'chore: update dependencies'
+      pr-labels: 'dependencies,automated'
+      skip: docker
+      exclude: examples fixtures
+    secrets: inherit
+```
+
 ## Config (`~/.bumperrc`)
 
 Path-scoped overrides. Running in an unknown repo auto-detects everything and persists a default
