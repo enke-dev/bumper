@@ -155,30 +155,27 @@ runs:
         title="${{ inputs.pr-title }}"
         labels="${{ inputs.pr-labels }}"
 
-        # Build label flags (gh pr create accepts --label repeatedly)
-        label_flags=""
-        if [ -n "$labels" ]; then
-          for l in $(echo "$labels" | tr ',' ' '); do
-            label_flags="$label_flags --label $l"
-          done
-        fi
-
         # Grab the commit body written by bumper --commit as the PR body
         body="$(git log -1 --format='%b' HEAD)"
 
-        # Update the existing PR if one is already open, otherwise create a new one
+        # Update the existing PR if one is already open, otherwise create a new one.
+        # Labels are applied separately below so a missing label can't abort the PR.
         existing="$(gh pr list --head "$branch" --base "$base" --json number --jq '.[0].number' 2>/dev/null || true)"
         if [ -n "$existing" ]; then
-          gh pr edit "$existing" --title "$title" --body "$body" $label_flags
-          echo "Updated PR #${existing}: ${title}"
-          echo "number=$existing" >> "$GITHUB_OUTPUT"
+          gh pr edit "$existing" --title "$title" --body "$body"
+          number="$existing"
+          echo "Updated PR #${number}: ${title}"
         else
-          gh pr create \
-            --head "$branch" \
-            --base "$base" \
-            --title "$title" \
-            --body "$body" \
-            $label_flags
-          echo "Created PR: ${title}"
-          echo "number=$(gh pr view "$branch" --json number --jq .number)" >> "$GITHUB_OUTPUT"
+          gh pr create --head "$branch" --base "$base" --title "$title" --body "$body"
+          number="$(gh pr view "$branch" --json number --jq .number)"
+          echo "Created PR #${number}: ${title}"
+        fi
+        echo "number=$number" >> "$GITHUB_OUTPUT"
+
+        # Apply labels one at a time; warn (don't fail) if a label doesn't exist yet
+        if [ -n "$labels" ]; then
+          for l in $(echo "$labels" | tr ',' ' '); do
+            gh pr edit "$number" --add-label "$l" \
+              || echo "::warning::label '$l' not found in this repo — skipped (create it to have it applied)"
+          done
         fi
