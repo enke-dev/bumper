@@ -166,7 +166,16 @@ runs:
           number="$existing"
           echo "Updated PR #${number}: ${title}"
         else
-          gh pr create --head "$branch" --base "$base" --title "$title" --body "$body"
+          if ! err="$(gh pr create --head "$branch" --base "$base" --title "$title" --body "$body" 2>&1)"; then
+            echo "$err"
+            if echo "$err" | grep -qi "not permitted to create"; then
+              echo "::error::GitHub Actions can't open pull requests in this repo. Enable it under" \
+                "Settings → Actions → General → Workflow permissions → 'Allow GitHub Actions to" \
+                "create and approve pull requests', or pass a PAT/GitHub App token via the action's" \
+                "'token' input. The update branch '$branch' was pushed, so you can open the PR by hand."
+            fi
+            exit 1
+          fi
           number="$(gh pr view "$branch" --json number --jq .number)"
           echo "Created PR #${number}: ${title}"
         fi

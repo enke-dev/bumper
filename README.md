@@ -191,6 +191,14 @@ jobs:
 The job needs `contents: write` (to push the update branch) and `pull-requests: write` (to open
 the PR), as shown above.
 
+> **Prerequisite** — GitHub disables Actions-authored PRs by default. Enable **Settings → Actions →
+> General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests"**
+> (also settable org-wide). Without it the branch is still pushed, but PR creation fails with
+> `GitHub Actions is not permitted to create or approve pull requests`.
+> Alternatively, pass a PAT or GitHub App token via the
+> [`token`](#inputs) input, which bypasses the setting **and** lets the resulting PR trigger your
+> other `pull_request` workflows (a bot's default `GITHUB_TOKEN` won't).
+
 ### Inputs
 
 All inputs are optional.
