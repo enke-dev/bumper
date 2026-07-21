@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.5.2](https://github.com/enke-dev/bumper/compare/0.5.1...0.5.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* **gh:** keep the registry .npmrc out of the update commit ([f6008e6](https://github.com/enke-dev/bumper/commit/f6008e6c448e21075ac508047f0763d590f9dbb7))
+
 ## [0.5.1](https://github.com/enke-dev/bumper/compare/0.5.0...0.5.1) (2026-07-21)
 
 
