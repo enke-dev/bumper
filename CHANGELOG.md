@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.5.1](https://github.com/enke-dev/bumper/compare/0.5.0...0.5.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* **gh:** drop ${{ secrets }} expression from input description ([56bc561](https://github.com/enke-dev/bumper/commit/56bc5613cc6664db48817f98e83f987dd9d1dcf7))
+
 # [0.5.0](https://github.com/enke-dev/bumper/compare/0.4.12...0.5.0) (2026-07-21)
 
 
