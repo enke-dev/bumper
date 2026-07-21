@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+# [0.5.0](https://github.com/enke-dev/bumper/compare/0.4.12...0.5.0) (2026-07-21)
+
+
+### Features
+
+* **gh:** optional private-registry auth for the reinstall ([bdc0761](https://github.com/enke-dev/bumper/commit/bdc0761627cdee49cbf94e0af4c6e5ea47249985))
+
 ## [0.4.12](https://github.com/enke-dev/bumper/compare/0.4.11...0.4.12) (2026-07-20)
 
 
