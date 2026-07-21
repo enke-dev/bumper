@@ -46,8 +46,8 @@ inputs:
   registry-token:
     description: >-
       Auth token for a private npm registry (e.g. GitHub Packages). When set, an .npmrc
-      granting access is written before install. Pass ${{ secrets.GITHUB_TOKEN }} for a
-      GitHub Packages scope your repo can read (needs `packages: read` on the job).
+      granting access is written before install. Pass the job's GITHUB_TOKEN secret for a
+      GitHub Packages scope your repo can read (needs "packages: read" on the job).
     default: ''
   registry-scope:
     description: 'Scope to bind to the private registry (e.g. "@optiscaners"). Optional.'
