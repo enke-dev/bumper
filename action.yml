@@ -130,8 +130,11 @@ runs:
           [ -n "$scope" ] && echo "${scope}:registry=${url}"
           echo "//${host}/:_authToken=${BUMPER_REGISTRY_TOKEN}"
         } | tee -a .npmrc "$HOME/.npmrc" >/dev/null
-        # keep the project .npmrc OUT of the update commit: it holds the token, and a stale
-        # copy committed to the branch shadows (and breaks) the downstream check's own auth.
+        # Never let the token-bearing .npmrc reach the update commit — it leaks the token and a
+        # stale copy on the branch shadows the downstream check's own auth. Cover both cases:
+        # skip-worktree hides the change when .npmrc is TRACKED (git add -A ignores tracked
+        # changes only via this); .git/info/exclude ignores it when UNTRACKED.
+        git update-index --skip-worktree .npmrc 2>/dev/null || true
         mkdir -p .git/info
         grep -qxF '.npmrc' .git/info/exclude 2>/dev/null || echo '.npmrc' >> .git/info/exclude
 
