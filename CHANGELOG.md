@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.5.3](https://github.com/enke-dev/bumper/compare/0.5.2...0.5.3) (2026-07-21)
+
+
+### Bug Fixes
+
+* **gh:** don't stage token .npmrc when it's a tracked file ([c886a94](https://github.com/enke-dev/bumper/commit/c886a94a2f72d7f3791f1100a294617473448daf))
+
 ## [0.5.2](https://github.com/enke-dev/bumper/compare/0.5.1...0.5.2) (2026-07-21)
 
 
