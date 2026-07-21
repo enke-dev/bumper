@@ -43,6 +43,18 @@ inputs:
   token:
     description: Token used to push the branch and open the PR (defaults to the job's GITHUB_TOKEN)
     default: ${{ github.token }}
+  registry-token:
+    description: >-
+      Auth token for a private npm registry (e.g. GitHub Packages). When set, an .npmrc
+      granting access is written before install. Pass ${{ secrets.GITHUB_TOKEN }} for a
+      GitHub Packages scope your repo can read (needs `packages: read` on the job).
+    default: ''
+  registry-scope:
+    description: 'Scope to bind to the private registry (e.g. "@optiscaners"). Optional.'
+    default: ''
+  registry-url:
+    description: Private registry URL used with registry-token
+    default: https://npm.pkg.github.com
 
 outputs:
   updated:
@@ -100,6 +112,24 @@ runs:
         if node -e "process.exit(require('./package.json').packageManager ? 0 : 1)" 2>/dev/null; then
           corepack prepare --activate
         fi
+
+    - name: Configure registry auth
+      # Written AFTER checkout (which cleans untracked files) and BEFORE install. Written to
+      # both the project .npmrc and ~/.npmrc: pnpm/npm read $HOME/.npmrc, but bun reads only
+      # the cwd .npmrc — covering both means every package manager authenticates.
+      if: inputs.registry-token != ''
+      shell: bash
+      env:
+        BUMPER_REGISTRY_TOKEN: ${{ inputs.registry-token }}
+      run: |
+        url="${{ inputs.registry-url }}"
+        scope="${{ inputs.registry-scope }}"
+        host="${url#*://}"; host="${host%%/*}"
+        # write the literal token (bun doesn't expand ${VAR} in .npmrc); GitHub masks it in logs
+        {
+          [ -n "$scope" ] && echo "${scope}:registry=${url}"
+          echo "//${host}/:_authToken=${BUMPER_REGISTRY_TOKEN}"
+        } | tee -a .npmrc "$HOME/.npmrc" >/dev/null
 
     - name: Configure git identity
       shell: bash
