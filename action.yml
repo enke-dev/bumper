@@ -130,6 +130,10 @@ runs:
           [ -n "$scope" ] && echo "${scope}:registry=${url}"
           echo "//${host}/:_authToken=${BUMPER_REGISTRY_TOKEN}"
         } | tee -a .npmrc "$HOME/.npmrc" >/dev/null
+        # keep the project .npmrc OUT of the update commit: it holds the token, and a stale
+        # copy committed to the branch shadows (and breaks) the downstream check's own auth.
+        mkdir -p .git/info
+        grep -qxF '.npmrc' .git/info/exclude 2>/dev/null || echo '.npmrc' >> .git/info/exclude
 
     - name: Configure git identity
       shell: bash
