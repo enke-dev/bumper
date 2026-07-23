@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
-import semver from 'semver';
+import { compareReversed, getPrerelease, satisfies } from 'verkit';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { PackageManager } from '../context/context.types.js';
@@ -25,16 +25,16 @@ let peers: Record<string, Record<string, string>>;
  * Offline stand-in for the network-backed registry lookups. `latest` feeds the global-latest
  * lookup; `peers` (keyed by package name) stands for the peers of the version being bumped *to*;
  * `versions` is the candidate pool `maxSatisfyingRanges` filters. That lookup runs the *real*
- * `semver.satisfies` intersection here — order-independent, `||` honored — so the tests exercise
+ * verkit `satisfies` intersection here — order-independent, `||` honored — so the tests exercise
  * the actual cap algebra rather than a hard-coded answer.
  */
 const lookups: RegistryLookups = {
   latestVersion: async pkg => latest[pkg] ?? null,
   maxSatisfyingRanges: async (pkg, ranges) =>
     (versions[pkg] ?? [])
-      .filter(v => semver.prerelease(v) === null) // mirror the real impl: stable versions only
-      .filter(v => ranges.every(range => semver.satisfies(v, range)))
-      .sort(semver.rcompare)[0] ?? null,
+      .filter(v => getPrerelease(v)?.length === 0) // mirror the real impl: stable versions only
+      .filter(v => ranges.every(range => satisfies(v, range)))
+      .sort(compareReversed)[0] ?? null,
   peerDependencies: async pkg => peers[pkg] ?? {},
 };
 

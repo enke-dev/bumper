@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import semver from 'semver';
+import { isLess, isValid, satisfies } from 'verkit';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { allDependencies, readPackageJson, writePackageJson } from './fs.utils.js';
@@ -292,9 +292,9 @@ async function rewriteSpecs(
       //    pin still satisfying them — typically a prerelease the stable-only cap resolution
       //    skipped — must be kept, not downgraded to the newest stable.
       const current = spec.replace(/^[\^~]/, '');
-      if (semver.valid(current) && semver.lt(version, current)) {
+      if (isValid(current) && isLess(version, current)) {
         const currentViolatesCaps =
-          capped_ && !(capRanges.get(name) ?? []).every(range => semver.satisfies(current, range));
+          capped_ && !(capRanges.get(name) ?? []).every(range => satisfies(current, range));
         if (!currentViolatesCaps) {
           return acc;
         }

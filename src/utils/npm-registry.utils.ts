@@ -1,4 +1,4 @@
-import semver from 'semver';
+import { compareReversed, getPrerelease, isValid, satisfies } from 'verkit';
 
 import { PackageManager } from '../context/context.types.js';
 import { exec, execOk } from './exec.utils.js';
@@ -105,7 +105,7 @@ export async function latestVersionInRange(
 /**
  * Highest published, non-prerelease version of a package satisfying *every* range in `ranges`
  * (semver AND) — the correct intersection of multiple peer constraints. It fetches the full
- * version list (`<tool> view <pkg> versions --json`) and filters with `semver.satisfies` per
+ * version list (`<tool> view <pkg> versions --json`) and filters with verkit's `satisfies` per
  * range, because ranges cannot be intersected by string-joining: a peer like `^17 || ^18 || ^19`
  * space-joined with another OR-range produces a *different* range depending on operand order
  * (`A B || C` parses as `A AND B, OR C`), silently allowing versions every peer forbids. Checking
@@ -139,9 +139,9 @@ export async function maxSatisfyingRanges(
         ? [parsed]
         : [];
     const match = versions
-      .filter(v => semver.valid(v) && semver.prerelease(v) === null)
-      .filter(v => ranges.every(range => semver.satisfies(v, range)))
-      .sort(semver.rcompare)[0];
+      .filter(v => isValid(v) && getPrerelease(v)?.length === 0)
+      .filter(v => ranges.every(range => satisfies(v, range)))
+      .sort(compareReversed)[0];
     return match ?? null;
   } catch {
     return null;

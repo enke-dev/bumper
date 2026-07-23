@@ -1,5 +1,5 @@
-import semver from 'semver';
 import { parseRange } from 'semver-utils';
+import { isValid } from 'verkit';
 
 /** A version segment that is present and purely numeric (an absent segment counts as fine). */
 function numericSegment(segment: string | undefined): boolean {
@@ -13,7 +13,7 @@ function numericSegment(segment: string | undefined): boolean {
  * git/url, `*`, `latest` — is left untouched.
  */
 export function isPinnable(spec: string): boolean {
-  return semver.valid(spec.replace(/^[\^~]/, '')) !== null;
+  return isValid(spec.replace(/^[\^~]/, ''));
 }
 
 /** Leading range operator of a spec (`^`, `~`, or `''`). */
