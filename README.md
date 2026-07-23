@@ -148,15 +148,15 @@ three families (mirrored by the `modules/` folder layout): **runtimes**, **packa
 — runtimes first (pin versions), then dependency-pinning features, then package managers install,
 then the remaining file-rewriting features:
 
-| id               | kind            | detects                         | does                                                                       |
-| ---------------- | --------------- | ------------------------------- | -------------------------------------------------------------------------- |
-| `node`           | runtime         | node runtime / `.node-version`  | install latest LTS via fnm/asdf, write `.node-version`                     |
-| `types-node`     | feature         | `@types/node` in any package    | pin spec to exact latest in the Node LTS major line                        |
-| `bun`            | package-manager | bun packageManager / lockfile   | self-upgrade, bump specs, pin `.bun-version`, reinstall                    |
-| `npm`            | package-manager | npm packageManager / lockfile   | bump specs to latest, clean reinstall, `approve-scripts --all`             |
-| `pnpm`           | package-manager | pnpm packageManager / lockfile  | self-update, bump specs to latest, clean reinstall, `approve-builds --all` |
-| `docker-node`    | feature         | `Dockerfile*` / `compose*.yaml` | align `node:<ver>` / `NODE_VERSION=` to LTS                                |
-| `github-actions` | feature         | `.github/workflows/*.y{a,}ml`   | pin actions via `actions-up`                                               |
+| id               | kind            | detects                         | does                                                                                        |
+| ---------------- | --------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
+| `node`           | runtime         | node runtime / `.node-version`  | install latest LTS via fnm/asdf, write `.node-version` + any `.nvmrc`, align `engines.node` |
+| `types-node`     | feature         | `@types/node` in any package    | pin spec to exact latest in the Node LTS major line                                         |
+| `bun`            | package-manager | bun packageManager / lockfile   | self-upgrade, bump specs, pin `.bun-version`, reinstall                                     |
+| `npm`            | package-manager | npm packageManager / lockfile   | bump specs to latest, clean reinstall, `approve-scripts --all`                              |
+| `pnpm`           | package-manager | pnpm packageManager / lockfile  | self-update, bump specs to latest, clean reinstall, `approve-builds --all`                  |
+| `docker-node`    | feature         | `Dockerfile*` / `compose*.yaml` | align `node:<ver>` / `NODE_VERSION=` to LTS                                                 |
+| `github-actions` | feature         | `.github/workflows/*.y{a,}ml`   | pin actions via `actions-up`                                                                |
 
 Adding a concern = adding one module (`*.runtime.ts` / `*.package-manager.ts` / `*.feature.ts`)
 implementing the `Module` interface and registering it. `bumper detect` exposes per-module

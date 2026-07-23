@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { isPinnable, isVersionRange, operatorOf } from './spec.utils.js';
+import { isPinnable, isVersionRange, operatorOf, repinNodeSpec } from './spec.utils.js';
 
 describe('isPinnable', () => {
   test('accepts concrete versions, with or without ^/~', () => {
@@ -42,6 +42,32 @@ describe('operatorOf', () => {
     assert.equal(operatorOf('^1.2.3'), '^');
     assert.equal(operatorOf('~1.2.3'), '~');
     assert.equal(operatorOf('1.2.3'), '');
+  });
+});
+
+describe('repinNodeSpec', () => {
+  const version = '22.15.1';
+  const major = 22;
+
+  test('preserves the operator', () => {
+    assert.equal(repinNodeSpec('>=20', version, major), '>=22');
+    assert.equal(repinNodeSpec('>20', version, major), '>22');
+    assert.equal(repinNodeSpec('^20', version, major), '^22');
+    assert.equal(repinNodeSpec('~20', version, major), '~22');
+    assert.equal(repinNodeSpec('20', version, major), '22');
+  });
+
+  test('major-only stays major, fuller specs take the full version', () => {
+    assert.equal(repinNodeSpec('>=20', version, major), '>=22');
+    assert.equal(repinNodeSpec('^20.0.0', version, major), '^22.15.1');
+    assert.equal(repinNodeSpec('20.11.0', version, major), '22.15.1');
+    assert.equal(repinNodeSpec('^20.11', version, major), '^22.15.1');
+  });
+
+  test('leaves shapes it does not own untouched (null)', () => {
+    for (const spec of ['>=18 <21', '18 || 20', '*', 'lts/*', 'latest', '']) {
+      assert.equal(repinNodeSpec(spec, version, major), null, spec);
+    }
   });
 });
 

@@ -50,7 +50,13 @@ describe('detection: node + npm', () => {
     assert.equal(ctx.runtime, Runtime.Node);
     assert.equal(ctx.packageManager, PackageManager.Npm);
     assert.equal(ctx.isMonorepo, false);
-    assert.deepEqual([...used].sort(), ['docker-node', 'github-actions', 'node', 'npm', 'types-node']);
+    assert.deepEqual([...used].sort(), [
+      'docker-node',
+      'github-actions',
+      'node',
+      'npm',
+      'types-node',
+    ]);
   });
 });
 

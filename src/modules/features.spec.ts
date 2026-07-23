@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { defaultRepoConfig } from '../config/config.js';
 import type { ModuleContext, NodeLts } from '../context/context.types.js';
 import { PackageManager, Runtime, VersionManager } from '../context/context.types.js';
-import { readPackageJson } from '../utils/fs.utils.js';
+import { pathExists, readPackageJson } from '../utils/fs.utils.js';
 import { dockerNodeFeature } from './features/docker-node/docker-node.feature.js';
 import { updateTypesNode } from './features/types-node/types-node.feature.js';
 import { nodeRuntime } from './runtimes/node/node.runtime.js';
@@ -56,12 +56,39 @@ describe('node runtime feature', () => {
     });
   });
 
-  test('dry-run leaves .node-version untouched', async () => {
+  test('updates an existing .nvmrc but never creates one', async () => {
     await withFixture('node-npm', async dir => {
-      const before = await readFile(join(dir, '.node-version'), 'utf8');
+      // fixture ships no .nvmrc → the root stays free of a redundant dotfile
+      await nodeRuntime.update(contextFor(dir));
+      assert.equal(await pathExists(join(dir, '.nvmrc')), false, 'no .nvmrc imposed');
+
+      // a repo that keeps one gets it aligned
+      await writeFile(join(dir, '.nvmrc'), 'v18.0.0\n');
+      await nodeRuntime.update(contextFor(dir));
+      assert.equal(await readFile(join(dir, '.nvmrc'), 'utf8'), `v${LTS.version}\n`);
+    });
+  });
+
+  test('aligns an existing engines.node floor, preserving its operator', async () => {
+    await withFixture('node-npm', async dir => {
+      // fixture declares `>=20` → major-granular, operator preserved
+      await nodeRuntime.update(contextFor(dir));
+      const pkg = await readPackageJson(dir);
+      assert.equal(pkg?.engines?.['node'], `>=${LTS.major}`);
+    });
+  });
+
+  test('dry-run leaves .node-version, .nvmrc and engines.node untouched', async () => {
+    await withFixture('node-npm', async dir => {
+      await writeFile(join(dir, '.nvmrc'), 'v18.0.0\n');
+      const beforeVersion = await readFile(join(dir, '.node-version'), 'utf8');
+      const beforeNvmrc = await readFile(join(dir, '.nvmrc'), 'utf8');
+      const beforePkg = await readPackageJson(dir);
       await nodeRuntime.update(contextFor(dir, true));
-      const after = await readFile(join(dir, '.node-version'), 'utf8');
-      assert.equal(after, before);
+      assert.equal(await readFile(join(dir, '.node-version'), 'utf8'), beforeVersion);
+      assert.equal(await readFile(join(dir, '.nvmrc'), 'utf8'), beforeNvmrc);
+      const afterPkg = await readPackageJson(dir);
+      assert.equal(afterPkg?.engines?.['node'], beforePkg?.engines?.['node']);
     });
   });
 });
