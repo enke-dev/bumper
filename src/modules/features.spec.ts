@@ -12,7 +12,7 @@ import { defaultRepoConfig } from '../config/config.js';
 import type { ModuleContext, NodeLts } from '../context/context.types.js';
 import { PackageManager, Runtime, VersionManager } from '../context/context.types.js';
 import { readPackageJson } from '../utils/fs.utils.js';
-import { dockerFeature } from './features/docker/docker.feature.js';
+import { dockerNodeFeature } from './features/docker-node/docker-node.feature.js';
 import { updateTypesNode } from './features/types-node/types-node.feature.js';
 import { nodeRuntime } from './runtimes/node/node.runtime.js';
 
@@ -88,10 +88,10 @@ describe('types-node feature', () => {
   });
 });
 
-describe('docker feature', () => {
+describe('docker-node feature', () => {
   test('aligns node:<ver> and NODE_VERSION= to the LTS version', async () => {
     await withFixture('node-npm', async dir => {
-      await dockerFeature.update(contextFor(dir));
+      await dockerNodeFeature.update(contextFor(dir));
       const dockerfile = await readFile(join(dir, 'Dockerfile'), 'utf8');
       assert.ok(dockerfile.includes(`node:${LTS.version}-alpine`), 'FROM image tag aligned');
       assert.ok(dockerfile.includes(`NODE_VERSION=${LTS.version}`), 'NODE_VERSION aligned');
@@ -102,7 +102,7 @@ describe('docker feature', () => {
   test('dry-run leaves the Dockerfile untouched', async () => {
     await withFixture('node-npm', async dir => {
       const before = await readFile(join(dir, 'Dockerfile'), 'utf8');
-      await dockerFeature.update(contextFor(dir, true));
+      await dockerNodeFeature.update(contextFor(dir, true));
       const after = await readFile(join(dir, 'Dockerfile'), 'utf8');
       assert.equal(after, before);
     });
@@ -116,7 +116,7 @@ describe('docker feature', () => {
       const before = await readFile(join(dir, 'Dockerfile'), 'utf8');
       await writeFile(excludedFile, before);
 
-      await dockerFeature.update(contextFor(dir, false, ['examples']));
+      await dockerNodeFeature.update(contextFor(dir, false, ['examples']));
 
       assert.equal(await readFile(excludedFile, 'utf8'), before, 'excluded Dockerfile untouched');
       const root = await readFile(join(dir, 'Dockerfile'), 'utf8');

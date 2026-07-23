@@ -117,7 +117,7 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | `--json`                 |     no     | `detect` only — emit machine-readable detection output.                                      |
 
 `--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `types-node`,
-`bun`, `npm`, `pnpm`, `docker`, `github-actions`).
+`bun`, `npm`, `pnpm`, `docker-node`, `github-actions`).
 
 ```sh
 bumper update --dry-run                               # preview, no writes
@@ -155,7 +155,7 @@ then the remaining file-rewriting features:
 | `bun`            | package-manager | bun packageManager / lockfile   | self-upgrade, bump specs, pin `.bun-version`, reinstall                    |
 | `npm`            | package-manager | npm packageManager / lockfile   | bump specs to latest, clean reinstall, `approve-scripts --all`             |
 | `pnpm`           | package-manager | pnpm packageManager / lockfile  | self-update, bump specs to latest, clean reinstall, `approve-builds --all` |
-| `docker`         | feature         | `Dockerfile*` / `compose*.yaml` | align `node:<ver>` / `NODE_VERSION=` to LTS                                |
+| `docker-node`    | feature         | `Dockerfile*` / `compose*.yaml` | align `node:<ver>` / `NODE_VERSION=` to LTS                                |
 | `github-actions` | feature         | `.github/workflows/*.y{a,}ml`   | pin actions via `actions-up`                                               |
 
 Adding a concern = adding one module (`*.runtime.ts` / `*.package-manager.ts` / `*.feature.ts`)
@@ -214,7 +214,7 @@ All inputs are optional.
 | `pr-title`  | `chore: update dependencies` | Title of the created or updated PR.                                                                          |
 | `pr-labels` | _(none)_                     | Comma-separated labels to apply to the PR (labels must already exist in the repo).                           |
 | `only`      | _(all modules)_              | Run only the listed module ids (comma-separated, e.g. `node,pnpm`).                                          |
-| `skip`      | _(none)_                     | Skip the listed module ids (comma-separated, e.g. `docker`).                                                 |
+| `skip`      | _(none)_                     | Skip the listed module ids (comma-separated, e.g. `docker-node`).                                            |
 | `exclude`   | _(none)_                     | Space-separated repo-relative paths to exclude (e.g. `examples fixtures`).                                   |
 | `token`     | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows). |
 
@@ -273,7 +273,7 @@ jobs:
           branch: chore/bumper-update
           pr-title: 'chore: update dependencies'
           pr-labels: 'dependencies,automated'
-          skip: docker
+          skip: docker-node
           exclude: examples fixtures
 ```
 
@@ -288,13 +288,13 @@ entry, so the next run is already scoped:
   "repos": {
     "/absolute/path/to/repository": {
       "exclude": ["packages/vendored-pkg"], // repo-relative paths skipped everywhere (see below)
-      "modules": { "docker": false }, // explicit per-module on/off overrides, keyed by module id
+      "modules": { "docker-node": false }, // explicit per-module on/off overrides, keyed by module id
     },
   },
 }
 ```
 
-A stored `modules` toggle is authoritative: `docker: false` disables that module even where its
+A stored `modules` toggle is authoritative: `docker-node: false` disables that module even where its
 files exist, `true` forces it on. Modules with no entry fall back to auto-detection.
 
 ```sh
@@ -302,7 +302,7 @@ bumper config list
 bumper config get                              # current repo (path defaults to cwd)
 bumper config get /path/to/repo                # another repo
 bumper config set exclude packages/a packages/b  # current repo
-bumper config set /path/to/repo modules.docker false
+bumper config set /path/to/repo modules.docker-node false
 ```
 
 `get` and `set` default the path to the current repo — omit it to configure where you're standing.
@@ -319,7 +319,7 @@ would do.
 leaves alone. It applies **uniformly**:
 
 - workspace members under an excluded path are dropped from every workspace operation, and
-- every file-discovering module (e.g. `docker`, which globs `**/Dockerfile*`) skips matches under
+- every file-discovering module (e.g. `docker-node`, which globs `**/Dockerfile*`) skips matches under
   an excluded path — so vendored packages, fixtures, or example projects used for testing are
   never rewritten.
 

@@ -16,12 +16,12 @@ function findDockerFiles(ctx: ModuleContext): Promise<string[]> {
   return collectFiles(ctx.cwd, DOCKER_GLOB, ctx.config.exclude);
 }
 
-export const dockerFeature: Module = {
+export const dockerNodeFeature: Module = {
   kind: ModuleKind.Feature,
-  id: 'docker',
+  id: 'docker-node',
   title: 'Align Node version in Docker/Compose files',
   async isUsed(ctx) {
-    const toggle = ctx.config.modules['docker'];
+    const toggle = ctx.config.modules['docker-node'];
     if (toggle !== undefined) {
       return toggle;
     }
