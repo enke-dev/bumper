@@ -10,7 +10,7 @@ import {
   writePackageJson,
 } from '../../../utils/fs.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
-import { repinNodeSpec } from '../../../utils/spec.utils.js';
+import { realignVersionSpec } from '../../../utils/spec.utils.js';
 import type { Module, ModuleContext } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 import { ensureNodeLts } from './node-lts.utils.js';
@@ -52,7 +52,7 @@ async function alignEnginesNode(dir: string, version: string, major: number): Pr
   if (!pkg || !pkg.engines || !current) {
     return;
   }
-  const next = repinNodeSpec(current, version, major);
+  const next = realignVersionSpec(current, version, major);
   if (next && next !== current) {
     pkg.engines['node'] = next;
     await writePackageJson(dir, pkg);

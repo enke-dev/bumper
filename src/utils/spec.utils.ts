@@ -1,4 +1,10 @@
 import semver from 'semver';
+import { parseRange } from 'semver-utils';
+
+/** A version segment that is present and purely numeric (an absent segment counts as fine). */
+function numericSegment(segment: string | undefined): boolean {
+  return segment === undefined || /^\d+$/.test(segment);
+}
 
 /**
  * Whether a spec is a concrete, pinnable version: a full `x.y.z` semver (incl. prerelease
@@ -17,21 +23,45 @@ export function operatorOf(spec: string): string {
 
 /**
  * Realign a single-version spec to a new release, preserving both the operator (`^`, `~`, `>=`,
- * `>`, or none) *and* the precision the author declared: a major-only spec (`>=20`) stays
+ * `>`, `=`, or none) *and* the precision the author declared: a major-only spec (`>=20`) stays
  * major-only (`>=22`), a fuller spec (`^20.0.0`, `20.11.0`) takes the full version (`^22.15.1`,
  * `22.15.1`). Keeps an `engines.node` floor aligned to the pinned Node without over-tightening a
- * deliberately loose range. Returns null when the spec isn't a plain operator+version shape — a
- * compound range (`>=18 <21`), `*`, `lts/*`, `latest` — so the caller leaves it untouched.
+ * deliberately loose range. Returns null when the spec isn't a plain operator+version pin — a
+ * compound range (`>=18 <21`), an `||` union, a wildcard (`20.x`, `*`), `lts/*`, `latest`, empty —
+ * so the caller leaves it untouched.
+ *
+ * `semver-utils` owns the parse (operator + precision detection); we emit the string ourselves
+ * because its `stringifyRange` inserts spaces and forces a full `x.y.z`. `major` is the LTS major
+ * used when the spec is major-granular; `version` supplies the minor/patch for fuller specs.
  */
-export function repinNodeSpec(spec: string, version: string, major: number): string | null {
-  const match = spec.trim().match(/^(\^|~|>=|>|)(\d+)((?:\.\d+){0,2})$/);
-  if (!match) {
+export function realignVersionSpec(spec: string, version: string, major: number): string | null {
+  const trimmed = spec.trim();
+  // Wildcards parse inconsistently (`20.x` keeps the `x`, `20.X` silently drops it) — bail on any.
+  if (/[xX*]/.test(trimmed)) {
     return null;
   }
-  const [, operator, , tail] = match;
-  // A bare major (empty tail) stays major-granular; any minor/patch means the author wanted a
-  // fuller pin, so give them the full resolved version.
-  return `${operator}${tail ? version : major}`;
+  const parts = parseRange(trimmed);
+  const part = parts[0];
+  // Exactly one plain comparator with a numeric major; anything else is a shape we don't rewrite.
+  if (parts.length !== 1 || part === undefined || part.operator === '||') {
+    return null;
+  }
+  const { operator, major: pMajor, minor, patch } = part;
+  if (
+    pMajor === undefined ||
+    !numericSegment(pMajor) ||
+    !numericSegment(minor) ||
+    !numericSegment(patch)
+  ) {
+    return null;
+  }
+  const [nextMajor, nextMinor, nextPatch] = version.split('.');
+  // Major-only (no minor) stays major-granular; a declared minor/patch takes the resolved version.
+  return (
+    `${operator ?? ''}${minor === undefined ? major : nextMajor}` +
+    (minor !== undefined ? `.${nextMinor}` : '') +
+    (patch !== undefined ? `.${nextPatch}` : '')
+  );
 }
 
 /**

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { isPinnable, isVersionRange, operatorOf, repinNodeSpec } from './spec.utils.js';
+import { isPinnable, isVersionRange, operatorOf, realignVersionSpec } from './spec.utils.js';
 
 describe('isPinnable', () => {
   test('accepts concrete versions, with or without ^/~', () => {
@@ -45,28 +45,43 @@ describe('operatorOf', () => {
   });
 });
 
-describe('repinNodeSpec', () => {
+describe('realignVersionSpec', () => {
   const version = '22.15.1';
   const major = 22;
 
   test('preserves the operator', () => {
-    assert.equal(repinNodeSpec('>=20', version, major), '>=22');
-    assert.equal(repinNodeSpec('>20', version, major), '>22');
-    assert.equal(repinNodeSpec('^20', version, major), '^22');
-    assert.equal(repinNodeSpec('~20', version, major), '~22');
-    assert.equal(repinNodeSpec('20', version, major), '22');
+    assert.equal(realignVersionSpec('>=20', version, major), '>=22');
+    assert.equal(realignVersionSpec('>20', version, major), '>22');
+    assert.equal(realignVersionSpec('^20', version, major), '^22');
+    assert.equal(realignVersionSpec('~20', version, major), '~22');
+    assert.equal(realignVersionSpec('=20', version, major), '=22');
+    assert.equal(realignVersionSpec('20', version, major), '22');
+    assert.equal(realignVersionSpec(' ^20 ', version, major), '^22');
   });
 
   test('major-only stays major, fuller specs take the full version', () => {
-    assert.equal(repinNodeSpec('>=20', version, major), '>=22');
-    assert.equal(repinNodeSpec('^20.0.0', version, major), '^22.15.1');
-    assert.equal(repinNodeSpec('20.11.0', version, major), '22.15.1');
-    assert.equal(repinNodeSpec('^20.11', version, major), '^22.15.1');
+    assert.equal(realignVersionSpec('>=20', version, major), '>=22');
+    assert.equal(realignVersionSpec('^20.0.0', version, major), '^22.15.1');
+    assert.equal(realignVersionSpec('20.11.0', version, major), '22.15.1');
+    assert.equal(realignVersionSpec('~20.1', version, major), '~22.15');
+    assert.equal(realignVersionSpec('>=20.0.0', version, major), '>=22.15.1');
   });
 
-  test('leaves shapes it does not own untouched (null)', () => {
-    for (const spec of ['>=18 <21', '18 || 20', '*', 'lts/*', 'latest', '']) {
-      assert.equal(repinNodeSpec(spec, version, major), null, spec);
+  test('leaves compound ranges, unions, wildcards and tags untouched (null)', () => {
+    for (const spec of [
+      '>=18 <21',
+      '18 || 20',
+      '20 || 22',
+      '*',
+      'lts/*',
+      'latest',
+      '',
+      '20.x',
+      '20.X',
+      '^20.x',
+      '1.2.x',
+    ]) {
+      assert.equal(realignVersionSpec(spec, version, major), null, spec);
     }
   });
 });
