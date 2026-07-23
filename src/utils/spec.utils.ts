@@ -11,14 +11,25 @@ function numericSegment(segment: string | undefined): boolean {
  * and build metadata), optionally prefixed by `^` or `~`. Anything else — ranges (`>=x <y`),
  * wildcards/partials (`1.x`, `1.2`, `1`), `workspace:`, `catalog:`, `link:`, `npm:` aliases,
  * git/url, `*`, `latest` — is left untouched.
+ *
+ * Gated on verkit's `isValid` (the authoritative full-version check) after stripping a `^`/`~`,
+ * *not* on `parseRange`: semver-utils silently strips protocol/alias prefixes (`npm:pkg@1.2.3` →
+ * `1.2.3`), which would wrongly report an alias as pinnable.
  */
 export function isPinnable(spec: string): boolean {
   return isValid(spec.replace(/^[\^~]/, ''));
 }
 
-/** Leading range operator of a spec (`^`, `~`, or `''`). */
+/** Comparators that make a spec a multi-version range (as opposed to `^`/`~`/exact). */
+const RANGE_OPERATORS = new Set(['<', '<=', '>', '>=', '||']);
+
+/**
+ * Leading range operator of a spec (`^`, `~`, `>=`, `>`, …, or `''`) — read structurally from
+ * semver-utils rather than hand-matched. Callers pass a single-comparator spec; on a pinnable
+ * spec this is `^`, `~`, or `''`.
+ */
 export function operatorOf(spec: string): string {
-  return spec.startsWith('^') ? '^' : spec.startsWith('~') ? '~' : '';
+  return parseRange(spec.trim())[0]?.operator ?? '';
 }
 
 /**
@@ -65,13 +76,12 @@ export function realignVersionSpec(spec: string, version: string, major: number)
 }
 
 /**
- * Whether a spec is a multi-version compatibility range (e.g. `>=4.8.4 <6.1.0`, `4 || 5`) —
- * as opposed to a pinnable version or a protocol/tag spec. Used to cap a concrete bump to a
- * range the same manifest declares for the package (typically an optional peer).
+ * Whether a spec is a multi-version compatibility range (e.g. `>=4.8.4 <6.1.0`, `4 || 5`, `>1.0.0`)
+ * — as opposed to a pinnable version, a wildcard/partial (`1.x`, `1`), or a protocol/tag spec. Used
+ * to cap a concrete bump to a range the same manifest declares for the package (typically an
+ * optional peer). Detected structurally via semver-utils: any comparator (`<`/`>`/`||`) marks a
+ * range; `^`/`~`/exact do not.
  */
 export function isVersionRange(spec: string): boolean {
-  if (isPinnable(spec)) {
-    return false;
-  }
-  return /[<>]/.test(spec) || spec.includes('||') || /\d\s+[\d<>=~^v]/.test(spec.trim());
+  return parseRange(spec.trim()).some(part => RANGE_OPERATORS.has(part.operator ?? ''));
 }

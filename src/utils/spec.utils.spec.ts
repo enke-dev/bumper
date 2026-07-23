@@ -7,33 +7,33 @@ import { isPinnable, isVersionRange, operatorOf, realignVersionSpec } from './sp
 
 describe('isPinnable', () => {
   test('accepts concrete versions, with or without ^/~', () => {
-    for (const spec of ['1.2.3', '^1.2.3', '~1.2.3', '0.0.0', '10.20.30']) {
-      assert.equal(isPinnable(spec), true, spec);
-    }
+    ['1.2.3', '^1.2.3', '~1.2.3', '0.0.0', '10.20.30'].forEach(spec =>
+      assert.equal(isPinnable(spec), true, spec)
+    );
   });
 
   test('accepts prerelease and build metadata', () => {
-    for (const spec of ['1.2.3-beta.1', '^1.0.0-rc.1', '~2.0.0+build.5', '1.0.0-alpha+meta']) {
-      assert.equal(isPinnable(spec), true, spec);
-    }
+    ['1.2.3-beta.1', '^1.0.0-rc.1', '~2.0.0+build.5', '1.0.0-alpha+meta'].forEach(spec =>
+      assert.equal(isPinnable(spec), true, spec)
+    );
   });
 
   test('rejects wildcards and partial versions (left untouched, not pinned)', () => {
-    for (const spec of ['1.x', '1.2.x', '1', '1.2', '1.X', '*', 'x']) {
-      assert.equal(isPinnable(spec), false, spec);
-    }
+    ['1.x', '1.2.x', '1', '1.2', '1.X', '*', 'x'].forEach(spec =>
+      assert.equal(isPinnable(spec), false, spec)
+    );
   });
 
   test('rejects ranges', () => {
-    for (const spec of ['>=4.8.4 <6.1.0', '4 || 5', '>1.0.0', '<=2.0.0']) {
-      assert.equal(isPinnable(spec), false, spec);
-    }
+    ['>=4.8.4 <6.1.0', '4 || 5', '>1.0.0', '<=2.0.0'].forEach(spec =>
+      assert.equal(isPinnable(spec), false, spec)
+    );
   });
 
   test('rejects protocol/tag/alias specs', () => {
-    for (const spec of ['workspace:*', 'catalog:', 'link:../foo', 'npm:pkg@1.2.3', 'latest', '']) {
-      assert.equal(isPinnable(spec), false, spec);
-    }
+    ['workspace:*', 'catalog:', 'link:../foo', 'npm:pkg@1.2.3', 'latest', ''].forEach(spec =>
+      assert.equal(isPinnable(spec), false, spec)
+    );
   });
 });
 
@@ -68,7 +68,7 @@ describe('realignVersionSpec', () => {
   });
 
   test('leaves compound ranges, unions, wildcards and tags untouched (null)', () => {
-    for (const spec of [
+    [
       '>=18 <21',
       '18 || 20',
       '20 || 22',
@@ -80,29 +80,31 @@ describe('realignVersionSpec', () => {
       '20.X',
       '^20.x',
       '1.2.x',
-    ]) {
-      assert.equal(realignVersionSpec(spec, version, major), null, spec);
-    }
+    ].forEach(spec => assert.equal(realignVersionSpec(spec, version, major), null, spec));
   });
 });
 
 describe('isVersionRange', () => {
-  test('detects multi-version ranges', () => {
-    for (const spec of ['>=4.8.4 <6.1.0', '4 || 5', '>1.0.0 <2.0.0']) {
-      assert.equal(isVersionRange(spec), true, spec);
-    }
+  test('detects multi-version ranges, including single comparators', () => {
+    ['>=4.8.4 <6.1.0', '4 || 5', '>1.0.0 <2.0.0', '>1.0.0', '<=2.0.0'].forEach(spec =>
+      assert.equal(isVersionRange(spec), true, spec)
+    );
+  });
+
+  test('protocol/tag/alias specs are not ranges', () => {
+    ['workspace:*', 'catalog:', 'npm:pkg@1.2.3', 'latest', ''].forEach(spec =>
+      assert.equal(isVersionRange(spec), false, spec)
+    );
   });
 
   test('pinnable versions are not ranges', () => {
-    for (const spec of ['1.2.3', '^1.2.3', '~1.2.3']) {
-      assert.equal(isVersionRange(spec), false, spec);
-    }
+    ['1.2.3', '^1.2.3', '~1.2.3'].forEach(spec => assert.equal(isVersionRange(spec), false, spec));
   });
 
   test('wildcards/partials are neither pinnable nor a cap range (left fully untouched)', () => {
-    for (const spec of ['1.x', '1.2', '1']) {
+    ['1.x', '1.2', '1'].forEach(spec => {
       assert.equal(isPinnable(spec), false, spec);
       assert.equal(isVersionRange(spec), false, spec);
-    }
+    });
   });
 });
