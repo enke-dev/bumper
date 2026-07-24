@@ -1,5 +1,13 @@
 # @enke.dev/bumper
 
+# [0.6.0](https://github.com/enke-dev/bumper/compare/0.5.3...0.6.0) (2026-07-24)
+
+
+### Features
+
+* **dist:** self-contained binaries via a reusable build, GH release, curl installer ([#4](https://github.com/enke-dev/bumper/issues/4)) ([ae7005c](https://github.com/enke-dev/bumper/commit/ae7005c02431adf34558186c55484ec4931fa534))
+* **node:** align .nvmrc and engines.node to the pinned LTS ([7627b85](https://github.com/enke-dev/bumper/commit/7627b85ab67f7de0cadc7645aad7b655fac47d03))
+
 ## [0.5.3](https://github.com/enke-dev/bumper/compare/0.5.2...0.5.3) (2026-07-21)
 
 
