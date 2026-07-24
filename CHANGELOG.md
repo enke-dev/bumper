@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+# [0.8.0](https://github.com/enke-dev/bumper/compare/0.7.1...0.8.0) (2026-07-24)
+
+
+### Features
+
+* **upgrade:** self-update the standalone binary via `bumper upgrade` ([323a89f](https://github.com/enke-dev/bumper/commit/323a89f590fb6a5f7b2d77a70b6272a5c004e208))
+
 ## [0.7.1](https://github.com/enke-dev/bumper/compare/0.7.0...0.7.1) (2026-07-24)
 
 # [0.7.0](https://github.com/enke-dev/bumper/compare/0.6.1...0.7.0) (2026-07-24)
