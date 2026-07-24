@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+# [0.7.0](https://github.com/enke-dev/bumper/compare/0.6.1...0.7.0) (2026-07-24)
+
+
+### Features
+
+* **docker-images:** base-image tag bumping + verkit/semver-utils version tooling ([#3](https://github.com/enke-dev/bumper/issues/3)) ([1b4a89c](https://github.com/enke-dev/bumper/commit/1b4a89c76d42d1d56c7d7f76483d70ebba6f715b))
+
 ## [0.6.1](https://github.com/enke-dev/bumper/compare/0.6.0...0.6.1) (2026-07-24)
 
 
