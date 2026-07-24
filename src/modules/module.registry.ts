@@ -51,10 +51,21 @@ export async function collectManagedDependencies(ctx: ModuleContext): Promise<Se
   return new Set(owned.flat());
 }
 
+/** Union of container image repos owned by every module that applies to this repo. */
+export async function collectManagedImages(ctx: ModuleContext): Promise<Set<string>> {
+  const owned = await Promise.all(
+    MODULES.map(async module =>
+      module.managedImages && (await module.isUsed(ctx)) ? module.managedImages(ctx) : []
+    )
+  );
+  return new Set(owned.flat());
+}
+
 /** Generic update procedure: run every applicable module, in registry order. */
 export async function runUpdate(ctx: ModuleContext, options: RunOptions = {}): Promise<void> {
-  // resolve owned deps up front so the generic bump can skip them, whatever the run order
+  // resolve owned deps + images up front so the generic bumps can skip them, whatever the run order
   ctx.managedDependencies = await collectManagedDependencies(ctx);
+  ctx.managedImages = await collectManagedImages(ctx);
 
   // reduce over a promise accumulator to keep modules strictly sequential (ordering
   // matters: runtimes pin versions before the features that read them)

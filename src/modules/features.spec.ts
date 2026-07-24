@@ -12,6 +12,7 @@ import { defaultRepoConfig } from '../config/config.js';
 import type { ModuleContext, NodeLts } from '../context/context.types.js';
 import { PackageManager, Runtime, VersionManager } from '../context/context.types.js';
 import { pathExists, readPackageJson } from '../utils/fs.utils.js';
+import { dockerImagesFeature } from './features/docker-images/docker-images.feature.js';
 import { dockerNodeFeature } from './features/docker-node/docker-node.feature.js';
 import { updateTypesNode } from './features/types-node/types-node.feature.js';
 import { nodeRuntime } from './runtimes/node/node.runtime.js';
@@ -148,6 +149,27 @@ describe('docker-node feature', () => {
       assert.equal(await readFile(excludedFile, 'utf8'), before, 'excluded Dockerfile untouched');
       const root = await readFile(join(dir, 'Dockerfile'), 'utf8');
       assert.ok(root.includes(`NODE_VERSION=${LTS.version}`), 'root Dockerfile still aligned');
+    });
+  });
+
+  test('owns the node image so the generic docker feature never bumps it', async () => {
+    assert.deepEqual(await dockerNodeFeature.managedImages?.(contextFor('/tmp')), ['node']);
+  });
+});
+
+describe('docker-images feature (skeleton)', () => {
+  test('detects a repo with Docker/compose files', async () => {
+    await withFixture('node-npm', async dir => {
+      assert.equal(await dockerImagesFeature.isUsed(contextFor(dir)), true);
+    });
+  });
+
+  test('dry-run rewrites nothing (registry lookup not yet implemented)', async () => {
+    await withFixture('node-npm', async dir => {
+      const before = await readFile(join(dir, 'Dockerfile'), 'utf8');
+      const ctx = { ...contextFor(dir, true), managedImages: new Set(['node']) };
+      await dockerImagesFeature.update(ctx);
+      assert.equal(await readFile(join(dir, 'Dockerfile'), 'utf8'), before);
     });
   });
 });

@@ -55,6 +55,12 @@ export interface ModuleContext {
    * owning module pins its own package. Populated by `runUpdate` before modules run.
    */
   managedDependencies?: ReadonlySet<string>;
+  /**
+   * Container image repos owned by the active modules; the generic docker base-image bump skips
+   * them so each owning module pins its own image (e.g. docker-node holds `node` at LTS).
+   * Populated by `runUpdate` before modules run.
+   */
+  managedImages?: ReadonlySet<string>;
   /** When true, modules print intended steps without mutating anything. */
   dryRun: boolean;
 }
