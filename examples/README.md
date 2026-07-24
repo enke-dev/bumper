@@ -1,7 +1,8 @@
 # examples
 
 Sample repositories used as fixtures by the detection + feature tests
-(`src/context/detection.spec.ts`, `src/modules/features.spec.ts`). Each one is a
+(`src/context/detection.spec.ts` and the colocated module specs,
+`src/modules/**/*.spec.ts`). Each one is a
 minimal, self-contained repo that exercises one detection/runtime combination.
 They double as living documentation of what `bumper detect` recognises.
 
