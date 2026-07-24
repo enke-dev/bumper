@@ -6,30 +6,17 @@ import { planLine } from '../../../utils/output.utils.js';
 import type { Module, ModuleContext } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 import { readDockerConfigAuth } from './docker-auth.utils.js';
-import { fetchDockerHubTags } from './docker-hub.client.js';
 import type { ImageRef } from './docker-refs.utils.js';
-import {
-  isDockerHub,
-  parseImageRef,
-  parseImageRefs,
-  partitionByOwnership,
-} from './docker-refs.utils.js';
+import { parseImageRef, parseImageRefs, partitionByOwnership } from './docker-refs.utils.js';
 import { parseTag, pickNewestTag } from './docker-tags.utils.js';
-import { fetchOciTags } from './oci-registry.client.js';
+import { fetchOciTags, ociHost } from './oci-registry.client.js';
 
-/** Resolve a repository's available tags for a parsed ref. Injected in tests; defaults to the
- * Docker Hub JSON API for Hub images and the OCI Distribution API elsewhere (ghcr/jfrog/…). */
+/** Resolve a repository's available tags for a parsed ref. Injected in tests; defaults to the OCI
+ * Distribution API for every registry (Docker Hub included, via `registry-1.docker.io`). */
 export type TagFetcher = (ref: ImageRef) => Promise<string[]>;
 
 const defaultTagFetcher: TagFetcher = ref =>
-  isDockerHub(ref)
-    ? fetchDockerHubTags(ref.namespace, ref.name)
-    : fetchOciTags(
-        ref.registry ?? '',
-        ref.namespace ? `${ref.namespace}/${ref.name}` : ref.name,
-        fetch,
-        readDockerConfigAuth
-      );
+  fetchOciTags(ociHost(ref.domain), ref.repository, fetch, readDockerConfigAuth);
 
 interface Bump {
   ref: string;
@@ -47,7 +34,7 @@ function escapeRegExp(value: string): string {
  */
 async function resolveBump(ref: string, fetchTags: TagFetcher): Promise<Bump | null> {
   const parsed = parseImageRef(ref);
-  if (parsed.tag === null || parsed.digest !== null || parseTag(parsed.tag) === null) {
+  if (!parsed || parsed.tag === null || parsed.digest !== null || parseTag(parsed.tag) === null) {
     return null;
   }
   const newest = pickNewestTag(parsed.tag, await fetchTags(parsed));

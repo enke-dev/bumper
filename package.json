@@ -57,6 +57,7 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
+    "@swimlane/docker-reference": "2.0.1",
     "semver-utils": "1.1.4",
     "verkit": "0.3.0"
   }

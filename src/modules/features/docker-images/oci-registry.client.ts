@@ -1,14 +1,22 @@
 import type { RegistryAuth } from './docker-auth.utils.js';
-import type { FetchLike } from './docker-hub.client.js';
+
+/** The `fetch` surface these clients need — swapped for a stub in tests. */
+export type FetchLike = typeof fetch;
 
 /**
- * Tag lookup for any OCI-compliant registry (GHCR, Artifactory, self-hosted) via the standard
- * Distribution API `/v2/<repo>/tags/list`, including the `WWW-Authenticate` bearer-token dance.
- * Pure `fetch`, no external client. Best-effort: any failure resolves to `[]`. Injectable for
- * offline tests. `resolveAuth` supplies Basic credentials for the token request when the registry
- * is private (see readDockerConfigAuth); omit for anonymous/public pulls.
+ * Tag lookup for any OCI-compliant registry (Docker Hub, GHCR, Artifactory, self-hosted) via the
+ * standard Distribution API `/v2/<repo>/tags/list`, including the `WWW-Authenticate` bearer-token
+ * dance. Pure `fetch`, no external client. Best-effort: any failure resolves to `[]`. Injectable
+ * for offline tests. `resolveAuth` supplies Basic credentials for the token request when the
+ * registry is private (see readDockerConfigAuth); omit for anonymous/public pulls.
  */
 export type AuthResolver = (registry: string) => Promise<RegistryAuth | null>;
+
+/** Map a normalized ref domain to the host serving the OCI API. Docker Hub's canonical `docker.io`
+ * is served by `registry-1.docker.io` (`auth.docker.io` issues the tokens). */
+export function ociHost(domain: string): string {
+  return domain === 'docker.io' ? 'registry-1.docker.io' : domain;
+}
 
 /** Parse a `WWW-Authenticate: Bearer realm="…",service="…",scope="…"` header into its params. */
 function parseChallenge(header: string | null): Record<string, string> {

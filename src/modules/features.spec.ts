@@ -166,13 +166,13 @@ describe('docker-images feature', () => {
   // docker-node). GHCR is reached the same way (routing to the OCI client is the default fetcher's
   // job — exercised in oci-registry.client.spec).
   const fetchTags = async (ref: ImageRef): Promise<string[]> => {
-    if (ref.name === 'node') {
+    if (ref.repository.endsWith('/node')) {
       throw new Error('owned image must not be queried');
     }
-    if (ref.name === 'postgres') {
+    if (ref.repository.endsWith('/postgres')) {
       return ['16', '17', '18', '18.3'];
     }
-    if (ref.name === 'redis') {
+    if (ref.repository.endsWith('/redis')) {
       return ['7.2', '7.4', '8.0'];
     }
     return [];

@@ -5,6 +5,7 @@
     "": {
       "name": "@enke.dev/bumper",
       "dependencies": {
+        "@swimlane/docker-reference": "2.0.1",
         "semver-utils": "1.1.4",
         "verkit": "0.3.0",
       },
@@ -207,6 +208,8 @@
     "@rviscomi/capo.js": ["@rviscomi/capo.js@2.1.0", "", {}, "sha512-y6J+KJqsrY8AcDswLKkvd8KdpFindjS4Q9rSuK8CIpsQOepEjgRaMR4S8OtuLOQoVYLCROT3ffMQqRWrUMQdQA=="],
 
     "@sindresorhus/merge-streams": ["@sindresorhus/merge-streams@4.0.0", "", {}, "sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ=="],
+
+    "@swimlane/docker-reference": ["@swimlane/docker-reference@2.0.1", "", {}, "sha512-+mxOe4TwtZJHmvVwq8CnY21wYpYbLXS3IXOWQbgolyfwJhS2vEsNKmNHGdWHd7KUkJTYLs7nmJFVx9OZ2qEVbA=="],
 
     "@thepassle/axobject-query": ["@thepassle/axobject-query@4.0.0", "", { "dependencies": { "dequal": "^2.0.3" } }, "sha512-/LHo+2jOdxs2WtbGocr3/lDSzsnjgCV6DSoBf4Y1Q0D24Hu67NPWuneoJimfHu5auqqSWi1fAvtln2013VxVqg=="],
 

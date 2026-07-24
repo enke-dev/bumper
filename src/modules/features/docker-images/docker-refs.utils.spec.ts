@@ -2,13 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import {
-  imageRepo,
-  isDockerHub,
-  parseImageRef,
-  parseImageRefs,
-  partitionByOwnership,
-} from './docker-refs.utils.js';
+import { parseImageRef, parseImageRefs, partitionByOwnership } from './docker-refs.utils.js';
 
 describe('parseImageRefs', () => {
   test('extracts FROM refs, ignoring platform flag, stage alias and scratch', () => {
@@ -33,76 +27,41 @@ describe('parseImageRefs', () => {
   });
 });
 
-describe('imageRepo', () => {
-  test('strips tag + digest, keeps registry/namespace', () => {
-    const cases: Record<string, string> = {
-      'node:22': 'node',
-      postgres: 'postgres',
-      'ghcr.io/x/app:1.2': 'ghcr.io/x/app',
-      'redis:7.2.4@sha256:abc': 'redis',
-      'myreg:5000/x:1.0': 'myreg:5000/x',
-    };
-    Object.entries(cases).forEach(([ref, repo]) => assert.equal(imageRepo(ref), repo, ref));
-  });
-});
-
-describe('partitionByOwnership', () => {
-  test('owned repos are held back; a same-name image under another namespace is not', () => {
-    const { owned, candidates } = partitionByOwnership(
-      ['node:22', 'postgres:16', 'ghcr.io/x/node:1'],
-      new Set(['node'])
-    );
-    assert.deepEqual(owned, ['node:22']);
-    assert.deepEqual(candidates, ['postgres:16', 'ghcr.io/x/node:1']);
-  });
-});
-
 describe('parseImageRef', () => {
-  test('applies Docker Hub implicit defaults + splits host/ns/name/tag/digest', () => {
+  test('normalizes to docker canonical form (domain + library/ + tag + digest)', () => {
     assert.deepEqual(parseImageRef('postgres:16'), {
-      registry: null,
-      namespace: 'library',
-      name: 'postgres',
+      domain: 'docker.io',
+      repository: 'library/postgres',
       tag: '16',
       digest: null,
     });
     assert.deepEqual(parseImageRef('user/app:1.2'), {
-      registry: null,
-      namespace: 'user',
-      name: 'app',
+      domain: 'docker.io',
+      repository: 'user/app',
       tag: '1.2',
       digest: null,
     });
     assert.deepEqual(parseImageRef('ghcr.io/x/y:1'), {
-      registry: 'ghcr.io',
-      namespace: 'x',
-      name: 'y',
+      domain: 'ghcr.io',
+      repository: 'x/y',
       tag: '1',
       digest: null,
     });
-    assert.deepEqual(parseImageRef('myreg:5000/x:1'), {
-      registry: 'myreg:5000',
-      namespace: '',
-      name: 'x',
-      tag: '1',
-      digest: null,
-    });
-    assert.deepEqual(parseImageRef('node'), {
-      registry: null,
-      namespace: 'library',
-      name: 'node',
-      tag: null,
-      digest: null,
-    });
-    assert.equal(parseImageRef('redis:7@sha256:abc').digest, 'sha256:abc');
+    assert.equal(
+      parseImageRef(`redis:7@sha256:${'a'.repeat(64)}`)?.digest,
+      `sha256:${'a'.repeat(64)}`
+    );
+    assert.equal(parseImageRef('node')?.tag, null);
   });
 });
 
-describe('isDockerHub', () => {
-  test('true for implicit + explicit hub hosts, false otherwise', () => {
-    assert.equal(isDockerHub(parseImageRef('postgres:16')), true);
-    assert.equal(isDockerHub(parseImageRef('docker.io/library/redis:7')), true);
-    assert.equal(isDockerHub(parseImageRef('ghcr.io/x/y:1')), false);
-    assert.equal(isDockerHub(parseImageRef('myreg:5000/x:1')), false);
+describe('partitionByOwnership', () => {
+  test('owned repos are held back across spellings; same name under another registry is not', () => {
+    const { owned, candidates } = partitionByOwnership(
+      ['node:22', 'library/node:20', 'postgres:16', 'ghcr.io/x/node:1'],
+      new Set(['node'])
+    );
+    assert.deepEqual(owned, ['node:22', 'library/node:20']);
+    assert.deepEqual(candidates, ['postgres:16', 'ghcr.io/x/node:1']);
   });
 });
