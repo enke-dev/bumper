@@ -54,22 +54,27 @@ async function resolveBump(
   if (!parsed || parsed.tag === null || parseTag(parsed.tag) === null) {
     return null;
   }
-  const newest = pickNewestTag(parsed.tag, await fetchTags(parsed));
-  if (newest === null || newest === parsed.tag) {
+  try {
+    const newest = pickNewestTag(parsed.tag, await fetchTags(parsed));
+    if (newest === null || newest === parsed.tag) {
+      return null;
+    }
+    if (parsed.digest === null) {
+      // tag-only: the tag sits at the end of the ref → swap just that suffix
+      return { ref, next: ref.slice(0, ref.length - parsed.tag.length) + newest };
+    }
+    const digest = await resolveDigest(parsed, newest);
+    if (digest === null) {
+      return null;
+    }
+    // `repo:tag@sha256:…` → bump the tag (before the `@`) and repin the digest after it
+    const beforeDigest = ref.slice(0, ref.lastIndexOf('@'));
+    const withNewTag = beforeDigest.slice(0, beforeDigest.length - parsed.tag.length) + newest;
+    return { ref, next: `${withNewTag}@${digest}` };
+  } catch {
+    // best-effort: a registry failure leaves this one ref untouched, never aborts the file/run
     return null;
   }
-  if (parsed.digest === null) {
-    // tag-only: the tag sits at the end of the ref → swap just that suffix
-    return { ref, next: ref.slice(0, ref.length - parsed.tag.length) + newest };
-  }
-  const digest = await resolveDigest(parsed, newest);
-  if (digest === null) {
-    return null;
-  }
-  // `repo:tag@sha256:…` → bump the tag (before the `@`) and repin the digest after it
-  const beforeDigest = ref.slice(0, ref.lastIndexOf('@'));
-  const withNewTag = beforeDigest.slice(0, beforeDigest.length - parsed.tag.length) + newest;
-  return { ref, next: `${withNewTag}@${digest}` };
 }
 
 /** Apply each bump to the file text, matching the ref as a whole token (never a substring of a
