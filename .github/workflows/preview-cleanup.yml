@@ -1,8 +1,7 @@
 name: Preview cleanup
 
-# When a PR closes (merged or not), drop its floating `pr-<number>` dist-tag so the
-# tag list stays tidy. Only the tag is removed — the immutable `…-pr-N.<run>` versions
-# stay published + pinnable.
+# When a PR closes (merged or not), delete its floating `pr-<number>` GitHub
+# pre-release + tag so they don't accumulate. (Previews are GitHub-only.)
 on:
   pull_request:
     types: [closed]
@@ -11,21 +10,21 @@ concurrency:
   group: preview-cleanup-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
-# nothing from GITHUB_TOKEN — the dist-tag removal uses NPM_TOKEN
+# contents: write to delete the pre-release + its tag
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   cleanup:
-    # fork PRs never publish a preview (no NPM_TOKEN), so there's nothing to clean
+    # fork PRs never publish a preview, so there's nothing to clean
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-
       # `|| true`: idempotent — a PR that never published (closed with no commits, or
-      # a tag already removed) has no dist-tag, and that's fine
-      - name: Remove the PR's preview dist-tag
+      # already cleaned) has no release, and that's fine
+      - name: Remove the PR's preview release (GitHub)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npm dist-tag rm @enke.dev/bumper "pr-${{ github.event.pull_request.number }}" || true
+          gh release delete "pr-${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" --yes --cleanup-tag 2>/dev/null || true
