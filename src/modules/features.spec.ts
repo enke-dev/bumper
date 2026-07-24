@@ -16,6 +16,7 @@ import {
   dockerImagesFeature,
   updateDockerImages,
 } from './features/docker-images/docker-images.feature.js';
+import type { ImageRef } from './features/docker-images/docker-refs.utils.js';
 import { dockerNodeFeature } from './features/docker-node/docker-node.feature.js';
 import { updateTypesNode } from './features/types-node/types-node.feature.js';
 import { nodeRuntime } from './runtimes/node/node.runtime.js';
@@ -161,16 +162,17 @@ describe('docker-node feature', () => {
 });
 
 describe('docker-images feature', () => {
-  // Offline tag lookup: postgres/redis have newer tags; the node image must never be queried
-  // (it's owned by docker-node). Throws if the owned image is looked up.
-  const fetchTags = async (_namespace: string, name: string): Promise<string[]> => {
-    if (name === 'node') {
+  // Offline tag lookup keyed off the parsed ref; the node image must never be queried (owned by
+  // docker-node). GHCR is reached the same way (routing to the OCI client is the default fetcher's
+  // job — exercised in oci-registry.client.spec).
+  const fetchTags = async (ref: ImageRef): Promise<string[]> => {
+    if (ref.name === 'node') {
       throw new Error('owned image must not be queried');
     }
-    if (name === 'postgres') {
+    if (ref.name === 'postgres') {
       return ['16', '17', '18', '18.3'];
     }
-    if (name === 'redis') {
+    if (ref.name === 'redis') {
       return ['7.2', '7.4', '8.0'];
     }
     return [];
@@ -214,8 +216,17 @@ describe('docker-images feature', () => {
     });
   });
 
-  test('leaves non-Hub, digest-pinned and non-numeric refs untouched', async () => {
-    const body = 'FROM ghcr.io/x/postgres:16\nFROM redis:latest\nFROM postgres@sha256:abc\n';
+  test('bumps a non-Hub (ghcr) image the same way', async () => {
+    await withDockerfile('FROM ghcr.io/x/redis:7.2\n', async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      assert.ok(
+        (await readFile(join(dir, 'Dockerfile'), 'utf8')).includes('FROM ghcr.io/x/redis:8.0')
+      );
+    });
+  });
+
+  test('leaves digest-pinned, untagged and non-numeric refs untouched', async () => {
+    const body = 'FROM redis:latest\nFROM postgres\nFROM postgres:16@sha256:abc\n';
     await withDockerfile(body, async (dir, ctx) => {
       await updateDockerImages(ctx, fetchTags);
       assert.equal(await readFile(join(dir, 'Dockerfile'), 'utf8'), body);
