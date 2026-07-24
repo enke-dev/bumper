@@ -11,6 +11,10 @@ concurrency:
   group: preview-cleanup-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
+# nothing from GITHUB_TOKEN — the dist-tag removal uses NPM_TOKEN
+permissions:
+  contents: read
+
 jobs:
   cleanup:
     # fork PRs never publish a preview (no NPM_TOKEN), so there's nothing to clean
