@@ -39,9 +39,21 @@ second pass needed to converge.
 
 ## Install
 
-Published publicly to [npm](https://www.npmjs.com/package/@enke.dev/bumper) as `@enke.dev/bumper`.
-The bin is a single bundled JS file (`dist/cli.mjs`) — no platform binaries — so it runs on
-**Node ≥22** _or_ **Bun**.
+Published publicly to [npm](https://www.npmjs.com/package/@enke.dev/bumper) as `@enke.dev/bumper`
+(a single bundled JS file, `dist/cli.mjs`, running on **Node ≥22** _or_ **Bun**), and as
+**self-contained binaries** per platform on the [GitHub releases](https://github.com/enke-dev/bumper/releases)
+(the Bun runtime embedded — no local Node/Bun needed).
+
+### Standalone binary (no runtime needed)
+
+Downloads the binary matching your platform from the latest release into `~/.local/bin`
+(override with `BUMPER_INSTALL_DIR`):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/enke-dev/bumper/main/install.sh | sh
+```
+
+Then invoke `bmpr` directly. Handy when the local Node is too old for the JS bin.
 
 ### Run without installing
 
