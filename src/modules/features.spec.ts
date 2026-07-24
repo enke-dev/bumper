@@ -193,6 +193,23 @@ describe('docker-images feature', () => {
     }
   }
 
+  /** Like {@link withDockerfile} but writes an arbitrary set of `{ name: contents }` files. */
+  async function withFiles(
+    files: Record<string, string>,
+    run: (dir: string, ctx: ModuleContext) => Promise<void>
+  ): Promise<void> {
+    const dir = await mkdtemp(join(tmpdir(), 'bumper-docker-'));
+    try {
+      await Promise.all(
+        Object.entries(files).map(([name, body]) => writeFile(join(dir, name), body))
+      );
+      const ctx: ModuleContext = { ...contextFor(dir), managedImages: new Set(['node']) };
+      await run(dir, ctx);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
   test('detects a repo with Docker/compose files', async () => {
     await withFixture('node-npm', async dir => {
       assert.equal(await dockerImagesFeature.isUsed(contextFor(dir)), true);
@@ -261,5 +278,109 @@ describe('docker-images feature', () => {
       },
       true
     );
+  });
+
+  test('matches the ref as a whole token, never a substring of a longer ref', async () => {
+    // `postgres:16` shares a prefix with `postgres:16-alpine`, and `node:20` is a suffix of the
+    // (unmanaged, so bumpable) `mynode:20`. Only the exact token must be rewritten.
+    const body =
+      'FROM postgres:16\n' +
+      'FROM postgres:16-alpine\n' +
+      'FROM mynode:20\n' +
+      'FROM node:20\n';
+    await withDockerfile(body, async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      const out = await readFile(join(dir, 'Dockerfile'), 'utf8');
+      // postgres:16 → 18, but postgres:16-alpine untouched (no alpine tags in the stub)
+      assert.ok(out.includes('FROM postgres:18\n'), 'bare postgres:16 bumped');
+      assert.ok(out.includes('FROM postgres:16-alpine\n'), 'the -alpine sibling left intact');
+      // mynode is not the owned `node` image (different repo) and has no tags → left as written,
+      // and must not have been mangled while the owned `node:20` was skipped.
+      assert.ok(out.includes('FROM mynode:20\n'), 'mynode:20 not touched as a node:20 substring');
+      assert.ok(out.includes('FROM node:20\n'), 'owned node:20 skipped');
+    });
+  });
+
+  test('bumps compose `image:` refs, not just Dockerfile FROM', async () => {
+    const body = 'services:\n  db:\n    image: postgres:16\n  cache:\n    image: "redis:7.2"\n';
+    await withFiles({ 'docker-compose.yaml': body }, async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      const out = await readFile(join(dir, 'docker-compose.yaml'), 'utf8');
+      assert.ok(out.includes('image: postgres:18'), 'unquoted compose ref bumped');
+      assert.ok(out.includes('redis:8.0'), 'quoted compose ref bumped');
+    });
+  });
+
+  test('rewrites every occurrence of a repeated ref', async () => {
+    const body = 'FROM postgres:16 AS base\nFROM postgres:16 AS worker\n';
+    await withDockerfile(body, async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      const out = await readFile(join(dir, 'Dockerfile'), 'utf8');
+      assert.equal(out, 'FROM postgres:18 AS base\nFROM postgres:18 AS worker\n');
+    });
+  });
+
+  test('updates multiple docker files independently in one run', async () => {
+    await withFiles(
+      {
+        Dockerfile: 'FROM postgres:16\n',
+        'docker-compose.yml': 'services:\n  cache:\n    image: redis:7.2\n',
+      },
+      async (dir, ctx) => {
+        await updateDockerImages(ctx, fetchTags);
+        assert.ok((await readFile(join(dir, 'Dockerfile'), 'utf8')).includes('postgres:18'));
+        assert.ok(
+          (await readFile(join(dir, 'docker-compose.yml'), 'utf8')).includes('redis:8.0')
+        );
+      }
+    );
+  });
+
+  test('leaves a multi-stage stage-name ref (`FROM base`) untouched', async () => {
+    const body = 'FROM postgres:16 AS base\nRUN echo hi\nFROM base\nCOPY --from=base /x /x\n';
+    await withDockerfile(body, async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      const out = await readFile(join(dir, 'Dockerfile'), 'utf8');
+      assert.ok(out.includes('FROM postgres:18 AS base'), 'the real base image bumped');
+      assert.ok(out.includes('\nFROM base\n'), 'stage-name reference left as-is (no tag to bump)');
+    });
+  });
+
+  test('bumps past a `--platform=` prefix on the FROM line', async () => {
+    await withDockerfile('FROM --platform=linux/amd64 postgres:16\n', async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      const out = await readFile(join(dir, 'Dockerfile'), 'utf8');
+      assert.equal(out, 'FROM --platform=linux/amd64 postgres:18\n');
+    });
+  });
+
+  test('rewriting a bare-major ref never bleeds into a longer-precision sibling', async () => {
+    // Tags chosen so `postgres:16` bumps (bare major → 18) but `postgres:16.3` is already the
+    // newest 2-segment tag and must stay. If the token boundary is wrong, bumping `postgres:16`
+    // eats the `16` inside `postgres:16.3` and wrongly rewrites it to `18.3` — this asserts it does
+    // not. (A sibling that also bumped to `…18.3` would hide the bug; here it must stay put.)
+    const tags = async (ref: ImageRef): Promise<string[]> =>
+      ref.repository.endsWith('/postgres') ? ['16', '17', '18', '16.3'] : [];
+    const body = 'FROM postgres:16\nFROM postgres:16.3\n';
+    await withDockerfile(body, async (dir, ctx) => {
+      await updateDockerImages(ctx, tags);
+      const out = await readFile(join(dir, 'Dockerfile'), 'utf8');
+      assert.equal(out, 'FROM postgres:18\nFROM postgres:16.3\n');
+    });
+  });
+
+  test('best-effort: a fetcher that throws for one image leaves it, still bumps the rest', async () => {
+    const flaky = async (ref: ImageRef): Promise<string[]> => {
+      if (ref.repository.endsWith('/redis')) {
+        throw new Error('registry unreachable');
+      }
+      return fetchTags(ref);
+    };
+    await withDockerfile('FROM postgres:16\nFROM redis:7.2\n', async (dir, ctx) => {
+      await updateDockerImages(ctx, flaky);
+      const out = await readFile(join(dir, 'Dockerfile'), 'utf8');
+      assert.ok(out.includes('FROM postgres:18'), 'healthy image still bumped');
+      assert.ok(out.includes('FROM redis:7.2'), 'failed image left untouched, run not aborted');
+    });
   });
 });
