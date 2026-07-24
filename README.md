@@ -5,8 +5,8 @@
 # Bumper
 
 Central, module-based repo updater that detects a repo's runtime + package manager and bumps everything: Node LTS,
-`@types/node`, all dependencies, the package manager itself, GitHub Actions pins, and Node
-versions in Docker/Compose files.
+`@types/node`, all dependencies, the package manager itself, GitHub Actions pins, Node versions in
+Docker/Compose files, and other base-image tags referenced there.
 
 ## tl;dr
 
@@ -129,7 +129,7 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | `--json`                 |     no     | `detect` only — emit machine-readable detection output.                                      |
 
 `--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `types-node`,
-`bun`, `npm`, `pnpm`, `docker-node`, `github-actions`).
+`bun`, `npm`, `pnpm`, `docker-node`, `docker-images`, `github-actions`).
 
 ```sh
 bumper update --dry-run                               # preview, no writes
@@ -168,6 +168,7 @@ then the remaining file-rewriting features:
 | `npm`            | package-manager | npm packageManager / lockfile   | bump specs to latest, clean reinstall, `approve-scripts --all`                              |
 | `pnpm`           | package-manager | pnpm packageManager / lockfile  | self-update, bump specs to latest, clean reinstall, `approve-builds --all`                  |
 | `docker-node`    | feature         | `Dockerfile*` / `compose*.yaml` | align `node:<ver>` / `NODE_VERSION=` to LTS                                                 |
+| `docker-images`  | feature         | `Dockerfile*` / `compose*.yaml` | bump other base-image tags to newest (same variant + precision) via Docker Hub              |
 | `github-actions` | feature         | `.github/workflows/*.y{a,}ml`   | pin actions via `actions-up`                                                                |
 
 Adding a concern = adding one module (`*.runtime.ts` / `*.package-manager.ts` / `*.feature.ts`)
