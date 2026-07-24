@@ -1,10 +1,8 @@
 name: check
 
 on:
-  # run only on pull requests, as the trunk is covered by the release.yml already
-  pull_request:
-    branches: ['*']
-  # reused by release.yml and update-dependencies.yml
+  # reusable only: preview.yml drives it on PRs, release.yml on trunk,
+  # update-dependencies.yml on its schedule — mirroring one check everywhere
   workflow_call:
     inputs:
       ref:
