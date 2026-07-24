@@ -62,6 +62,25 @@ describe('docker-images feature', () => {
     });
   });
 
+  // The presence/absence branches of isUsed are covered cross-feature in detection.spec; the config
+  // toggle override is not exercised anywhere else, so pin both directions of it here.
+  test('config toggle forces the feature off even when a Dockerfile is present', async () => {
+    await withTempDir('docker', async dir => {
+      await writeFile(join(dir, 'Dockerfile'), 'FROM postgres:16\n');
+      const base = contextFor(dir);
+      const ctx = { ...base, config: { ...base.config, modules: { 'docker-images': false } } };
+      assert.equal(await dockerImagesFeature.isUsed(ctx), false);
+    });
+  });
+
+  test('config toggle forces the feature on even when no Docker files exist', async () => {
+    await withTempDir('docker', async dir => {
+      const base = contextFor(dir);
+      const ctx = { ...base, config: { ...base.config, modules: { 'docker-images': true } } };
+      assert.equal(await dockerImagesFeature.isUsed(ctx), true);
+    });
+  });
+
   test('bumps a Hub image to the newest same-shape tag, skipping the owned node image', async () => {
     await withDockerfile('FROM node:20-alpine\nFROM postgres:16\n', async (dir, ctx) => {
       await updateDockerImages(ctx, fetchTags);
