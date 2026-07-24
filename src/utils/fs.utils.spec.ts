@@ -1,10 +1,10 @@
 // Runtime-agnostic test (see spec.utils.spec.ts): runs under both `bun test` and `node --test`.
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
+import { makeTempDir } from '../testing/with-temp-dir.harness.js';
 import {
   allDependencies,
   anyExists,
@@ -18,7 +18,7 @@ import type { PackageJson } from './package.types.js';
 let dir: string;
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'bumper-fs-'));
+  dir = await makeTempDir('fs');
 });
 
 afterEach(async () => {

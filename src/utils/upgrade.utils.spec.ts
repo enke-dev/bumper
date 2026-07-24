@@ -2,16 +2,16 @@
 // Registry lookups are injected (see `RegistryLookups`), so the orchestrator runs offline
 // without module mocking. fs stays real, backed by a tmpdir.
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
-import semver from 'semver';
+import { compareReversed, getPrerelease, satisfies } from 'verkit';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { PackageManager } from '../context/context.types.js';
-import { readPackageJson } from './fs.utils.js';
+import { makeTempDir } from '../testing/with-temp-dir.harness.js';
+import { readPackageJson, writePackageJson } from './fs.utils.js';
 import type { PackageJson } from './package.types.js';
 import type { RegistryLookups } from './upgrade.utils.js';
 import { upgradeAllWorkspaces } from './upgrade.utils.js';
@@ -25,16 +25,16 @@ let peers: Record<string, Record<string, string>>;
  * Offline stand-in for the network-backed registry lookups. `latest` feeds the global-latest
  * lookup; `peers` (keyed by package name) stands for the peers of the version being bumped *to*;
  * `versions` is the candidate pool `maxSatisfyingRanges` filters. That lookup runs the *real*
- * `semver.satisfies` intersection here — order-independent, `||` honored — so the tests exercise
+ * verkit `satisfies` intersection here — order-independent, `||` honored — so the tests exercise
  * the actual cap algebra rather than a hard-coded answer.
  */
 const lookups: RegistryLookups = {
   latestVersion: async pkg => latest[pkg] ?? null,
   maxSatisfyingRanges: async (pkg, ranges) =>
     (versions[pkg] ?? [])
-      .filter(v => semver.prerelease(v) === null) // mirror the real impl: stable versions only
-      .filter(v => ranges.every(range => semver.satisfies(v, range)))
-      .sort(semver.rcompare)[0] ?? null,
+      .filter(v => getPrerelease(v)?.length === 0) // mirror the real impl: stable versions only
+      .filter(v => ranges.every(range => satisfies(v, range)))
+      .sort(compareReversed)[0] ?? null,
   peerDependencies: async pkg => peers[pkg] ?? {},
 };
 
@@ -48,8 +48,8 @@ function ctx(overrides: Partial<ModuleContext> = {}): ModuleContext {
   } as ModuleContext;
 }
 
-async function writePkg(pkg: PackageJson): Promise<void> {
-  await writeFile(join(dir, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
+function writePkg(pkg: PackageJson): Promise<void> {
+  return writePackageJson(dir, pkg);
 }
 
 /** Swap `process.stdout.write` for a buffer; runtime-agnostic (no bun/jest spy API). */
@@ -69,7 +69,7 @@ function captureStdout(): { output: () => string; restore: () => void } {
 }
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'bumper-upgrade-'));
+  dir = await makeTempDir('upgrade');
   latest = {};
   versions = {};
   peers = {};
@@ -331,17 +331,11 @@ describe('upgradeAllWorkspaces', () => {
 
   test('rewrites specs across every workspace member', async () => {
     latest = { lit: '3.2.0' };
-    const memberA = await mkdtemp(join(tmpdir(), 'bumper-ws-a-'));
-    const memberB = await mkdtemp(join(tmpdir(), 'bumper-ws-b-'));
+    const memberA = await makeTempDir('ws-a');
+    const memberB = await makeTempDir('ws-b');
     try {
-      await writeFile(
-        join(memberA, 'package.json'),
-        `${JSON.stringify({ name: 'a', dependencies: { lit: '^3.0.0' } }, null, 2)}\n`
-      );
-      await writeFile(
-        join(memberB, 'package.json'),
-        `${JSON.stringify({ name: 'b', dependencies: { lit: '~3.1.0' } }, null, 2)}\n`
-      );
+      await writePackageJson(memberA, { name: 'a', dependencies: { lit: '^3.0.0' } });
+      await writePackageJson(memberB, { name: 'b', dependencies: { lit: '~3.1.0' } });
 
       await upgradeAllWorkspaces(ctx({ workspaces: [memberA, memberB] }), lookups);
 

@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 
+import { isDockerFileName, parseImageRef, parseImageRefs, refKey } from './docker.utils.js';
 import { exec } from './exec.utils.js';
 import type { PackageJson } from './package.types.js';
 
@@ -17,6 +18,7 @@ export interface ChangeSummary {
   node?: Change;
   bun?: Change;
   actions: Change[];
+  images: Change[];
   otherFiles: string[];
 }
 
@@ -65,12 +67,12 @@ function diffManifest(before: PackageJson, after: PackageJson): Change[] {
 /** `uses: owner/repo@ref` pins in a workflow file, keyed by action name (last occurrence wins). */
 function parseUses(text: string): Map<string, string> {
   const pins = new Map<string, string>();
-  for (const match of text.matchAll(USES_RE)) {
+  [...text.matchAll(USES_RE)].forEach(match => {
     const [, name, ref] = match;
     if (name !== undefined && ref !== undefined) {
       pins.set(name, ref);
     }
-  }
+  });
   return pins;
 }
 
@@ -87,6 +89,33 @@ function diffUses(before: string, after: string): Change[] {
   return changes;
 }
 
+/** Index a file's image refs by their registry-qualified identity (last occurrence wins). */
+function imagesByKey(text: string): Map<string, string> {
+  const byKey = new Map<string, string>();
+  parseImageRefs(text).forEach(raw => {
+    const parsed = parseImageRef(raw);
+    if (parsed !== null) {
+      byKey.set(refKey(parsed), raw);
+    }
+  });
+  return byKey;
+}
+
+/** Base-image refs that changed between two Docker/compose files, paired by image identity. */
+function diffImages(before: string, after: string): Change[] {
+  const from = imagesByKey(before);
+  const to = imagesByKey(after);
+  const changes: Change[] = [];
+  to.forEach((ref, key) => {
+    const prev = from.get(key);
+    if (prev !== undefined && prev !== ref) {
+      // strip the implicit `docker.io/library/` noise from the label
+      changes.push({ name: key.replace(/^docker\.io\/(library\/)?/, ''), from: prev, to: ref });
+    }
+  });
+  return changes;
+}
+
 /**
  * Fold a set of file diffs into a grouped {@link ChangeSummary}. Pure — the git plumbing lives in
  * {@link collectChangedFiles}/{@link commitAll} — so the grouping is exercised without a repo.
@@ -94,10 +123,10 @@ function diffUses(before: string, after: string): Change[] {
  * pins; workflow YAML → action pins; anything else is listed by path.
  */
 export function summarizeChanges(files: FileDiff[]): ChangeSummary {
-  const summary: ChangeSummary = { deps: [], actions: [], otherFiles: [] };
+  const summary: ChangeSummary = { deps: [], actions: [], images: [], otherFiles: [] };
   const seenDep = new Set<string>();
 
-  for (const file of files) {
+  files.forEach(file => {
     const name = basename(file.path);
 
     if (name === 'package.json') {
@@ -105,15 +134,15 @@ export function summarizeChanges(files: FileDiff[]): ChangeSummary {
       const after = parseJson(file.after);
       if (before === null || after === null) {
         summary.otherFiles.push(file.path);
-        continue;
+        return;
       }
-      for (const change of diffManifest(before, after)) {
+      diffManifest(before, after).forEach(change => {
         const key = `${change.name}\t${change.from}\t${change.to}`;
         if (!seenDep.has(key)) {
           seenDep.add(key);
           summary.deps.push(change);
         }
-      }
+      });
       if (
         before.packageManager &&
         after.packageManager &&
@@ -125,25 +154,36 @@ export function summarizeChanges(files: FileDiff[]): ChangeSummary {
           to: after.packageManager,
         };
       }
-      continue;
+      return;
     }
 
     if (name === '.node-version' && file.before !== null) {
       summary.node = { name: 'node', from: file.before.trim(), to: file.after.trim() };
-      continue;
+      return;
     }
     if (name === '.bun-version' && file.before !== null) {
       summary.bun = { name: 'bun', from: file.before.trim(), to: file.after.trim() };
-      continue;
+      return;
     }
 
     if (file.path.includes('.github/workflows/') && file.before !== null) {
       summary.actions.push(...diffUses(file.before, file.after));
-      continue;
+      return;
+    }
+
+    if (isDockerFileName(name) && file.before !== null) {
+      const imageChanges = diffImages(file.before, file.after);
+      if (imageChanges.length > 0) {
+        summary.images.push(...imageChanges);
+      } else {
+        // changed for a non-ref reason (e.g. NODE_VERSION=) → keep it visible by path
+        summary.otherFiles.push(file.path);
+      }
+      return;
     }
 
     summary.otherFiles.push(file.path);
-  }
+  });
 
   return summary;
 }
@@ -153,6 +193,7 @@ export function isEmptySummary(s: ChangeSummary): boolean {
   return (
     s.deps.length === 0 &&
     s.actions.length === 0 &&
+    s.images.length === 0 &&
     s.otherFiles.length === 0 &&
     s.packageManager === undefined &&
     s.node === undefined &&
@@ -182,6 +223,10 @@ export function renderCommitBody(s: ChangeSummary): string {
   list(
     'GitHub Actions',
     s.actions.map(a => `\`${a.name}\`: ${a.from} → ${a.to}`)
+  );
+  list(
+    'Docker images',
+    s.images.map(i => `\`${i.name}\`: ${i.from} → ${i.to}`)
   );
   list('Other', s.otherFiles);
 

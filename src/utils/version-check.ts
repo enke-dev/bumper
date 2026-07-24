@@ -1,4 +1,4 @@
-import semver from 'semver';
+import { isGreater, isValid } from 'verkit';
 
 import { PackageManager } from '../context/context.types.js';
 import { exec } from './exec.utils.js';
@@ -28,9 +28,7 @@ export function checkForSelfUpdate(
   run: typeof exec = exec
 ): Promise<string | null> {
   return latestVersion(SELF, viewTool(pm), cwd, run).then(latest =>
-    latest && semver.valid(latest) && semver.valid(current) && semver.gt(latest, current)
-      ? latest
-      : null
+    latest && isValid(latest) && isValid(current) && isGreater(latest, current) ? latest : null
   );
 }
 

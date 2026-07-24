@@ -1,20 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
 
-import type { ModuleContext } from '../../../context/context.types.js';
-import { collectFiles } from '../../../utils/fs.utils.js';
+import { findDockerFiles } from '../../../utils/docker.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
 import type { Module } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 import { ensureNodeLts } from '../../runtimes/node/node-lts.utils.js';
-
-const DOCKER_GLOB =
-  '**/{Dockerfile*,docker-compose*.yaml,docker-compose*.yml,compose*.yaml,compose*.yml}';
-
-/** Locate Docker/compose files, honoring `exclude` and skipping dependency dirs. */
-function findDockerFiles(ctx: ModuleContext): Promise<string[]> {
-  return collectFiles(ctx.cwd, DOCKER_GLOB, ctx.config.exclude);
-}
 
 export const dockerNodeFeature: Module = {
   kind: ModuleKind.Feature,
@@ -26,6 +17,11 @@ export const dockerNodeFeature: Module = {
       return toggle;
     }
     return (await findDockerFiles(ctx)).length > 0;
+  },
+  async managedImages() {
+    // Own the `node` image so the generic docker feature never bumps it past LTS — this feature
+    // holds it at the current LTS instead (parallels how types-node owns `@types/node`).
+    return ['node'];
   },
   async update(ctx) {
     const { version } = await ensureNodeLts(ctx);

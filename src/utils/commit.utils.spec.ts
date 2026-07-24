@@ -75,9 +75,36 @@ describe('summarizeChanges', () => {
   });
 
   test('unrecognized files fall back to a path list', () => {
+    const s = summarizeChanges([{ path: 'Makefile', before: 'a', after: 'b' }]);
+    assert.deepEqual(s.otherFiles, ['Makefile']);
+  });
+
+  test('groups base-image bumps from Docker/compose files, paired by image identity', () => {
     const s = summarizeChanges([
-      { path: 'Dockerfile', before: 'FROM node:20', after: 'FROM node:22' },
+      {
+        path: 'Dockerfile',
+        before: 'FROM node:20\nFROM postgres:16',
+        after: 'FROM node:22\nFROM postgres:18',
+      },
+      { path: 'compose.yaml', before: '    image: redis:7.2', after: '    image: redis:8.0' },
     ]);
+    assert.deepEqual(s.images, [
+      { name: 'node', from: 'node:20', to: 'node:22' },
+      { name: 'postgres', from: 'postgres:16', to: 'postgres:18' },
+      { name: 'redis', from: 'redis:7.2', to: 'redis:8.0' },
+    ]);
+    assert.equal(s.otherFiles.length, 0);
+  });
+
+  test('a Docker file that changed for a non-ref reason stays visible by path', () => {
+    const s = summarizeChanges([
+      {
+        path: 'Dockerfile',
+        before: 'FROM node:22\nENV NODE_VERSION=20',
+        after: 'FROM node:22\nENV NODE_VERSION=22',
+      },
+    ]);
+    assert.deepEqual(s.images, []);
     assert.deepEqual(s.otherFiles, ['Dockerfile']);
   });
 

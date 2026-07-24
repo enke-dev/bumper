@@ -31,6 +31,14 @@ export interface Module {
    * module manages no specific package.
    */
   managedDependencies?(ctx: ModuleContext): Promise<string[]>;
+  /**
+   * Container image repositories this module owns when {@link isUsed} — the generic docker
+   * base-image bump skips them so the module can pin them itself (e.g. the docker-node feature
+   * owns the `node` image, holding it at the current LTS rather than the newest major). Repos are
+   * matched as written on the `FROM`/`image:` line (`node`, `library/node`, `ghcr.io/x/y`). Omit
+   * when the module manages no specific image.
+   */
+  managedImages?(ctx: ModuleContext): Promise<string[]>;
   /** Action: perform the bump. Must honor `ctx.dryRun`. */
   update(ctx: ModuleContext): Promise<void>;
 }
