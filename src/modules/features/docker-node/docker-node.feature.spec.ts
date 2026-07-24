@@ -1,6 +1,6 @@
 // Runtime-agnostic test (see detection.spec.ts): runs under both `bun test` and `node --test`.
 // Exercises the docker-node feature end-to-end against a copied fixture, with the Node LTS pinned
-// on the context (see module-test-kit) so no network call is made.
+// on the context (see src/testing/module-context.factory) so no network call is made.
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -8,6 +8,7 @@ import { describe, test } from 'node:test';
 
 import { contextFor, LTS } from '../../../testing/module-context.factory.js';
 import { withFixture } from '../../../testing/with-fixture.harness.js';
+import { withTempDir } from '../../../testing/with-temp-dir.harness.js';
 import { dockerNodeFeature } from './docker-node.feature.js';
 
 describe('docker-node feature', () => {
@@ -48,5 +49,24 @@ describe('docker-node feature', () => {
 
   test('owns the node image so the generic docker feature never bumps it', async () => {
     assert.deepEqual(await dockerNodeFeature.managedImages?.(contextFor('/tmp')), ['node']);
+  });
+
+  // Presence/absence is covered cross-feature in detection.spec; the config toggle override is not
+  // exercised elsewhere, so pin both directions of it here (mirrors the docker-images feature).
+  test('config toggle forces the feature off even when a Dockerfile is present', async () => {
+    await withTempDir('docker-node', async dir => {
+      await writeFile(join(dir, 'Dockerfile'), 'FROM node:20\n');
+      const base = contextFor(dir);
+      const ctx = { ...base, config: { ...base.config, modules: { 'docker-node': false } } };
+      assert.equal(await dockerNodeFeature.isUsed(ctx), false);
+    });
+  });
+
+  test('config toggle forces the feature on even when no Docker files exist', async () => {
+    await withTempDir('docker-node', async dir => {
+      const base = contextFor(dir);
+      const ctx = { ...base, config: { ...base.config, modules: { 'docker-node': true } } };
+      assert.equal(await dockerNodeFeature.isUsed(ctx), true);
+    });
   });
 });
