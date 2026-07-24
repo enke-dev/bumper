@@ -12,11 +12,8 @@ export type FetchLike = typeof fetch;
  */
 export type AuthResolver = (registry: string) => Promise<RegistryAuth | null>;
 
-/** Map a normalized ref domain to the host serving the OCI API. Docker Hub's canonical `docker.io`
- * is served by `registry-1.docker.io` (`auth.docker.io` issues the tokens). */
-export function ociHost(domain: string): string {
-  return domain === 'docker.io' ? 'registry-1.docker.io' : domain;
-}
+// Following at most this many `Link: rel=next` pages, so a huge repo can't loop unboundedly.
+const MAX_TAG_PAGES = 10;
 
 /** Parse a `WWW-Authenticate: Bearer realm="…",service="…",scope="…"` header into its params. */
 function parseChallenge(header: string | null): Record<string, string> {
@@ -41,7 +38,9 @@ async function fetchBearerToken(
 ): Promise<string | null> {
   const challenge = parseChallenge(header);
   const realm = challenge['realm'];
-  if (realm === undefined) {
+  // The realm is server-controlled; never send Basic credentials to a non-HTTPS token endpoint
+  // (a compromised/misconfigured registry could otherwise harvest them in cleartext).
+  if (realm === undefined || !realm.startsWith('https://')) {
     return null;
   }
   const params = new URLSearchParams();
@@ -95,6 +94,39 @@ async function authorizedRequest(
   return response.ok ? response : null;
 }
 
+/** The absolute URL of the `rel=next` page in an OCI `Link` header, or null when there is none. */
+function nextPageUrl(header: string | null, registry: string): string | null {
+  const match = header?.match(/<([^>]+)>\s*;\s*rel="?next"?/i);
+  const target = match?.[1];
+  if (target === undefined) {
+    return null;
+  }
+  return target.startsWith('http') ? target : `https://${registry}${target}`;
+}
+
+/** Follow `Link: rel=next` pages (bounded), accumulating tag names — registries that paginate
+ * `tags/list` would otherwise expose only the first page, hiding the newest tags. */
+async function collectTags(
+  url: string,
+  registry: string,
+  repository: string,
+  fetchImpl: FetchLike,
+  resolveAuth: AuthResolver | undefined,
+  depth: number,
+  accumulated: string[]
+): Promise<string[]> {
+  const response = await authorizedRequest(url, registry, repository, fetchImpl, resolveAuth);
+  if (response === null) {
+    return accumulated;
+  }
+  const body = (await response.json()) as { tags?: string[] };
+  const tags = [...accumulated, ...(body.tags ?? [])];
+  const next = nextPageUrl(response.headers.get('link'), registry);
+  return next !== null && depth + 1 < MAX_TAG_PAGES
+    ? collectTags(next, registry, repository, fetchImpl, resolveAuth, depth + 1, tags)
+    : tags;
+}
+
 /** Active tags for an OCI repository (`namespace/name`) on `registry`. */
 export async function fetchOciTags(
   registry: string,
@@ -104,12 +136,7 @@ export async function fetchOciTags(
 ): Promise<string[]> {
   try {
     const url = `https://${registry}/v2/${repository}/tags/list`;
-    const response = await authorizedRequest(url, registry, repository, fetchImpl, resolveAuth);
-    if (response === null) {
-      return [];
-    }
-    const body = (await response.json()) as { tags?: string[] };
-    return body.tags ?? [];
+    return await collectTags(url, registry, repository, fetchImpl, resolveAuth, 0, []);
   } catch {
     return [];
   }

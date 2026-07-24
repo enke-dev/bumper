@@ -58,6 +58,44 @@ describe('fetchOciTags', () => {
     assert.ok(sawBasic, 'Basic auth header was sent to the token endpoint');
   });
 
+  test('follows Link: rel=next pages, accumulating tags', async () => {
+    const fetchImpl = async (input: string | URL | Request) => {
+      const url = String(input);
+      return url.includes('last=17')
+        ? new Response(JSON.stringify({ tags: ['18'] }), { status: 200 })
+        : new Response(JSON.stringify({ tags: ['16', '17'] }), {
+            status: 200,
+            headers: { link: '</v2/x/y/tags/list?last=17&n=100>; rel="next"' },
+          });
+    };
+    assert.deepEqual(await fetchOciTags('ghcr.io', 'x/y', fetchImpl as unknown as typeof fetch), [
+      '16',
+      '17',
+      '18',
+    ]);
+  });
+
+  test('never sends Basic credentials to a non-HTTPS token realm', async () => {
+    const httpChallenge =
+      'Bearer realm="http://insecure/token",service="s",scope="repository:x/y:pull"';
+    let sentToRealm = false;
+    const fetchImpl = async (input: string | URL | Request) => {
+      if (String(input).includes('insecure')) {
+        sentToRealm = true;
+        return new Response(JSON.stringify({ token: 'T' }), { status: 200 });
+      }
+      return new Response('', { status: 401, headers: { 'www-authenticate': httpChallenge } });
+    };
+    const tags = await fetchOciTags(
+      'ghcr.io',
+      'x/y',
+      fetchImpl as unknown as typeof fetch,
+      async () => ({ username: 'u', password: 'p' })
+    );
+    assert.deepEqual(tags, []);
+    assert.equal(sentToRealm, false, 'credentials were never sent to the http realm');
+  });
+
   test('resolves to [] on registry failure', async () => {
     const fetchImpl = async () => new Response('', { status: 500 });
     assert.deepEqual(

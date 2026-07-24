@@ -2,14 +2,19 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
 
 import type { ImageRef } from '../../../utils/docker.utils.js';
-import { findDockerFiles, parseImageRef, parseImageRefs } from '../../../utils/docker.utils.js';
+import {
+  findDockerFiles,
+  parseImageRef,
+  parseImageRefs,
+  registryHost,
+} from '../../../utils/docker.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
 import type { Module, ModuleContext } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 import { readDockerConfigAuth } from './docker-auth.utils.js';
 import { partitionByOwnership } from './docker-refs.utils.js';
 import { parseTag, pickNewestTag } from './docker-tags.utils.js';
-import { fetchOciDigest, fetchOciTags, ociHost } from './oci-registry.client.js';
+import { fetchOciDigest, fetchOciTags } from './oci-registry.client.js';
 
 /** Resolve a repository's available tags for a parsed ref. Injected in tests; defaults to the OCI
  * Distribution API for every registry (Docker Hub included, via `registry-1.docker.io`). */
@@ -19,10 +24,10 @@ export type TagFetcher = (ref: ImageRef) => Promise<string[]>;
 export type DigestResolver = (ref: ImageRef, tag: string) => Promise<string | null>;
 
 const defaultTagFetcher: TagFetcher = ref =>
-  fetchOciTags(ociHost(ref.domain), ref.repository, fetch, readDockerConfigAuth);
+  fetchOciTags(registryHost(ref.domain), ref.repository, fetch, readDockerConfigAuth);
 
 const defaultDigestResolver: DigestResolver = (ref, tag) =>
-  fetchOciDigest(ociHost(ref.domain), ref.repository, tag, fetch, readDockerConfigAuth);
+  fetchOciDigest(registryHost(ref.domain), ref.repository, tag, fetch, readDockerConfigAuth);
 
 interface Bump {
   ref: string;

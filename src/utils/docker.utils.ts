@@ -18,16 +18,31 @@ export function isDockerFileName(name: string): boolean {
   return /^Dockerfile/.test(name) || /^(docker-)?compose.*\.ya?ml$/.test(name);
 }
 
+/**
+ * Known canonical registry API hosts, keyed by the normalized ref domain. Docker Hub's `docker.io`
+ * is served by `registry-1.docker.io` — the stable public endpoint fronting Hub's load balancer
+ * (the `-1` is frozen legacy naming, the same constant docker/containerd/crane use; clients do not
+ * fail over to a `registry-2`). Add vendor aliases here as data, not in the transport client.
+ */
+const REGISTRY_HOSTS: Record<string, string> = {
+  'docker.io': 'registry-1.docker.io',
+};
+
+/** The registry host serving the OCI API for a normalized ref domain (identity unless aliased). */
+export function registryHost(domain: string): string {
+  return REGISTRY_HOSTS[domain] ?? domain;
+}
+
 // `FROM [--platform=…] <ref> [AS stage]` — capture the ref, ignore the optional platform + stage.
-const FROM_RE = /^\s*FROM\s+(?:--platform=\S+\s+)?(\S+)/gim;
+const FROM_REGEX = /^\s*FROM\s+(?:--platform=\S+\s+)?(\S+)/gim;
 // compose `image: repo:tag` (optionally quoted).
-const IMAGE_RE = /^\s*image:\s*["']?([^\s"']+)["']?/gim;
+const IMAGE_REGEX = /^\s*image:\s*["']?([^\s"']+)["']?/gim;
 
 /** Every base-image reference declared in a Dockerfile or compose file's text. */
 export function parseImageRefs(text: string): string[] {
   const refs = [
-    ...[...text.matchAll(FROM_RE)].map(match => match[1]),
-    ...[...text.matchAll(IMAGE_RE)].map(match => match[1]),
+    ...[...text.matchAll(FROM_REGEX)].map(match => match[1]),
+    ...[...text.matchAll(IMAGE_REGEX)].map(match => match[1]),
   ].filter((ref): ref is string => ref !== undefined);
   // `FROM scratch` is the empty base image — nothing to bump.
   return refs.filter(ref => ref !== 'scratch');

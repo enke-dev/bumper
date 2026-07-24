@@ -2,7 +2,15 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { isDockerFileName, parseImageRef, parseImageRefs } from './docker.utils.js';
+import { isDockerFileName, parseImageRef, parseImageRefs, registryHost } from './docker.utils.js';
+
+describe('registryHost', () => {
+  test('maps Docker Hub to its canonical endpoint, everything else is identity', () => {
+    assert.equal(registryHost('docker.io'), 'registry-1.docker.io');
+    assert.equal(registryHost('ghcr.io'), 'ghcr.io');
+    assert.equal(registryHost('myreg:5000'), 'myreg:5000');
+  });
+});
 
 describe('isDockerFileName', () => {
   test('matches Dockerfiles and compose manifests', () => {
