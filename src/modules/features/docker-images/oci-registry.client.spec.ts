@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
 import type { RegistryAuth } from './docker-auth.utils.js';
-import { fetchOciTags } from './oci-registry.client.js';
+import { fetchOciDigest, fetchOciTags } from './oci-registry.client.js';
 
 const CHALLENGE =
   'Bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:x/y:pull"';
@@ -63,6 +63,28 @@ describe('fetchOciTags', () => {
     assert.deepEqual(
       await fetchOciTags('ghcr.io', 'x/y', fetchImpl as unknown as typeof fetch),
       []
+    );
+  });
+});
+
+describe('fetchOciDigest', () => {
+  test('returns the Docker-Content-Digest header from a manifest HEAD', async () => {
+    const digest = `sha256:${'c'.repeat(64)}`;
+    const fetchImpl = async (_input: string | URL | Request, init?: RequestInit) => {
+      assert.equal(init?.method, 'HEAD');
+      return new Response('', { status: 200, headers: { 'docker-content-digest': digest } });
+    };
+    assert.equal(
+      await fetchOciDigest('ghcr.io', 'x/y', '18', fetchImpl as unknown as typeof fetch),
+      digest
+    );
+  });
+
+  test('null when the manifest is unreachable', async () => {
+    const fetchImpl = async () => new Response('', { status: 404 });
+    assert.equal(
+      await fetchOciDigest('ghcr.io', 'x/y', '18', fetchImpl as unknown as typeof fetch),
+      null
     );
   });
 });

@@ -225,8 +225,27 @@ describe('docker-images feature', () => {
     });
   });
 
-  test('leaves digest-pinned, untagged and non-numeric refs untouched', async () => {
-    const body = 'FROM redis:latest\nFROM postgres\nFROM postgres:16@sha256:abc\n';
+  test('repins a digest-pinned ref: bumps the tag AND re-resolves the digest', async () => {
+    const old = `sha256:${'a'.repeat(64)}`;
+    const fresh = `sha256:${'b'.repeat(64)}`;
+    const resolveDigest = async (_ref: ImageRef, tag: string) => (tag === '18' ? fresh : null);
+    await withDockerfile(`FROM postgres:16@${old}\n`, async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags, resolveDigest);
+      assert.equal(await readFile(join(dir, 'Dockerfile'), 'utf8'), `FROM postgres:18@${fresh}\n`);
+    });
+  });
+
+  test('leaves a digest-pinned ref alone when the new digest cannot be resolved', async () => {
+    const body = `FROM postgres:16@sha256:${'a'.repeat(64)}\n`;
+    const resolveDigest = async () => null;
+    await withDockerfile(body, async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags, resolveDigest);
+      assert.equal(await readFile(join(dir, 'Dockerfile'), 'utf8'), body);
+    });
+  });
+
+  test('leaves bare-digest, untagged and non-numeric refs untouched', async () => {
+    const body = `FROM redis:latest\nFROM postgres\nFROM postgres@sha256:${'a'.repeat(64)}\n`;
     await withDockerfile(body, async (dir, ctx) => {
       await updateDockerImages(ctx, fetchTags);
       assert.equal(await readFile(join(dir, 'Dockerfile'), 'utf8'), body);

@@ -63,6 +63,38 @@ async function fetchBearerToken(
   return body.token ?? body.access_token ?? null;
 }
 
+/**
+ * Issue a request, transparently running the bearer-token dance on a 401 and retrying. Returns the
+ * successful response, or null on any auth/registry failure. Shared by the tag + manifest lookups.
+ */
+async function authorizedRequest(
+  url: string,
+  registry: string,
+  repository: string,
+  fetchImpl: FetchLike,
+  resolveAuth: AuthResolver | undefined,
+  init: RequestInit = {}
+): Promise<Response | null> {
+  let response = await fetchImpl(url, init);
+  if (response.status === 401) {
+    const auth = resolveAuth ? await resolveAuth(registry) : null;
+    const token = await fetchBearerToken(
+      response.headers.get('www-authenticate'),
+      repository,
+      fetchImpl,
+      auth
+    );
+    if (token === null) {
+      return null;
+    }
+    response = await fetchImpl(url, {
+      ...init,
+      headers: { ...init.headers, Authorization: `Bearer ${token}` },
+    });
+  }
+  return response.ok ? response : null;
+}
+
 /** Active tags for an OCI repository (`namespace/name`) on `registry`. */
 export async function fetchOciTags(
   registry: string,
@@ -70,28 +102,47 @@ export async function fetchOciTags(
   fetchImpl: FetchLike = fetch,
   resolveAuth?: AuthResolver
 ): Promise<string[]> {
-  const url = `https://${registry}/v2/${repository}/tags/list`;
   try {
-    let response = await fetchImpl(url);
-    if (response.status === 401) {
-      const auth = resolveAuth ? await resolveAuth(registry) : null;
-      const token = await fetchBearerToken(
-        response.headers.get('www-authenticate'),
-        repository,
-        fetchImpl,
-        auth
-      );
-      if (token === null) {
-        return [];
-      }
-      response = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
-    }
-    if (!response.ok) {
+    const url = `https://${registry}/v2/${repository}/tags/list`;
+    const response = await authorizedRequest(url, registry, repository, fetchImpl, resolveAuth);
+    if (response === null) {
       return [];
     }
     const body = (await response.json()) as { tags?: string[] };
     return body.tags ?? [];
   } catch {
     return [];
+  }
+}
+
+// The manifest media types to accept, so multi-arch indexes and single manifests both resolve.
+const MANIFEST_ACCEPT = [
+  'application/vnd.oci.image.index.v1+json',
+  'application/vnd.oci.image.manifest.v1+json',
+  'application/vnd.docker.distribution.manifest.list.v2+json',
+  'application/vnd.docker.distribution.manifest.v2+json',
+].join(', ');
+
+/**
+ * The content digest a tag currently resolves to (`sha256:…`), via a `HEAD` on the manifest —
+ * used to repin a `repo:tag@sha256:…` ref to the bumped tag's digest. Null when unresolvable, so
+ * the caller never writes a stale or guessed digest.
+ */
+export async function fetchOciDigest(
+  registry: string,
+  repository: string,
+  tag: string,
+  fetchImpl: FetchLike = fetch,
+  resolveAuth?: AuthResolver
+): Promise<string | null> {
+  try {
+    const url = `https://${registry}/v2/${repository}/manifests/${tag}`;
+    const response = await authorizedRequest(url, registry, repository, fetchImpl, resolveAuth, {
+      method: 'HEAD',
+      headers: { Accept: MANIFEST_ACCEPT },
+    });
+    return response?.headers.get('docker-content-digest') ?? null;
+  } catch {
+    return null;
   }
 }

@@ -9,14 +9,20 @@ import { readDockerConfigAuth } from './docker-auth.utils.js';
 import type { ImageRef } from './docker-refs.utils.js';
 import { parseImageRef, parseImageRefs, partitionByOwnership } from './docker-refs.utils.js';
 import { parseTag, pickNewestTag } from './docker-tags.utils.js';
-import { fetchOciTags, ociHost } from './oci-registry.client.js';
+import { fetchOciDigest, fetchOciTags, ociHost } from './oci-registry.client.js';
 
 /** Resolve a repository's available tags for a parsed ref. Injected in tests; defaults to the OCI
  * Distribution API for every registry (Docker Hub included, via `registry-1.docker.io`). */
 export type TagFetcher = (ref: ImageRef) => Promise<string[]>;
 
+/** Resolve the content digest a tag currently points at — used to repin a digest-pinned ref. */
+export type DigestResolver = (ref: ImageRef, tag: string) => Promise<string | null>;
+
 const defaultTagFetcher: TagFetcher = ref =>
   fetchOciTags(ociHost(ref.domain), ref.repository, fetch, readDockerConfigAuth);
+
+const defaultDigestResolver: DigestResolver = (ref, tag) =>
+  fetchOciDigest(ociHost(ref.domain), ref.repository, tag, fetch, readDockerConfigAuth);
 
 interface Bump {
   ref: string;
@@ -28,21 +34,37 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Resolve the newer ref for a candidate, or null to leave it. Requires an explicit numeric tag and
- * no digest pin (digest repinning is a later step); untagged/`latest`, non-numeric tags, and refs
- * whose registry can't be reached are left untouched.
+ * Resolve the newer ref for a candidate, or null to leave it. Requires an explicit numeric tag;
+ * untagged/`latest` and non-numeric tags are left untouched. A `repo:tag@sha256:…` ref is repinned
+ * — the tag bumps AND the digest is re-resolved to that new tag (skipped if the digest can't be
+ * resolved, so we never write a stale/guessed one). A bare `repo@sha256:…` with no tag has no
+ * version anchor and is left as-is.
  */
-async function resolveBump(ref: string, fetchTags: TagFetcher): Promise<Bump | null> {
+async function resolveBump(
+  ref: string,
+  fetchTags: TagFetcher,
+  resolveDigest: DigestResolver
+): Promise<Bump | null> {
   const parsed = parseImageRef(ref);
-  if (!parsed || parsed.tag === null || parsed.digest !== null || parseTag(parsed.tag) === null) {
+  if (!parsed || parsed.tag === null || parseTag(parsed.tag) === null) {
     return null;
   }
   const newest = pickNewestTag(parsed.tag, await fetchTags(parsed));
   if (newest === null || newest === parsed.tag) {
     return null;
   }
-  // the tag sits at the end of the ref (no digest here) → swap just that suffix
-  return { ref, next: ref.slice(0, ref.length - parsed.tag.length) + newest };
+  if (parsed.digest === null) {
+    // tag-only: the tag sits at the end of the ref → swap just that suffix
+    return { ref, next: ref.slice(0, ref.length - parsed.tag.length) + newest };
+  }
+  const digest = await resolveDigest(parsed, newest);
+  if (digest === null) {
+    return null;
+  }
+  // `repo:tag@sha256:…` → bump the tag (before the `@`) and repin the digest after it
+  const beforeDigest = ref.slice(0, ref.lastIndexOf('@'));
+  const withNewTag = beforeDigest.slice(0, beforeDigest.length - parsed.tag.length) + newest;
+  return { ref, next: `${withNewTag}@${digest}` };
 }
 
 /** Apply each bump to the file text, matching the ref as a whole token (never a substring of a
@@ -62,7 +84,8 @@ function applyBumps(text: string, bumps: readonly Bump[]): string {
  */
 export async function updateDockerImages(
   ctx: ModuleContext,
-  fetchTags: TagFetcher = defaultTagFetcher
+  fetchTags: TagFetcher = defaultTagFetcher,
+  resolveDigest: DigestResolver = defaultDigestResolver
 ): Promise<void> {
   const owned = ctx.managedImages ?? new Set<string>();
   const files = await findDockerFiles(ctx);
@@ -71,9 +94,9 @@ export async function updateDockerImages(
       const original = await readFile(file, 'utf8');
       const { candidates } = partitionByOwnership(parseImageRefs(original), owned);
       const unique = [...new Set(candidates)];
-      const bumps = (await Promise.all(unique.map(ref => resolveBump(ref, fetchTags)))).filter(
-        (bump): bump is Bump => bump !== null
-      );
+      const bumps = (
+        await Promise.all(unique.map(ref => resolveBump(ref, fetchTags, resolveDigest)))
+      ).filter((bump): bump is Bump => bump !== null);
       if (bumps.length === 0) {
         return;
       }
