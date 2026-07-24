@@ -1,13 +1,14 @@
 // Runtime-agnostic test (see detection.spec.ts): runs under both `bun test` and `node --test`.
 // Exercises the node runtime end-to-end against a copied fixture, with the Node LTS pinned on the
-// context (see module-test-kit) so no network call is made.
+// context (see src/testing/context) so no network call is made.
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
+import { contextFor, LTS } from '../../../testing/module-context.factory.js';
+import { withFixture } from '../../../testing/with-fixture.harness.js';
 import { pathExists, readPackageJson } from '../../../utils/fs.utils.js';
-import { contextFor, LTS, withFixture } from '../../module-test-kit.js';
 import { nodeRuntime } from './node.runtime.js';
 
 describe('node runtime feature', () => {

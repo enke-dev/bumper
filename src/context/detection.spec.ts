@@ -2,20 +2,17 @@
 // both `bun test` and `node --test`. The whole suite follows this `.spec.ts` convention —
 // no `bun:` imports in tests or source — so both runtimes exercise identical code paths.
 import assert from 'node:assert/strict';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { defaultRepoConfig } from '../config/config.js';
 import { detectModules } from '../modules/module.registry.js';
+import { EXAMPLES } from '../testing/with-fixture.harness.js';
 import type { ModuleContext } from './context.types.js';
 import { PackageManager, Runtime, VersionManager } from './context.types.js';
 import { detectPackageManager } from './detectors/package-manager.detector.js';
 import { detectRuntime } from './detectors/runtime.detector.js';
 import { detectWorkspaces } from './detectors/workspace.detector.js';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const EXAMPLES = join(HERE, '..', '..', 'examples');
 
 /**
  * Build a context straight from the detectors — deliberately NOT via `buildContext`,

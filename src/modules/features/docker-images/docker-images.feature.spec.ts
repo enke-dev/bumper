@@ -1,15 +1,16 @@
 // Runtime-agnostic test (see detection.spec.ts): runs under both `bun test` and `node --test`.
 // Exercises the docker-images feature end-to-end against throwaway tmp files, with the tag/digest
-// lookups injected (see module-test-kit for the shared context) so no network call is made.
+// lookups injected (see src/testing for the shared context) so no network call is made.
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
 import type { ModuleContext } from '../../../context/context.types.js';
+import { contextFor } from '../../../testing/module-context.factory.js';
+import { withFixture } from '../../../testing/with-fixture.harness.js';
+import { withTempDir } from '../../../testing/with-temp-dir.harness.js';
 import type { ImageRef } from '../../../utils/docker.utils.js';
-import { contextFor, withFixture } from '../../module-test-kit.js';
 import { dockerImagesFeature, updateDockerImages } from './docker-images.feature.js';
 
 describe('docker-images feature', () => {
@@ -29,36 +30,30 @@ describe('docker-images feature', () => {
     return [];
   };
 
-  async function withDockerfile(
+  function withDockerfile(
     body: string,
     run: (dir: string, ctx: ModuleContext) => Promise<void>,
     dryRun = false
   ): Promise<void> {
-    const dir = await mkdtemp(join(tmpdir(), 'bumper-docker-'));
-    try {
+    return withTempDir('docker', async dir => {
       await writeFile(join(dir, 'Dockerfile'), body);
       const ctx: ModuleContext = { ...contextFor(dir, dryRun), managedImages: new Set(['node']) };
       await run(dir, ctx);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    });
   }
 
   /** Like {@link withDockerfile} but writes an arbitrary set of `{ name: contents }` files. */
-  async function withFiles(
+  function withFiles(
     files: Record<string, string>,
     run: (dir: string, ctx: ModuleContext) => Promise<void>
   ): Promise<void> {
-    const dir = await mkdtemp(join(tmpdir(), 'bumper-docker-'));
-    try {
+    return withTempDir('docker', async dir => {
       await Promise.all(
         Object.entries(files).map(([name, body]) => writeFile(join(dir, name), body))
       );
       const ctx: ModuleContext = { ...contextFor(dir), managedImages: new Set(['node']) };
       await run(dir, ctx);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    });
   }
 
   test('detects a repo with Docker/compose files', async () => {

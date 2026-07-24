@@ -6,7 +6,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
-import { contextFor, LTS, withFixture } from '../../module-test-kit.js';
+import { contextFor, LTS } from '../../../testing/module-context.factory.js';
+import { withFixture } from '../../../testing/with-fixture.harness.js';
 import { dockerNodeFeature } from './docker-node.feature.js';
 
 describe('docker-node feature', () => {

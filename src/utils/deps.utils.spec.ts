@@ -1,13 +1,13 @@
 // Runtime-agnostic test (see spec.utils.spec.ts): runs under both `bun test` and `node --test`.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { PackageManager } from '../context/context.types.js';
+import { withTempDir } from '../testing/with-temp-dir.harness.js';
 import { approveScripts, cleanInstall, selfUpdate } from './deps.utils.js';
 
 function ctx(overrides: Partial<ModuleContext> = {}): ModuleContext {
@@ -48,8 +48,7 @@ describe('cleanInstall', () => {
   });
 
   test('removes the stale lockfile before reinstalling (real fs, no-op install)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bumper-clean-'));
-    try {
+    await withTempDir('clean', async dir => {
       const lockfile = join(dir, 'package-lock.json');
       await writeFile(lockfile, '{"lockfileVersion":3}\n');
       // `true` is a real, always-present binary → the install step is a harmless no-op.
@@ -57,14 +56,11 @@ describe('cleanInstall', () => {
         'true',
       ]);
       assert.equal(existsSync(lockfile), false, 'stale package-lock.json is removed');
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    });
   });
 
   test('runs the install twice so a from-scratch resolve settles the lockfile', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'bumper-clean-twice-'));
-    try {
+    await withTempDir('clean-twice', async dir => {
       // an install script that appends one line per invocation; the file's line count is the count.
       const counter = join(dir, 'runs');
       const script = join(dir, 'install.sh');
@@ -75,9 +71,7 @@ describe('cleanInstall', () => {
       ]);
       const runs = (await readFile(counter, 'utf8')).trim().split('\n');
       assert.equal(runs.length, 2, 'install command runs exactly twice');
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    });
   });
 });
 

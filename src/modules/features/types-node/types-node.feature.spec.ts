@@ -1,11 +1,12 @@
 // Runtime-agnostic test (see detection.spec.ts): runs under both `bun test` and `node --test`.
 // Exercises the types-node feature end-to-end against a copied fixture, with the Node LTS pinned on
-// the context (see module-test-kit) and the registry lookup stubbed so no network call is made.
+// the context (see src/testing/context) and the registry lookup stubbed so no network call is made.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
+import { contextFor, LTS } from '../../../testing/module-context.factory.js';
+import { withFixture } from '../../../testing/with-fixture.harness.js';
 import { readPackageJson } from '../../../utils/fs.utils.js';
-import { contextFor, LTS, withFixture } from '../../module-test-kit.js';
 import { updateTypesNode } from './types-node.feature.js';
 
 describe('types-node feature', () => {

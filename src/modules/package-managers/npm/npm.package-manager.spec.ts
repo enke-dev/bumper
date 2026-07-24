@@ -2,13 +2,14 @@
 // The LTS is pinned on the context so `ensureNodeLts` never touches the network; fs is real,
 // backed by a tmpdir.
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
 import type { ModuleContext, NodeLts } from '../../../context/context.types.js';
 import { PackageManager } from '../../../context/context.types.js';
+import { makeTempDir } from '../../../testing/with-temp-dir.harness.js';
+import { writePackageJson } from '../../../utils/fs.utils.js';
 import type { PackageJson } from '../../../utils/package.types.js';
 import { alignNpmToNodeLts } from './npm.package-manager.js';
 
@@ -28,8 +29,8 @@ function ctx(overrides: Partial<ModuleContext> = {}): ModuleContext {
   } as ModuleContext;
 }
 
-async function writePkg(pkg: PackageJson): Promise<void> {
-  await writeFile(join(dir, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
+function writePkg(pkg: PackageJson): Promise<void> {
+  return writePackageJson(dir, pkg);
 }
 
 async function readField(): Promise<string | undefined> {
@@ -37,7 +38,7 @@ async function readField(): Promise<string | undefined> {
 }
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'bumper-npm-pm-'));
+  dir = await makeTempDir('npm-pm');
 });
 
 afterEach(async () => {
