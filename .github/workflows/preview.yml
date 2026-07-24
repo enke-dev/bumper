@@ -10,15 +10,27 @@ concurrency:
   group: preview-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+# default for the reusable check/build calls — check.yml writes a test report, and a
+# reusable workflow can't be granted more than its caller. The preview job overrides.
+# (publishing itself uses NPM_TOKEN, not GITHUB_TOKEN.)
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   check:
     uses: ./.github/workflows/check.yml
     secrets: inherit
 
+  # same reusable build as production — the binaries land as a run artifact,
+  # downloadable per-PR so a reviewer can test the actual binary, not just the npm bin
+  build:
+    uses: ./.github/workflows/build.yml
+
   preview:
-    needs: check
+    needs: [check, build]
     # fork PRs can't read NPM_TOKEN (GitHub withholds secrets), so publish would
-    # fail — skip it there; the check job above still runs for them
+    # fail — skip it there; the check + build jobs above still run for them
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
