@@ -11,12 +11,12 @@ import { fileURLToPath } from 'node:url';
 import { defaultRepoConfig } from '../config/config.js';
 import type { ModuleContext, NodeLts } from '../context/context.types.js';
 import { PackageManager, Runtime, VersionManager } from '../context/context.types.js';
+import type { ImageRef } from '../utils/docker.utils.js';
 import { pathExists, readPackageJson } from '../utils/fs.utils.js';
 import {
   dockerImagesFeature,
   updateDockerImages,
 } from './features/docker-images/docker-images.feature.js';
-import type { ImageRef } from './features/docker-images/docker-refs.utils.js';
 import { dockerNodeFeature } from './features/docker-node/docker-node.feature.js';
 import { updateTypesNode } from './features/types-node/types-node.feature.js';
 import { nodeRuntime } from './runtimes/node/node.runtime.js';

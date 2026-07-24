@@ -1,13 +1,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
 
-import { findDockerFiles } from '../../../utils/docker.utils.js';
+import type { ImageRef } from '../../../utils/docker.utils.js';
+import { findDockerFiles, parseImageRef, parseImageRefs } from '../../../utils/docker.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
 import type { Module, ModuleContext } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 import { readDockerConfigAuth } from './docker-auth.utils.js';
-import type { ImageRef } from './docker-refs.utils.js';
-import { parseImageRef, parseImageRefs, partitionByOwnership } from './docker-refs.utils.js';
+import { partitionByOwnership } from './docker-refs.utils.js';
 import { parseTag, pickNewestTag } from './docker-tags.utils.js';
 import { fetchOciDigest, fetchOciTags, ociHost } from './oci-registry.client.js';
 
