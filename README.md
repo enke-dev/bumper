@@ -57,6 +57,12 @@ curl -fsSL https://raw.githubusercontent.com/enke-dev/bumper/main/install.sh | s
 
 Then invoke `bmpr` directly. Handy when the local Node is too old for the JS bin.
 
+Keep it current with `bmpr upgrade` — it downloads the latest release for your platform and
+replaces the running binary in place (re-running `install.sh` works too). A package-manager
+install ignores this and is upgraded through that manager instead (the command says so and prints
+the global-install command). During `bumper update` an out-of-date binary is flagged with the same
+`bumper upgrade` hint rather than a package-manager one.
+
 ### Run without installing
 
 Use your package manager's runner to fetch + execute the latest version on the fly:
@@ -106,6 +112,7 @@ bumper detect                 # show context + applicable modules for the cwd
 bumper detect /path --json    # machine-readable detection
 bumper update                 # run every applicable module, in order
 bumper update /path/to/repo   # target another repo (defaults to cwd)
+bumper upgrade                # update the bumper binary itself (standalone install only)
 ```
 
 Every invocation prints a one-line `bumper v<version>` banner (suppressed under `--json`). During

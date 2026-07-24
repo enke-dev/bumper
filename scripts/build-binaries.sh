@@ -10,5 +10,6 @@ for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
   out="dist/bin/bmpr-${target}"
   [ "$target" = windows-x64 ] && out="${out}.exe"
   echo "compiling ${target}…"
-  bun build --compile --target="bun-${target}" ./src/cli.ts --outfile "$out"
+  bun build --compile --define "__BUMPER_CHANNEL__='binary'" \
+    --target="bun-${target}" ./src/cli.ts --outfile "$out"
 done

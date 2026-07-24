@@ -1,6 +1,8 @@
 import { isGreater, isValid } from 'verkit';
 
 import { PackageManager } from '../context/context.types.js';
+import type { InstallChannel } from './channel.js';
+import { installChannel } from './channel.js';
 import { exec } from './exec.utils.js';
 import { latestVersion, viewTool } from './npm-registry.utils.js';
 
@@ -32,7 +34,17 @@ export function checkForSelfUpdate(
   );
 }
 
-/** One-line hint text for an available update (no ANSI; the caller styles it). */
-export function updateHint(pm: PackageManager, current: string, latest: string): string {
-  return `bumper ${current} is out of date — ${latest} available: ${INSTALL_CMD[pm]} ${SELF}`;
+/**
+ * One-line hint text for an available update (no ANSI; the caller styles it). A binary install
+ * upgrades itself (`bumper upgrade`); a package-manager install is upgraded through that manager,
+ * so point at its global-install command.
+ */
+export function updateHint(
+  pm: PackageManager,
+  current: string,
+  latest: string,
+  channel: InstallChannel = installChannel()
+): string {
+  const how = channel === 'binary' ? 'run: bumper upgrade' : `${INSTALL_CMD[pm]} ${SELF}`;
+  return `bumper ${current} is out of date — ${latest} available: ${how}`;
 }

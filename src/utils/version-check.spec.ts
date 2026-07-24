@@ -41,9 +41,16 @@ describe('checkForSelfUpdate', () => {
 });
 
 describe('updateHint', () => {
-  test('uses the package manager global-install command', () => {
-    assert.match(updateHint(PackageManager.Bun, '0.1.0', '0.4.3'), /bun add -g @enke\.dev\/bumper/);
-    assert.match(updateHint(PackageManager.Pnpm, '0.1.0', '0.4.3'), /pnpm add -g/);
-    assert.match(updateHint(PackageManager.Npm, '0.1.0', '0.4.3'), /npm i -g/);
+  test('managed channel uses the package manager global-install command', () => {
+    const managed = (pm: PackageManager) => updateHint(pm, '0.1.0', '0.4.3', 'managed');
+    assert.match(managed(PackageManager.Bun), /bun add -g @enke\.dev\/bumper/);
+    assert.match(managed(PackageManager.Pnpm), /pnpm add -g/);
+    assert.match(managed(PackageManager.Npm), /npm i -g/);
+  });
+
+  test('binary channel points at the self-upgrade command instead', () => {
+    const hint = updateHint(PackageManager.Npm, '0.1.0', '0.4.3', 'binary');
+    assert.match(hint, /run: bumper upgrade/);
+    assert.doesNotMatch(hint, /npm i -g/);
   });
 });
