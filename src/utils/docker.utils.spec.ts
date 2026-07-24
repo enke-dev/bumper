@@ -48,6 +48,18 @@ describe('parseImageRefs', () => {
     ].join('\n');
     assert.deepEqual(parseImageRefs(compose), ['redis:7.2', 'nginx:1.27']);
   });
+
+  test('ignores commented-out refs and FROM/image not at line start', () => {
+    const text = [
+      'FROM postgres:16',
+      '# FROM postgres:99',
+      '  # FROM redis:99',
+      '#FROM mysql:99',
+      'RUN echo "FROM fake:99"',
+      '    # image: redis:99',
+    ].join('\n');
+    assert.deepEqual(parseImageRefs(text), ['postgres:16']);
+  });
 });
 
 describe('parseImageRef', () => {
