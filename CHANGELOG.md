@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.6.1](https://github.com/enke-dev/bumper/compare/0.6.0...0.6.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **dist:** compile binaries with the released version; previews GitHub-only ([#6](https://github.com/enke-dev/bumper/issues/6)) ([18eb4f0](https://github.com/enke-dev/bumper/commit/18eb4f09a8cd70428f5526f85c458b1a6f2f33e5))
+
 # [0.6.0](https://github.com/enke-dev/bumper/compare/0.5.3...0.6.0) (2026-07-24)
 
 
