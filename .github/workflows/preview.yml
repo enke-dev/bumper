@@ -10,9 +10,8 @@ concurrency:
   group: preview-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-# default for the reusable check/build calls — check.yml writes a test report, and a
+# default for the reusable check call — check.yml writes a test report, and a
 # reusable workflow can't be granted more than its caller. The preview job overrides.
-# (publishing itself uses NPM_TOKEN, not GITHUB_TOKEN.)
 permissions:
   contents: read
   checks: write
@@ -22,19 +21,15 @@ jobs:
     uses: ./.github/workflows/check.yml
     secrets: inherit
 
-  # same reusable build as production — the binaries land as a run artifact,
-  # downloadable per-PR so a reviewer can test the actual binary, not just the npm bin
-  build:
-    uses: ./.github/workflows/build.yml
-
   preview:
-    needs: [check, build]
-    # fork PRs can't read NPM_TOKEN (GitHub withholds secrets), so publish would
-    # fail — skip it there; the check + build jobs above still run for them
+    needs: check
+    # fork PRs get a read-only GITHUB_TOKEN (can't create the release) — skip the
+    # preview there; the check job above still runs for them
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    # contents: write — creates/refreshes the floating `pr-<number>` pre-release + tag
     permissions:
-      contents: read
+      contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -46,16 +41,12 @@ jobs:
         with:
           bun-version-file: package.json
 
-      # npmjs auth for the `@enke.dev/bumper` publish (public scoped package)
-      - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
-
-      # runs the `prepare` script → builds dist/cli.mjs (npm re-runs it at publish too)
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # immutable, traceable version: <base>-pr-<number>.<run_number>. run_number is
-      # globally monotonic so it never collides — every push publishes a fresh version
+      # stamp a traceable preview version into package.json (local only — previews are
+      # GitHub-only, not published to npm) so the compiled binary reports it. run_number
+      # is globally monotonic, so each build is uniquely identifiable.
       - name: Set preview version
         id: version
         run: |
@@ -64,24 +55,32 @@ jobs:
           npm version "$preview" --no-git-tag-version
           echo "version=${preview}" >> "$GITHUB_OUTPUT"
 
-      # per-PR dist-tag `pr-<number>` floats to this PR's newest build (never `latest`);
-      # the exact <version> stays immutable for pinning
-      - name: Publish preview
-        run: npm publish --tag "pr-${{ github.event.pull_request.number }}" --access public
+      # compile AFTER the version stamp so the binaries bake in the preview version
+      # (the CLI reads it from package.json at compile time)
+      - name: Compile binaries
+        run: sh scripts/build-binaries.sh
+
+      # a floating `pr-<number>` pre-release carrying the binaries, refreshed each push
+      # (delete + recreate at the head SHA). `--prerelease` so it never becomes the
+      # "latest" release the installer targets.
+      - name: Publish preview to GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="pr-${{ github.event.pull_request.number }}"
+          gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$tag" dist/bin/bmpr-* \
+            --prerelease \
+            --target "${{ github.event.pull_request.head.sha }}" \
+            --title "Preview — PR #${{ github.event.pull_request.number }}" \
+            --notes "Preview build for PR #${{ github.event.pull_request.number }} (\`${{ steps.version.outputs.version }}\`). Binaries below; install per README."
 
       - name: Summary
         run: |
-          version='${{ steps.version.outputs.version }}'
           tag='pr-${{ github.event.pull_request.number }}'
+          version='${{ steps.version.outputs.version }}'
           {
             echo "### Preview published :package:"
             echo ''
-            echo "Floating (newest on this PR):"
-            echo "\`\`\`sh"
-            echo "bunx --bun @enke.dev/bumper@${tag} update"
-            echo "\`\`\`"
-            echo "Pinned (this exact build):"
-            echo "\`\`\`sh"
-            echo "npm i @enke.dev/bumper@${version}"
-            echo "\`\`\`"
+            echo "Binaries on the \`${tag}\` GitHub pre-release (\`${version}\`)."
           } >> "$GITHUB_STEP_SUMMARY"

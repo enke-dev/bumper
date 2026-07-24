@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "after:bump": "sh scripts/build-binaries.sh"
+  },
+  "npm": {
+    "skipChecks": true,
+    "publish": true
+  },
+  "github": {
+    "release": true,
+    "assets": ["dist/bin/bmpr-*"]
+  },
+  "git": {
+    "commitMessage": "chore: release v${version}",
+    "pushArgs": ["--follow-tags"]
+  },
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "infile": "CHANGELOG.md",
+      "header": "# @enke.dev/bumper",
+      "preset": "angular"
+    }
+  }
+}

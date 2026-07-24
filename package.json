@@ -22,7 +22,7 @@
     "bumper": "./dist/cli.mjs"
   },
   "files": [
-    "dist",
+    "dist/cli.mjs",
     "assets/icon/icon.png"
   ],
   "engines": {

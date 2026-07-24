@@ -13,7 +13,7 @@ concurrency:
   group: production-${{ github.ref }}
   cancel-in-progress: false
 
-# default for the reusable check/build calls — check.yml writes a test report, and a
+# default for the reusable check call — check.yml writes a test report, and a
 # reusable workflow can't be granted more than its caller. The release job overrides.
 permissions:
   contents: read
@@ -24,11 +24,8 @@ jobs:
     uses: ./.github/workflows/check.yml
     secrets: inherit
 
-  build:
-    uses: ./.github/workflows/build.yml
-
   release:
-    needs: [check, build]
+    needs: check
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -58,40 +55,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # binaries compiled by the build job → attached to the GH release below
-      - name: Download binaries
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: binaries
-          path: dist/bin
-
       - name: Configure git identity
         run: |
           git config user.name  "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
 
-      # release-it does it all in one run — bump, changelog, npm publish, push the
-      # tag, and create the GitHub release with the binaries attached. No-op when no
-      # releasable commits. The release commit it pushes uses GITHUB_TOKEN, so it
-      # won't re-trigger this workflow (loop-prevention works in our favour here).
+      # release-it (config in .release-it.json) does it all in one run — bump,
+      # changelog, npm publish, push the tag, and create the GitHub release with the
+      # binaries attached. Its `after:bump` hook compiles the binaries AFTER the
+      # version bump, so they bake in the released version (not the pre-bump one).
+      # No-op when there are no releasable commits. The release commit it pushes uses
+      # GITHUB_TOKEN, so it won't re-trigger this workflow (loop-prevention helps here).
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >
-          bunx \
-            -p release-it \
-            -p @release-it/conventional-changelog \
-            release-it \
-              --ci \
-              --npm.skipChecks \
-              --npm.publish \
-              --github.release \
-              --github.assets='dist/bin/bmpr-*' \
-              --git.commitMessage='chore: release v${version}' \
-              --git.pushArgs=--follow-tags \
-              --plugins.@release-it/conventional-changelog.infile=CHANGELOG.md \
-              --plugins.@release-it/conventional-changelog.header='# @enke.dev/bumper' \
-              --plugins.@release-it/conventional-changelog.preset=angular
+        run: bunx -p release-it -p @release-it/conventional-changelog release-it --ci
 
       - name: Resolve released version
         id: version
