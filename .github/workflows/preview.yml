@@ -52,18 +52,24 @@ jobs:
           npm version "$preview" --no-git-tag-version
           echo "version=${preview}" >> "$GITHUB_OUTPUT"
 
-      # dist-tag `preview` keeps it off `latest`; the exact version is immutable
+      # per-PR dist-tag `pr-<number>` floats to this PR's newest build (never `latest`);
+      # the exact <version> stays immutable for pinning
       - name: Publish preview
-        run: npm publish --tag preview --access public
+        run: npm publish --tag "pr-${{ github.event.pull_request.number }}" --access public
 
       - name: Summary
         run: |
           version='${{ steps.version.outputs.version }}'
+          tag='pr-${{ github.event.pull_request.number }}'
           {
             echo "### Preview published :package:"
             echo ''
+            echo "Floating (newest on this PR):"
             echo "\`\`\`sh"
-            echo "npm  i @enke.dev/bumper@${version}"
-            echo "bunx --bun @enke.dev/bumper@${version} update"
+            echo "bunx --bun @enke.dev/bumper@${tag} update"
+            echo "\`\`\`"
+            echo "Pinned (this exact build):"
+            echo "\`\`\`sh"
+            echo "npm i @enke.dev/bumper@${version}"
             echo "\`\`\`"
           } >> "$GITHUB_STEP_SUMMARY"
