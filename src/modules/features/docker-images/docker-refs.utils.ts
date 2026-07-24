@@ -46,3 +46,54 @@ export function partitionByOwnership(
   refs.forEach(ref => result[owned.has(imageRepo(ref)) ? 'owned' : 'candidates'].push(ref));
   return result;
 }
+
+/** An image reference decomposed into its addressable parts. `registry: null` means Docker Hub. */
+export interface ImageRef {
+  /** Registry host (`ghcr.io`, `myreg:5000`), or null for Docker Hub (the implicit default). */
+  registry: string | null;
+  /** Namespace/org — `library` for a bare Docker Hub name (`postgres`), `x` for `ghcr.io/x/y`. */
+  namespace: string;
+  /** Image name (repository leaf), e.g. `postgres`, `app`. */
+  name: string;
+  /** The tag, or null when the ref pins none (implicit `latest`). */
+  tag: string | null;
+  /** The `@sha256:…` digest, or null when unpinned. */
+  digest: string | null;
+}
+
+const DOCKER_HUB_HOSTS = new Set(['docker.io', 'index.docker.io', 'registry-1.docker.io']);
+
+/**
+ * Decompose an image ref into registry/namespace/name/tag/digest, applying Docker's implicit
+ * defaults (a bare name lives under `library` on Docker Hub). The first path segment is treated as
+ * a registry host only when it looks like one (contains `.` or `:`, or is `localhost`) — matching
+ * docker's own disambiguation. Minimal but covers the Docker Hub + `host/ns/name` shapes; richer
+ * grammar (a dedicated parser lib) can slot in later without changing callers.
+ */
+export function parseImageRef(ref: string): ImageRef {
+  const at = ref.indexOf('@');
+  const digest = at === -1 ? null : ref.slice(at + 1);
+  const withoutDigest = at === -1 ? ref : ref.slice(0, at);
+
+  const segments = withoutDigest.split('/');
+  const first = segments[0] ?? '';
+  const hasRegistry = segments.length > 1 && (/[.:]/.test(first) || first === 'localhost');
+  const registry = hasRegistry ? first : null;
+  const path = hasRegistry ? segments.slice(1) : segments;
+
+  const leaf = path[path.length - 1] ?? '';
+  const colon = leaf.lastIndexOf(':');
+  const name = colon === -1 ? leaf : leaf.slice(0, colon);
+  const tag = colon === -1 ? null : leaf.slice(colon + 1);
+
+  const namespaceParts = path.slice(0, -1);
+  const namespace =
+    namespaceParts.length > 0 ? namespaceParts.join('/') : registry ? '' : 'library';
+
+  return { registry, namespace, name, tag, digest };
+}
+
+/** Whether a parsed ref points at Docker Hub (the only registry the v1 client speaks). */
+export function isDockerHub(ref: ImageRef): boolean {
+  return ref.registry === null || DOCKER_HUB_HOSTS.has(ref.registry);
+}

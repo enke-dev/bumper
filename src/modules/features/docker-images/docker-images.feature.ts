@@ -1,21 +1,99 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
 
 import { findDockerFiles } from '../../../utils/docker.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
-import type { Module } from '../../module.types.js';
+import type { Module, ModuleContext } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
-import { parseImageRefs, partitionByOwnership } from './docker-refs.utils.js';
+import { fetchDockerHubTags } from './docker-hub.client.js';
+import {
+  isDockerHub,
+  parseImageRef,
+  parseImageRefs,
+  partitionByOwnership,
+} from './docker-refs.utils.js';
+import { parseTag, pickNewestTag } from './docker-tags.utils.js';
+
+/** Resolve a repository's available tags. Injected in tests; defaults to the Docker Hub client. */
+export type TagFetcher = (namespace: string, name: string) => Promise<string[]>;
+
+const defaultTagFetcher: TagFetcher = (namespace, name) => fetchDockerHubTags(namespace, name);
+
+interface Bump {
+  ref: string;
+  next: string;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /**
- * Bump base images referenced in Docker/compose files to their newest tag — the docker counterpart
- * of the package-manager bumps. Images owned by another module (see {@link Module.managedImages},
- * e.g. `node` held at LTS by docker-node) are skipped via the ownership carve-out.
- *
- * SKELETON: the ownership partition + file/ref discovery are wired and tested; the registry lookup
- * that resolves each candidate's newest tag is not implemented yet, so `update` currently rewrites
- * nothing. This module is intentionally NOT in the registry until that lands.
+ * Resolve the newer ref for a candidate, or null to leave it. v1 scope: Docker Hub only, an
+ * explicit numeric tag, and no digest pin (digest repinning is a later step). Non-Hub registries,
+ * untagged/`latest`, and non-numeric tags are skipped untouched.
  */
+async function resolveBump(ref: string, fetchTags: TagFetcher): Promise<Bump | null> {
+  const parsed = parseImageRef(ref);
+  if (!isDockerHub(parsed) || parsed.tag === null || parsed.digest !== null) {
+    return null;
+  }
+  if (parseTag(parsed.tag) === null) {
+    return null;
+  }
+  const newest = pickNewestTag(parsed.tag, await fetchTags(parsed.namespace, parsed.name));
+  if (newest === null || newest === parsed.tag) {
+    return null;
+  }
+  // the tag sits at the end of the ref (no digest here) → swap just that suffix
+  return { ref, next: ref.slice(0, ref.length - parsed.tag.length) + newest };
+}
+
+/** Apply each bump to the file text, matching the ref as a whole token (never a substring of a
+ * longer ref like `mynode:16` or `postgres:16-alpine`). */
+function applyBumps(text: string, bumps: readonly Bump[]): string {
+  return bumps.reduce((acc, { ref, next }) => {
+    const token = new RegExp(`(?<![\\w./@-])${escapeRegExp(ref)}(?![\\w.-])`, 'g');
+    return acc.replace(token, next);
+  }, text);
+}
+
+/**
+ * Bump base images referenced in Docker/compose files to their newest tag on the same variant +
+ * precision (see {@link pickNewestTag}). Images owned by another module (see
+ * {@link Module.managedImages}, e.g. `node` held at LTS by docker-node) are skipped via the
+ * ownership carve-out. Best-effort per image: a registry failure leaves that ref untouched.
+ */
+export async function updateDockerImages(
+  ctx: ModuleContext,
+  fetchTags: TagFetcher = defaultTagFetcher
+): Promise<void> {
+  const owned = ctx.managedImages ?? new Set<string>();
+  const files = await findDockerFiles(ctx);
+  await Promise.all(
+    files.map(async file => {
+      const original = await readFile(file, 'utf8');
+      const { candidates } = partitionByOwnership(parseImageRefs(original), owned);
+      const unique = [...new Set(candidates)];
+      const bumps = (await Promise.all(unique.map(ref => resolveBump(ref, fetchTags)))).filter(
+        (bump): bump is Bump => bump !== null
+      );
+      if (bumps.length === 0) {
+        return;
+      }
+      const label = relative(ctx.cwd, file);
+      if (ctx.dryRun) {
+        bumps.forEach(({ ref, next }) => planLine(`bump ${ref} → ${next} in ${label}`));
+        return;
+      }
+      const updated = applyBumps(original, bumps);
+      if (updated !== original) {
+        await writeFile(file, updated);
+      }
+    })
+  );
+}
+
 export const dockerImagesFeature: Module = {
   kind: ModuleKind.Feature,
   id: 'docker-images',
@@ -27,26 +105,5 @@ export const dockerImagesFeature: Module = {
     }
     return (await findDockerFiles(ctx)).length > 0;
   },
-  async update(ctx) {
-    const owned = ctx.managedImages ?? new Set<string>();
-    const files = await findDockerFiles(ctx);
-    const perFile = await Promise.all(
-      files.map(async file => {
-        const { candidates } = partitionByOwnership(
-          parseImageRefs(await readFile(file, 'utf8')),
-          owned
-        );
-        return { file, candidates };
-      })
-    );
-    perFile.forEach(({ file, candidates }) => {
-      const label = relative(ctx.cwd, file);
-      candidates.forEach(ref => {
-        // TODO: resolve the newest tag for `ref` via the registry client, then rewrite in place.
-        if (ctx.dryRun) {
-          planLine(`check ${ref} for a newer tag in ${label}`);
-        }
-      });
-    });
-  },
+  update: ctx => updateDockerImages(ctx),
 };

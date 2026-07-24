@@ -1,5 +1,6 @@
 import type { ModuleContext } from '../context/context.types.js';
 import { runStep } from '../utils/output.utils.js';
+import { dockerImagesFeature } from './features/docker-images/docker-images.feature.js';
 import { dockerNodeFeature } from './features/docker-node/docker-node.feature.js';
 import { githubActionsFeature } from './features/github-actions/github-actions.feature.js';
 import { typesNodeFeature } from './features/types-node/types-node.feature.js';
@@ -23,6 +24,7 @@ const MODULES: readonly Module[] = [
   npmPackageManager,
   pnpmPackageManager,
   dockerNodeFeature,
+  dockerImagesFeature,
   githubActionsFeature,
 ];
 

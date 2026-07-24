@@ -2,7 +2,13 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { imageRepo, parseImageRefs, partitionByOwnership } from './docker-refs.utils.js';
+import {
+  imageRepo,
+  isDockerHub,
+  parseImageRef,
+  parseImageRefs,
+  partitionByOwnership,
+} from './docker-refs.utils.js';
 
 describe('parseImageRefs', () => {
   test('extracts FROM refs, ignoring platform flag, stage alias and scratch', () => {
@@ -48,5 +54,55 @@ describe('partitionByOwnership', () => {
     );
     assert.deepEqual(owned, ['node:22']);
     assert.deepEqual(candidates, ['postgres:16', 'ghcr.io/x/node:1']);
+  });
+});
+
+describe('parseImageRef', () => {
+  test('applies Docker Hub implicit defaults + splits host/ns/name/tag/digest', () => {
+    assert.deepEqual(parseImageRef('postgres:16'), {
+      registry: null,
+      namespace: 'library',
+      name: 'postgres',
+      tag: '16',
+      digest: null,
+    });
+    assert.deepEqual(parseImageRef('user/app:1.2'), {
+      registry: null,
+      namespace: 'user',
+      name: 'app',
+      tag: '1.2',
+      digest: null,
+    });
+    assert.deepEqual(parseImageRef('ghcr.io/x/y:1'), {
+      registry: 'ghcr.io',
+      namespace: 'x',
+      name: 'y',
+      tag: '1',
+      digest: null,
+    });
+    assert.deepEqual(parseImageRef('myreg:5000/x:1'), {
+      registry: 'myreg:5000',
+      namespace: '',
+      name: 'x',
+      tag: '1',
+      digest: null,
+    });
+    assert.deepEqual(parseImageRef('node'), {
+      registry: null,
+      namespace: 'library',
+      name: 'node',
+      tag: null,
+      digest: null,
+    });
+    assert.equal(parseImageRef('redis:7@sha256:abc').digest, 'sha256:abc');
+  });
+});
+
+describe('isDockerHub', () => {
+  test('true for implicit + explicit hub hosts, false otherwise', () => {
+    assert.equal(isDockerHub(parseImageRef('postgres:16')), true);
+    assert.equal(isDockerHub(parseImageRef('docker.io/library/redis:7')), true);
+    assert.equal(isDockerHub(parseImageRef('ghcr.io/x/y:1')), false);
+    assert.equal(isDockerHub(parseImageRef('myreg:5000/x:1')), false);
   });
 });

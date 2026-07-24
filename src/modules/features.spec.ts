@@ -12,7 +12,10 @@ import { defaultRepoConfig } from '../config/config.js';
 import type { ModuleContext, NodeLts } from '../context/context.types.js';
 import { PackageManager, Runtime, VersionManager } from '../context/context.types.js';
 import { pathExists, readPackageJson } from '../utils/fs.utils.js';
-import { dockerImagesFeature } from './features/docker-images/docker-images.feature.js';
+import {
+  dockerImagesFeature,
+  updateDockerImages,
+} from './features/docker-images/docker-images.feature.js';
 import { dockerNodeFeature } from './features/docker-node/docker-node.feature.js';
 import { updateTypesNode } from './features/types-node/types-node.feature.js';
 import { nodeRuntime } from './runtimes/node/node.runtime.js';
@@ -157,19 +160,76 @@ describe('docker-node feature', () => {
   });
 });
 
-describe('docker-images feature (skeleton)', () => {
+describe('docker-images feature', () => {
+  // Offline tag lookup: postgres/redis have newer tags; the node image must never be queried
+  // (it's owned by docker-node). Throws if the owned image is looked up.
+  const fetchTags = async (_namespace: string, name: string): Promise<string[]> => {
+    if (name === 'node') {
+      throw new Error('owned image must not be queried');
+    }
+    if (name === 'postgres') {
+      return ['16', '17', '18', '18.3'];
+    }
+    if (name === 'redis') {
+      return ['7.2', '7.4', '8.0'];
+    }
+    return [];
+  };
+
+  async function withDockerfile(
+    body: string,
+    run: (dir: string, ctx: ModuleContext) => Promise<void>,
+    dryRun = false
+  ): Promise<void> {
+    const dir = await mkdtemp(join(tmpdir(), 'bumper-docker-'));
+    try {
+      await writeFile(join(dir, 'Dockerfile'), body);
+      const ctx: ModuleContext = { ...contextFor(dir, dryRun), managedImages: new Set(['node']) };
+      await run(dir, ctx);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
   test('detects a repo with Docker/compose files', async () => {
     await withFixture('node-npm', async dir => {
       assert.equal(await dockerImagesFeature.isUsed(contextFor(dir)), true);
     });
   });
 
-  test('dry-run rewrites nothing (registry lookup not yet implemented)', async () => {
-    await withFixture('node-npm', async dir => {
-      const before = await readFile(join(dir, 'Dockerfile'), 'utf8');
-      const ctx = { ...contextFor(dir, true), managedImages: new Set(['node']) };
-      await dockerImagesFeature.update(ctx);
-      assert.equal(await readFile(join(dir, 'Dockerfile'), 'utf8'), before);
+  test('bumps a Hub image to the newest same-shape tag, skipping the owned node image', async () => {
+    await withDockerfile('FROM node:20-alpine\nFROM postgres:16\n', async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      const out = await readFile(join(dir, 'Dockerfile'), 'utf8');
+      assert.ok(out.includes('FROM postgres:18'), 'postgres bumped to newest bare major');
+      assert.ok(out.includes('FROM node:20-alpine'), 'owned node image left untouched');
     });
+  });
+
+  test('preserves precision + variant when picking the newer tag', async () => {
+    await withDockerfile('FROM redis:7.2\n', async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      // 7.2 is major.minor → newest major.minor is 8.0 (not the bare-major 8)
+      assert.ok((await readFile(join(dir, 'Dockerfile'), 'utf8')).includes('FROM redis:8.0'));
+    });
+  });
+
+  test('leaves non-Hub, digest-pinned and non-numeric refs untouched', async () => {
+    const body = 'FROM ghcr.io/x/postgres:16\nFROM redis:latest\nFROM postgres@sha256:abc\n';
+    await withDockerfile(body, async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      assert.equal(await readFile(join(dir, 'Dockerfile'), 'utf8'), body);
+    });
+  });
+
+  test('dry-run rewrites nothing', async () => {
+    await withDockerfile(
+      'FROM postgres:16\n',
+      async (dir, ctx) => {
+        await updateDockerImages(ctx, fetchTags);
+        assert.equal(await readFile(join(dir, 'Dockerfile'), 'utf8'), 'FROM postgres:16\n');
+      },
+      true
+    );
   });
 });

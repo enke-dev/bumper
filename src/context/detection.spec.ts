@@ -51,6 +51,7 @@ describe('detection: node + npm', () => {
     assert.equal(ctx.packageManager, PackageManager.Npm);
     assert.equal(ctx.isMonorepo, false);
     assert.deepEqual([...used].sort(), [
+      'docker-images',
       'docker-node',
       'github-actions',
       'node',
