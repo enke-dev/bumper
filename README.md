@@ -11,7 +11,12 @@ Docker/Compose files, and other base-image tags referenced there.
 ## tl;dr
 
 ```sh
-# run bumper in the current repo, auto-detecting everything
+# install bumper via shell script
+curl -fsSL https://raw.githubusercontent.com/enke-dev/bumper/main/install.sh | sh
+# run bumper
+bmpr update -c
+
+# or invoke bumper directly in the current repo without installing
 npx @enke.dev/bumper update         # with npm
 pnpm dlx @enke.dev/bumper update    # with pnpm
 bunx --bun @enke.dev/bumper update  # with Bun, no Node needed
