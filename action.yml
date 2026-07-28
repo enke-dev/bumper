@@ -82,10 +82,6 @@ runs:
 
     - name: Set up Bun
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-      with:
-        # use the version the target repo declares (packageManager field),
-        # not latest — avoids lockfile churn from CI running ahead of the repo
-        bun-version-file: package.json
 
     - name: Set up Node
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -100,7 +96,9 @@ runs:
       # `corepack enable` only installs shims — the pinned PM is downloaded lazily on
       # first use, which fails in CI ("ENOENT .../corepack/v1/pnpm") unless we both
       # disable the interactive download prompt and pre-activate the pinned version.
-      # Guarded on a packageManager field so npm-only repos (which have none) don't error.
+      # Guarded on the *name* in the packageManager field: repos without one (npm-only)
+      # and bun repos (Corepack rejects `bun@…` as "Unsupported package manager
+      # specification", and setup-bun above already provides it) must skip prepare.
       shell: bash
       env:
         COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
@@ -109,9 +107,10 @@ runs:
         # persist for later steps: bumper bumps the packageManager field mid-run, so its
         # `pnpm install` downloads the *new* pinned version — which must not prompt either
         echo "COREPACK_ENABLE_DOWNLOAD_PROMPT=0" >> "$GITHUB_ENV"
-        if node -e "process.exit(require('./package.json').packageManager ? 0 : 1)" 2>/dev/null; then
-          corepack prepare --activate
-        fi
+        pm="$(node -e "process.stdout.write(require('./package.json').packageManager ?? '')" 2>/dev/null || true)"
+        case "${pm%%@*}" in
+          npm | pnpm | yarn) corepack prepare --activate ;;
+        esac
 
     - name: Configure registry auth
       # Written AFTER checkout (which cleans untracked files) and BEFORE install. Written to
