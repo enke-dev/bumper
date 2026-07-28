@@ -259,6 +259,58 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.dependencies?.['bar'], '4.0.0');
   });
 
+  test('realigns literal version pins inside override trees', async () => {
+    // A root that only overrides (e.g. a monorepo whose members hold the dependency) can't use the
+    // `$name` back-reference, so the pin is literal — and must not rot behind the bump. Only
+    // packages the repo itself depends on move: an override-only pin is often a deliberate
+    // downgrade around a regression, so `legacy` below stays exactly where it was authored.
+    latest = { prettier: '3.9.6', legacy: '5.0.0' };
+    versions = { prettier: ['3.8.5', '3.9.6'] };
+    await writePkg({
+      name: 'root',
+      devDependencies: { prettier: '3.8.5' },
+      overrides: {
+        prettier: '3.8.5',
+        nested: { prettier: '^3.8.5' },
+        ref: '$prettier',
+        legacy: '4.1.0',
+      },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    const overrides = pkg?.['overrides'] as Record<string, unknown>;
+    assert.equal(overrides['prettier'], '3.9.6');
+    assert.deepEqual(overrides['nested'], { prettier: '^3.9.6' }, 'nested pins realign too');
+    assert.equal(overrides['ref'], '$prettier', '$name references stay as authored');
+    assert.equal(overrides['legacy'], '4.1.0', 'override-only pin left alone');
+  });
+
+  test('a pnpm-workspace.yaml override exempts too (pnpm 11 dropped the package.json field)', async () => {
+    latest = { prettier: '3.9.6', 'void-html': '2.1.0' };
+    versions = { prettier: ['3.8.5', '3.9.6'] };
+    peers = { 'void-html': { prettier: '3.0.0 - 3.8.x' } };
+    await writePkg({ name: 'root', devDependencies: { prettier: '3.8.5', 'void-html': '2.1.0' } });
+    await writeFile(
+      join(dir, 'pnpm-workspace.yaml'),
+      [
+        'packages:',
+        '  - packages/*',
+        'overrides:',
+        '  # keep the fleet on 3.9 despite the plugin peer',
+        '  prettier: $prettier',
+        'allowBuilds:',
+        '  esbuild: true',
+      ].join('\n')
+    );
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.devDependencies?.['prettier'], '3.9.6');
+  });
+
   test('an override for one package leaves other peer caps intact', async () => {
     latest = { foo: '4.0.0', baz: '4.0.0', 'peer-pkg': '1.0.0' };
     versions = { foo: ['3.0.0', '4.0.0'], baz: ['3.7.0', '4.0.0'] };

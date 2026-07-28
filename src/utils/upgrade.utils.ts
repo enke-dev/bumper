@@ -1,9 +1,10 @@
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { isLess, isValid, satisfies } from 'verkit';
 
 import type { ModuleContext } from '../context/context.types.js';
-import { allDependencies, readPackageJson, writePackageJson } from './fs.utils.js';
+import { allDependencies, pathExists, readPackageJson, writePackageJson } from './fs.utils.js';
 import {
   latestVersion,
   maxSatisfyingRanges,
@@ -87,23 +88,97 @@ function overrideKeys(node: unknown): string[] {
 }
 
 /**
- * Packages the root manifest force-resolves — npm/bun `overrides`, yarn `resolutions`, or
- * `pnpm.overrides`. Such an entry is a deliberate "this version wins everywhere" statement, so a
- * dependency's `peerDependencies` must not cap it: the repo has already decided the conflict, and
- * the installer honors the override rather than the peer.
+ * Package names under the `overrides:` block of a `pnpm-workspace.yaml` body. pnpm 11 dropped the
+ * `pnpm` field in `package.json` ("no longer read by pnpm ... see the new home of each setting"),
+ * so on current pnpm this file is the *only* place an override lives — miss it and every pnpm repo
+ * silently keeps getting capped. Parsed line-wise like the `packages:` block in the workspace
+ * detector rather than pulling in a YAML dependency: the block is a flat `name: spec` map.
+ */
+function parsePnpmOverrides(yaml: string): string[] {
+  return yaml.split('\n').reduce<{ inBlock: boolean; names: string[] }>(
+    (state, raw) => {
+      const line = raw.replace(/\s+$/, '');
+      if (/^overrides:\s*$/.test(line)) {
+        return { ...state, inBlock: true };
+      }
+      if (!state.inBlock || line.trim() === '' || line.trim().startsWith('#')) {
+        return state;
+      }
+      const entry = line.match(/^\s+['"]?(@?[^'":]+)['"]?\s*:/);
+      if (entry?.[1]) {
+        state.names.push(entry[1].trim());
+        return state;
+      }
+      // a next top-level key ends the block
+      return /^\S/.test(line) ? { ...state, inBlock: false } : state;
+    },
+    { inBlock: false, names: [] }
+  ).names;
+}
+
+/**
+ * Packages the repo force-resolves — npm/bun `overrides`, yarn `resolutions`, `pnpm.overrides`, or
+ * the `overrides:` block of `pnpm-workspace.yaml`. Such an entry is a deliberate "this version wins
+ * everywhere" statement, so a dependency's `peerDependencies` must not cap it: the repo has already
+ * decided the conflict, and the installer honors the override rather than the peer.
  *
  * Without this, one dependency with a stale peer drags the whole repo backwards — an outdated
  * prettier plugin peering `3.0.0 - 3.8.x` pinned prettier to 3.8 across repos that explicitly
  * declared `overrides: { prettier: "$prettier" }` to stay on 3.9. Only cap *exemption* is implied;
  * the overridden package is still bumped to latest like any other.
  */
-function overriddenNames(root: PackageJson | undefined): Set<string> {
+async function overriddenNames(cwd: string, root: PackageJson | undefined): Promise<Set<string>> {
+  const workspaceFile = join(cwd, 'pnpm-workspace.yaml');
+  const yaml = (await pathExists(workspaceFile)) ? await readFile(workspaceFile, 'utf8') : '';
+  return new Set(
+    [...overrideTrees(root).flatMap(overrideKeys), ...parsePnpmOverrides(yaml)].filter(Boolean)
+  );
+}
+
+/** The override trees a root manifest declares, across all three field spellings. */
+function overrideTrees(root: PackageJson | undefined): unknown[] {
   if (!root) {
-    return new Set();
+    return [];
   }
   const pnpm = (root['pnpm'] as { overrides?: unknown } | undefined)?.overrides;
-  const trees = [...OVERRIDE_FIELDS.map(field => root[field]), pnpm];
-  return new Set(trees.flatMap(overrideKeys).filter(Boolean));
+  return [...OVERRIDE_FIELDS.map(field => root[field]), pnpm].filter(tree => tree !== undefined);
+}
+
+/**
+ * Realign concrete version pins *inside* the override trees to the same target the dependency
+ * buckets get. An override exists to force a version, so leaving it behind rots the pin: the repo
+ * bumps prettier while its `overrides` still forces the release from months ago. A monorepo root
+ * that only overrides (no dependency of its own) can't use the `$name` back-reference, so a
+ * literal version is the only option there — and it has to be maintained.
+ *
+ * Only string leaves that are pinnable and whose package already resolved a `latest` this run are
+ * touched; `$name` references, ranges and unresolvable names are left exactly as authored.
+ */
+function rewriteOverrideTree(
+  node: unknown,
+  managed: ReadonlySet<string>,
+  latest: Map<string, string | null>
+): boolean {
+  if (node === null || typeof node !== 'object') {
+    return false;
+  }
+  const tree = node as Record<string, unknown>;
+  return Object.entries(tree).reduce((changed, [key, value]) => {
+    const name = key.replace(/^(\*\*\/)+/, '').replace(/(?<!^)@[^@]*$/, '');
+    if (typeof value !== 'string') {
+      return rewriteOverrideTree(value, managed, latest) || changed;
+    }
+    const version = managed.has(name) || !isPinnable(value) ? null : latest.get(name);
+    if (!version) {
+      return changed;
+    }
+    const next = `${operatorOf(value)}${version}`;
+    if (next === value) {
+      return changed;
+    }
+    tree[key] = next;
+    return true;
+  }, false);
 }
 
 /**
@@ -234,7 +309,7 @@ export async function upgradeAllWorkspaces(
   const latest = await resolveLatest(names, tool, ctx.cwd, lookups);
   // A peer cap applies unless another module owns the package, or the root manifest force-resolves
   // it — an override already settles the conflict the peer range describes.
-  const capExempt = new Set([...managed, ...overriddenNames(pkgs.get(ctx.cwd))]);
+  const capExempt = new Set([...managed, ...(await overriddenNames(ctx.cwd, pkgs.get(ctx.cwd)))]);
   const peerCaps = await collectPeerCaps(
     ctx.cwd,
     collectDependencyNames(pkgs),
@@ -244,9 +319,25 @@ export async function upgradeAllWorkspaces(
     lookups
   );
 
+  const root = pkgs.get(ctx.cwd);
   await Promise.all(
     [...pkgs].map(async ([dir, pkg]) => {
-      if (await rewriteSpecs(pkg, managed, latest, peerCaps, tool, ctx.cwd, lookups)) {
+      const specsChanged = await rewriteSpecs(
+        pkg,
+        managed,
+        latest,
+        peerCaps,
+        tool,
+        ctx.cwd,
+        lookups
+      );
+      // Override trees live in the root manifest only, whichever field spelling is used.
+      const overridesChanged =
+        pkg === root &&
+        overrideTrees(root)
+          .map(tree => rewriteOverrideTree(tree, managed, latest))
+          .some(Boolean);
+      if (specsChanged || overridesChanged) {
         await writePackageJson(dir, pkg);
       }
     })
