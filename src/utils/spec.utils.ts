@@ -1,5 +1,8 @@
 import { parseRange } from 'semver-utils';
-import { isValid } from 'verkit';
+import { isValid, isValidRange, normalizeRange } from 'verkit';
+
+/** What `normalizeRange` collapses every match-anything spec (`*`, `x`, empty) to. */
+const WILDCARD_RANGE = '*';
 
 /** A version segment that is present and purely numeric (an absent segment counts as fine). */
 function numericSegment(segment: string | undefined): boolean {
@@ -19,9 +22,6 @@ function numericSegment(segment: string | undefined): boolean {
 export function isPinnable(spec: string): boolean {
   return isValid(spec.replace(/^[\^~]/, ''));
 }
-
-/** Comparators that make a spec a multi-version range (as opposed to `^`/`~`/exact). */
-const RANGE_OPERATORS = new Set(['<', '<=', '>', '>=', '||']);
 
 /**
  * Leading range operator of a spec (`^`, `~`, `>=`, `>`, …, or `''`) — read structurally from
@@ -76,12 +76,21 @@ export function realignVersionSpec(spec: string, version: string, major: number)
 }
 
 /**
- * Whether a spec is a multi-version compatibility range (e.g. `>=4.8.4 <6.1.0`, `4 || 5`, `>1.0.0`)
- * — as opposed to a pinnable version, a wildcard/partial (`1.x`, `1`), or a protocol/tag spec. Used
- * to cap a concrete bump to a range the same manifest declares for the package (typically an
- * optional peer). Detected structurally via semver-utils: any comparator (`<`/`>`/`||`) marks a
- * range; `^`/`~`/exact do not.
+ * Whether a spec is a compatibility range that *caps* which versions are acceptable — e.g.
+ * `>=4.8.4 <6.1.0`, `4 || 5`, `>1.0.0`, a hyphen range (`3.0.0 - 3.8.x`) or a wildcard/partial
+ * (`1.x`, `1.2`, `1`). Used to cap a concrete bump to a range a manifest or a dependency's
+ * `peerDependencies` declares for the package; a spec this misses is silently bumped past the
+ * cap, which is how a peer of `3.0.0 - 3.8.x` let `prettier@3.9.6` through and broke install.
+ *
+ * Defined structurally rather than by matching operators: a cap is any range semver understands
+ * (`isValidRange`) that isn't a plain pin (`^`/`~`/exact — those are specs bumper rewrites, not
+ * bounds it must respect) and doesn't admit every version (`*`, `x`, empty normalize to `*`, so
+ * they bound nothing). Protocol/tag specs (`workspace:`, `catalog:`, `npm:` aliases, git/url,
+ * `latest`) aren't valid ranges and are left untouched.
  */
 export function isVersionRange(spec: string): boolean {
-  return parseRange(spec.trim()).some(part => RANGE_OPERATORS.has(part.operator ?? ''));
+  const trimmed = spec.trim();
+  return (
+    isValidRange(trimmed) && !isPinnable(trimmed) && normalizeRange(trimmed) !== WILDCARD_RANGE
+  );
 }

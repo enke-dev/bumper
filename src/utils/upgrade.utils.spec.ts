@@ -203,6 +203,38 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.dependencies?.['lit'], '^3.2.0');
   });
 
+  test('caps on a hyphen-range peer', async () => {
+    // Regression (kvlm/projector): @awmottaz/prettier-plugin-void-html peers
+    // `prettier: 3.0.0 - 3.8.x`. The hyphen range carries no `<`/`>`/`||` comparator, so it was
+    // dropped as "not a range" and prettier went to 3.9.6 — which `npm install` then rejected
+    // with ERESOLVE.
+    latest = { prettier: '3.9.6', 'void-html': '2.1.0' };
+    versions = { prettier: ['3.0.0', '3.8.6', '3.9.6'] };
+    peers = { 'void-html': { prettier: '3.0.0 - 3.8.x' } };
+    await writePkg({
+      name: 'root',
+      devDependencies: { prettier: '^3.9.6', 'void-html': '2.1.0' },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.devDependencies?.['prettier'], '^3.8.6', 'capped to newest within the peer');
+  });
+
+  test('caps on a wildcard/partial peer range', async () => {
+    // `3.x` also carries no comparator — same silent-drop class as the hyphen range above.
+    latest = { foo: '4.1.0', 'peer-pkg': '1.0.0' };
+    versions = { foo: ['3.0.0', '3.7.2', '4.1.0'] };
+    peers = { 'peer-pkg': { foo: '3.x' } };
+    await writePkg({ name: 'root', dependencies: { foo: '^4.1.0', 'peer-pkg': '1.0.0' } });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.dependencies?.['foo'], '^3.7.2');
+  });
+
   test('intersects OR-ranges from multiple peers correctly, order-independent', async () => {
     // Regression (estino/ui non-idempotent run): two deps peer `release-it` with OR-ranges.
     //   release-it-pnpm   → ^17 || ^18 || ^19   (forbids 20)

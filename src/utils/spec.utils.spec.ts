@@ -101,10 +101,20 @@ describe('isVersionRange', () => {
     ['1.2.3', '^1.2.3', '~1.2.3'].forEach(spec => assert.equal(isVersionRange(spec), false, spec));
   });
 
-  test('wildcards/partials are neither pinnable nor a cap range (left fully untouched)', () => {
-    ['1.x', '1.2', '1'].forEach(spec => {
+  test('hyphen ranges are ranges (a peer of `3.0.0 - 3.8.x` must cap the bump)', () => {
+    ['3.0.0 - 3.8.x', '1.0.0 - 2.0.0', '1 - 2'].forEach(spec =>
+      assert.equal(isVersionRange(spec), true, spec)
+    );
+  });
+
+  test('wildcards/partials are ranges — they bound the major/minor — but stay unpinnable', () => {
+    ['1.x', '1.2', '1', '1.2.x'].forEach(spec => {
       assert.equal(isPinnable(spec), false, spec);
-      assert.equal(isVersionRange(spec), false, spec);
+      assert.equal(isVersionRange(spec), true, spec);
     });
+  });
+
+  test('match-anything specs bound nothing, so they are not cap ranges', () => {
+    ['*', 'x', 'X', ' '].forEach(spec => assert.equal(isVersionRange(spec), false, spec));
   });
 });
