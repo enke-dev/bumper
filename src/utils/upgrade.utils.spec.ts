@@ -222,6 +222,60 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.devDependencies?.['prettier'], '^3.8.6', 'capped to newest within the peer');
   });
 
+  test('an override exempts a package from peer caps', async () => {
+    // Regression (the prettier fleet): a stale plugin peer (`3.0.0 - 3.8.x`) held prettier at 3.8
+    // in repos that declare `overrides: { prettier: "$prettier" }` precisely to stay on 3.9. The
+    // installer honors the override over the peer, so the cap must not apply.
+    latest = { prettier: '3.9.6', 'void-html': '2.1.0' };
+    versions = { prettier: ['3.8.5', '3.9.6'] };
+    peers = { 'void-html': { prettier: '3.0.0 - 3.8.x' } };
+    await writePkg({
+      name: 'root',
+      devDependencies: { prettier: '3.8.5', 'void-html': '2.1.0' },
+      overrides: { prettier: '$prettier' },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.devDependencies?.['prettier'], '3.9.6', 'override wins over the peer cap');
+  });
+
+  test('yarn resolutions and pnpm.overrides exempt too, globs and range keys included', async () => {
+    latest = { foo: '4.0.0', bar: '4.0.0', 'peer-pkg': '1.0.0' };
+    versions = { foo: ['3.0.0', '4.0.0'], bar: ['3.0.0', '4.0.0'] };
+    peers = { 'peer-pkg': { foo: '3.x', bar: '3.x' } };
+    await writePkg({
+      name: 'root',
+      dependencies: { foo: '3.0.0', bar: '3.0.0', 'peer-pkg': '1.0.0' },
+      resolutions: { '**/foo': '4.0.0' },
+      pnpm: { overrides: { 'bar@3.x': '4.0.0' } },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.dependencies?.['foo'], '4.0.0');
+    assert.equal(pkg?.dependencies?.['bar'], '4.0.0');
+  });
+
+  test('an override for one package leaves other peer caps intact', async () => {
+    latest = { foo: '4.0.0', baz: '4.0.0', 'peer-pkg': '1.0.0' };
+    versions = { foo: ['3.0.0', '4.0.0'], baz: ['3.7.0', '4.0.0'] };
+    peers = { 'peer-pkg': { foo: '3.x', baz: '3.x' } };
+    await writePkg({
+      name: 'root',
+      dependencies: { foo: '3.0.0', baz: '3.7.0', 'peer-pkg': '1.0.0' },
+      overrides: { foo: '4.0.0' },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.dependencies?.['foo'], '4.0.0', 'overridden → uncapped');
+    assert.equal(pkg?.dependencies?.['baz'], '3.7.0', 'not overridden → still capped');
+  });
+
   test('caps on a wildcard/partial peer range', async () => {
     // `3.x` also carries no comparator — same silent-drop class as the hyphen range above.
     latest = { foo: '4.1.0', 'peer-pkg': '1.0.0' };

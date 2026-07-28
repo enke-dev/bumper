@@ -71,6 +71,41 @@ function collectDependencyNames(pkgs: Map<string, PackageJson>): string[] {
   return [...new Set([...pkgs.values()].flatMap(pkg => Object.keys(allDependencies(pkg))))];
 }
 
+/** Fields through which a root manifest force-resolves a package version, per package manager. */
+const OVERRIDE_FIELDS = ['overrides', 'resolutions'] as const;
+
+/** Collect every package name keyed anywhere in an override tree (npm allows nesting). */
+function overrideKeys(node: unknown): string[] {
+  if (node === null || typeof node !== 'object') {
+    return [];
+  }
+  return Object.entries(node as Record<string, unknown>).flatMap(([key, value]) => [
+    // `**/pkg` (yarn glob) and `pkg@1.x` (npm, scoped by range) both name the same package
+    key.replace(/^(\*\*\/)+/, '').replace(/(?<!^)@[^@]*$/, ''),
+    ...overrideKeys(value),
+  ]);
+}
+
+/**
+ * Packages the root manifest force-resolves — npm/bun `overrides`, yarn `resolutions`, or
+ * `pnpm.overrides`. Such an entry is a deliberate "this version wins everywhere" statement, so a
+ * dependency's `peerDependencies` must not cap it: the repo has already decided the conflict, and
+ * the installer honors the override rather than the peer.
+ *
+ * Without this, one dependency with a stale peer drags the whole repo backwards — an outdated
+ * prettier plugin peering `3.0.0 - 3.8.x` pinned prettier to 3.8 across repos that explicitly
+ * declared `overrides: { prettier: "$prettier" }` to stay on 3.9. Only cap *exemption* is implied;
+ * the overridden package is still bumped to latest like any other.
+ */
+function overriddenNames(root: PackageJson | undefined): Set<string> {
+  if (!root) {
+    return new Set();
+  }
+  const pnpm = (root['pnpm'] as { overrides?: unknown } | undefined)?.overrides;
+  const trees = [...OVERRIDE_FIELDS.map(field => root[field]), pnpm];
+  return new Set(trees.flatMap(overrideKeys).filter(Boolean));
+}
+
 /**
  * The version a direct dependency is moving to this run: the freshly-resolved `latest` when the
  * dependency is being bumped, otherwise the version currently installed under `node_modules`
@@ -102,14 +137,15 @@ async function targetVersion(
  * *to* (see {@link targetVersion}), NOT from the stale manifest installed under `node_modules`.
  * A dep that grows a new peer in the version being installed (e.g. `@enke.dev/lint` adding a
  * `typescript@6.0.3` peer across a bump) is honored in the same run — otherwise the rewrite and
- * the subsequent install disagree and only a second run would converge. Managed peers (owned by
- * another module, e.g. `@types/node`) and non-version specs (`*`, tags, protocols) are ignored.
+ * the subsequent install disagree and only a second run would converge. Peers in `exempt` (owned
+ * by another module like `@types/node`, or force-resolved by the root manifest — see
+ * {@link overriddenNames}) and non-version specs (`*`, tags, protocols) are ignored.
  */
 async function collectPeerCaps(
   cwd: string,
   depNames: string[],
   latest: Map<string, string | null>,
-  managed: ReadonlySet<string>,
+  exempt: ReadonlySet<string>,
   tool: string,
   lookups: RegistryLookups
 ): Promise<Map<string, string[]>> {
@@ -122,7 +158,7 @@ async function collectPeerCaps(
       }
       const peers = await lookups.peerDependencies(dep, version, tool, cwd);
       Object.entries(peers).forEach(([peer, range]) => {
-        if (managed.has(peer) || (!isPinnable(range) && !isVersionRange(range))) {
+        if (exempt.has(peer) || (!isPinnable(range) && !isVersionRange(range))) {
           return;
         }
         (collected.get(peer) ?? collected.set(peer, new Set()).get(peer))?.add(range);
@@ -196,11 +232,14 @@ export async function upgradeAllWorkspaces(
   // Sequential: peer caps are read for the versions we're bumping *to*, so latest must resolve
   // first. A dep that adds a peer in its new version is then honored in this same run.
   const latest = await resolveLatest(names, tool, ctx.cwd, lookups);
+  // A peer cap applies unless another module owns the package, or the root manifest force-resolves
+  // it — an override already settles the conflict the peer range describes.
+  const capExempt = new Set([...managed, ...overriddenNames(pkgs.get(ctx.cwd))]);
   const peerCaps = await collectPeerCaps(
     ctx.cwd,
     collectDependencyNames(pkgs),
     latest,
-    managed,
+    capExempt,
     tool,
     lookups
   );
