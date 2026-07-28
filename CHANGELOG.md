@@ -1,5 +1,15 @@
 # @enke.dev/bumper
 
+# [0.10.0](https://github.com/enke-dev/bumper/compare/0.9.0...0.10.0) (2026-07-28)
+
+### Bug Fixes
+
+* **upgrade:** drop v prefix from release asset URL ([a5c330e](https://github.com/enke-dev/bumper/commit/a5c330e8090a3b4d88276f7f5ebd95e56705b607))
+
+### Features
+
+* **deps:** let overrides exempt a package from peer caps ([ae76436](https://github.com/enke-dev/bumper/commit/ae76436773a31412629bb3ba381e5530308a5a68))
+
 # [0.9.0](https://github.com/enke-dev/bumper/compare/0.8.1...0.9.0) (2026-07-28)
 
 ### Features
