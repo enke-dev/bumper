@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+# [0.9.0](https://github.com/enke-dev/bumper/compare/0.8.1...0.9.0) (2026-07-28)
+
+### Features
+
+* **deps:** let overrides exempt a package from peer caps ([8a88e60](https://github.com/enke-dev/bumper/commit/8a88e600b43924c65a8ae385f189e6ad4286ec4b))
+
 ## [0.8.1](https://github.com/enke-dev/bumper/compare/0.8.0...0.8.1) (2026-07-28)
 
 ### Bug Fixes
