@@ -1,9 +1,8 @@
-import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { PackageManager } from '../../../context/context.types.js';
 import { cleanInstall, selfUpdate } from '../../../utils/deps.utils.js';
-import { readPackageJson } from '../../../utils/fs.utils.js';
+import { readPackageJson, writeLine } from '../../../utils/fs.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
 import { upgradeAllWorkspaces } from '../../../utils/upgrade.utils.js';
 import type { Module, ModuleContext } from '../../module.types.js';
@@ -20,7 +19,7 @@ async function pinBunVersion(ctx: ModuleContext): Promise<void> {
     planLine(`write ${version} to .bun-version`);
     return;
   }
-  await writeFile(join(ctx.cwd, '.bun-version'), `${version}\n`);
+  await writeLine(join(ctx.cwd, '.bun-version'), version);
 }
 
 export const bunPackageManager: Module = {

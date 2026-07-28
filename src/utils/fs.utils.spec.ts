@@ -11,6 +11,7 @@ import {
   globFiles,
   pathExists,
   readPackageJson,
+  writeLine,
   writePackageJson,
 } from './fs.utils.js';
 import type { PackageJson } from './package.types.js';
@@ -105,6 +106,61 @@ describe('writePackageJson', () => {
     const pkg: PackageJson = { name: 'bar', dependencies: { lit: '^3.0.0' } };
     await writePackageJson(dir, pkg);
     assert.deepEqual(await readPackageJson(dir), pkg);
+  });
+
+  test('keeps the indent the file already uses', async () => {
+    // Regression (optiscaners/directus-firmware-release-service): a tab-indented manifest came
+    // back two-space indented, so every line showed up changed and `prettier --check` failed.
+    const path = join(dir, 'package.json');
+    await writeFile(path, '{\n\t"name": "foo",\n\t"version": "1.0.0"\n}\n');
+
+    await writePackageJson(dir, { name: 'foo', version: '1.1.0' });
+
+    assert.equal(await readFile(path, 'utf8'), '{\n\t"name": "foo",\n\t"version": "1.1.0"\n}\n');
+  });
+
+  test('keeps a four-space indent', async () => {
+    const path = join(dir, 'package.json');
+    await writeFile(path, '{\n    "name": "foo"\n}\n');
+
+    await writePackageJson(dir, { name: 'bar' });
+
+    assert.equal(await readFile(path, 'utf8'), '{\n    "name": "bar"\n}\n');
+  });
+
+  test('keeps CRLF line endings and a missing trailing newline', async () => {
+    const path = join(dir, 'package.json');
+    await writeFile(path, '{\r\n  "name": "foo"\r\n}');
+
+    await writePackageJson(dir, { name: 'bar' });
+
+    assert.equal(await readFile(path, 'utf8'), '{\r\n  "name": "bar"\r\n}');
+  });
+});
+
+describe('writeLine', () => {
+  test('creates a new file with a trailing newline', async () => {
+    const path = join(dir, '.node-version');
+    await writeLine(path, 'v22.15.1');
+    assert.equal(await readFile(path, 'utf8'), 'v22.15.1\n');
+  });
+
+  test('keeps a missing trailing newline', async () => {
+    const path = join(dir, '.bun-version');
+    await writeFile(path, '1.3.13');
+
+    await writeLine(path, '1.3.14');
+
+    assert.equal(await readFile(path, 'utf8'), '1.3.14');
+  });
+
+  test('keeps CRLF', async () => {
+    const path = join(dir, '.nvmrc');
+    await writeFile(path, 'v20.0.0\r\n');
+
+    await writeLine(path, 'v22.15.1');
+
+    assert.equal(await readFile(path, 'utf8'), 'v22.15.1\r\n');
   });
 });
 

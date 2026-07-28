@@ -1,4 +1,3 @@
-import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { Runtime, VersionManager } from '../../../context/context.types.js';
@@ -7,6 +6,7 @@ import {
   anyExists,
   pathExists,
   readPackageJson,
+  writeLine,
   writePackageJson,
 } from '../../../utils/fs.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
@@ -36,7 +36,7 @@ async function writeVersionFile(
 ): Promise<void> {
   const target = join(dir, name);
   if (ensure || (await pathExists(target))) {
-    await writeFile(target, `v${version}\n`);
+    await writeLine(target, `v${version}`);
   }
 }
 

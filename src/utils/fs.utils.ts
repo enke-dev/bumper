@@ -69,9 +69,52 @@ export async function readPackageJson(dir: string): Promise<PackageJson | null> 
   }
 }
 
-/** Write `package.json`, preserving two-space indent + trailing newline. */
+/** First indent unit of an already-formatted file: the leading whitespace of a nested key. */
+const INDENT_UNIT = /^([ \t]+)(?=")/m;
+
+/**
+ * The formatting an existing file already uses. Rewriting a file wholesale must not restyle it —
+ * a repo indenting `package.json` with tabs got two spaces back, so every line came out changed
+ * and its own `prettier --check` failed on the update PR.
+ *
+ * Read off the file's own bytes rather than resolved from `.editorconfig`/`.prettierrc`/etc: the
+ * file already reflects whatever the repo enforces (including no config at all), so preserving it
+ * is both simpler and correct for tooling we don't know about. Defaults (two spaces, LF, trailing
+ * newline) apply only when the file is new or has nothing to read a style from.
+ */
+export function detectFormat(content: string): { indent: string; eol: string; final: string } {
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  return {
+    indent: INDENT_UNIT.exec(content)?.[1] ?? '  ',
+    eol,
+    final: content === '' || content.endsWith('\n') ? eol : '',
+  };
+}
+
+/** Existing contents of `path`, or `''` when it doesn't exist / can't be read. */
+async function readOrEmpty(path: string): Promise<string> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+/** Write `package.json`, keeping the indent, line endings and trailing newline it already had. */
 export async function writePackageJson(dir: string, pkg: PackageJson): Promise<void> {
-  await writeFile(join(dir, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
+  const path = join(dir, 'package.json');
+  const { indent, eol, final } = detectFormat(await readOrEmpty(path));
+  const json = JSON.stringify(pkg, null, indent);
+  await writeFile(path, `${eol === '\n' ? json : json.replaceAll('\n', eol)}${final}`);
+}
+
+/**
+ * Write a single-line file (`.node-version`, `.bun-version`, `.nvmrc`), keeping the line ending
+ * and trailing-newline style it already had. New files get the LF + trailing newline default.
+ */
+export async function writeLine(path: string, line: string): Promise<void> {
+  const { final } = detectFormat(await readOrEmpty(path));
+  await writeFile(path, `${line}${final}`);
 }
 
 /** Combined dependency spec map across all dependency buckets. */
