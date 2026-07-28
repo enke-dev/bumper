@@ -1,5 +1,13 @@
 # @enke.dev/bumper
 
+## [0.8.1](https://github.com/enke-dev/bumper/compare/0.8.0...0.8.1) (2026-07-28)
+
+### Bug Fixes
+
+* **action:** skip corepack prepare for bun-pinned repos ([c4a0b80](https://github.com/enke-dev/bumper/commit/c4a0b801a0eb02d5b49c3fdfad9ba57f18409937))
+* **deps:** respect hyphen and wildcard peer ranges as bump caps ([eb33916](https://github.com/enke-dev/bumper/commit/eb33916224449f66231072681a00ffa141c4fa7b))
+* **fs:** preserve a file's own formatting when rewriting it ([8828cd8](https://github.com/enke-dev/bumper/commit/8828cd8785b67c0444a15519674f8ce53e357e3d))
+
 # [0.8.0](https://github.com/enke-dev/bumper/compare/0.7.1...0.8.0) (2026-07-24)
 
 
