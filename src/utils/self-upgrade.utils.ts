@@ -53,14 +53,17 @@ export async function latestReleaseVersion(
   }
 }
 
-/** Download a specific release asset's bytes, or null on any failure (never throws). */
+/**
+ * Download a specific release asset's bytes, or null on any failure (never throws). Release tags
+ * are the bare version (`0.9.0`, no `v` prefix) — matching what the release workflow pushes.
+ */
 export async function downloadAsset(
   version: string,
   asset: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Uint8Array | null> {
   try {
-    const response = await fetchImpl(`${RELEASE_DOWNLOAD}/v${version}/${asset}`);
+    const response = await fetchImpl(`${RELEASE_DOWNLOAD}/${version}/${asset}`);
     if (!response.ok) {
       return null;
     }

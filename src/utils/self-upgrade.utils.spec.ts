@@ -49,6 +49,19 @@ describe('downloadAsset', () => {
     );
   });
 
+  test('requests the bare-version tag, without a v prefix', async () => {
+    let requested = '';
+    const fetchImpl = async (url: string) => {
+      requested = url;
+      return new Response(new Uint8Array([1]), { status: 200 });
+    };
+    await downloadAsset('1.2.3', 'bmpr-linux-x64', fetchImpl as unknown as typeof fetch);
+    assert.equal(
+      requested,
+      'https://github.com/enke-dev/bumper/releases/download/1.2.3/bmpr-linux-x64'
+    );
+  });
+
   test('null when the asset is missing (404)', async () => {
     const notFound = async () => new Response('', { status: 404 });
     assert.equal(
