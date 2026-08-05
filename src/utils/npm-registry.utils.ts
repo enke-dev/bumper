@@ -1,4 +1,4 @@
-import { compareReversed, getPrerelease, isValid, satisfies } from 'verkit';
+import { compareReversed, isStable, satisfies } from 'verkit';
 
 import { PackageManager } from '../context/context.types.js';
 import { exec, execOk } from './exec.utils.js';
@@ -139,7 +139,7 @@ export async function maxSatisfyingRanges(
         ? [parsed]
         : [];
     const match = versions
-      .filter(v => isValid(v) && getPrerelease(v)?.length === 0)
+      .filter(isStable)
       .filter(v => ranges.every(range => satisfies(v, range)))
       .sort(compareReversed)[0];
     return match ?? null;
