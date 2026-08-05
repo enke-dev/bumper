@@ -139,7 +139,7 @@ export async function maxSatisfyingRanges(
         ? [parsed]
         : [];
     const match = versions
-      .filter(isStable)
+      .filter(v => isStable(v))
       .filter(v => ranges.every(range => satisfies(v, range)))
       .sort(compareReversed)[0];
     return match ?? null;

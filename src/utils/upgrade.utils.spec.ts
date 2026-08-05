@@ -32,7 +32,7 @@ const lookups: RegistryLookups = {
   latestVersion: async pkg => latest[pkg] ?? null,
   maxSatisfyingRanges: async (pkg, ranges) =>
     (versions[pkg] ?? [])
-      .filter(isStable) // mirror the real impl: stable versions only
+      .filter(v => isStable(v)) // mirror the real impl: stable versions only
       .filter(v => ranges.every(range => satisfies(v, range)))
       .sort(compareReversed)[0] ?? null,
   peerDependencies: async pkg => peers[pkg] ?? {},
