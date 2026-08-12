@@ -40,6 +40,12 @@ inputs:
   exclude:
     description: Space-separated repo-relative paths to exclude (e.g. "examples fixtures")
     default: ''
+  format:
+    description: Run the repo's formatter after the update (equivalent to --format / -f)
+    default: 'false'
+  approve:
+    description: Approve install scripts after the update, pnpm/npm only (equivalent to --approve / -a)
+    default: 'false'
   token:
     description: Token used to push the branch and open the PR (defaults to the job's GITHUB_TOKEN)
     default: ${{ github.token }}
@@ -184,6 +190,12 @@ runs:
           for p in ${{ inputs.exclude }}; do
             args="$args --exclude $p"
           done
+        fi
+        if [ "${{ inputs.format }}" = "true" ]; then
+          args="$args --format"
+        fi
+        if [ "${{ inputs.approve }}" = "true" ]; then
+          args="$args --approve"
         fi
         echo "args=$args" >> "$GITHUB_OUTPUT"
 
