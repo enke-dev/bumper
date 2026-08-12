@@ -105,7 +105,7 @@ export const updateCommand: Command = {
     options: [
       '--dry-run       Print intended steps without changing anything',
       '--commit, -c    Commit all changes as "chore: update dependencies" with a summary',
-      "--format, -f    Run the repo's \"format\" script, or eslint --fix / prettier --write",
+      '--format, -f    Run the repo\'s "format" script, or eslint --fix / prettier --write',
       '--approve, -a   Approve install scripts (pnpm/npm)',
       '--only id       Module id to run exclusively (repeat for several)',
       '--skip id       Module id to skip (repeat for several)',
