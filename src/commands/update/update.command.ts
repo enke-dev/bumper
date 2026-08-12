@@ -25,8 +25,10 @@ const APPROVE_CMDS: Partial<Record<string, string[]>> = {
   npm: ['npm', 'approve-scripts', '--all'],
 };
 
-/** Stage + commit everything in the work tree with a grouped markdown summary, or report why
- * it was skipped. */
+/**
+ * Stage + commit everything in the work tree with a grouped markdown summary, or report why
+ * it was skipped.
+ */
 async function commitChanges(cwd: string): Promise<void> {
   if (!(await isGitRepo(cwd))) {
     process.stdout.write(`${YELLOW}--commit skipped: ${cwd} is not a git repository${RESET}\n`);

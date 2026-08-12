@@ -136,8 +136,8 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | ------------------------ | :--------: | -------------------------------------------------------------------------------------------- |
 | `--dry-run`              |     no     | Print every intended step, change nothing on disk.                                           |
 | `--commit`, `-c`         |     no     | After updating, commit the changes as `chore: update dependencies` with a summary.           |
-| `--format`, `-f`         |     no     | Run the repo's `format` npm script; or fall back to `eslint --fix` / `prettier --write`. Runs before the commit. |
-| `--approve`, `-a`        |     no     | Approve install scripts via `pnpm approve-builds --all` or `npm approve-scripts --all`. Runs before format and commit. |
+| `--format`, `-f`         |     no     | Run the repo's `format` script, or fall back to `eslint --fix` / `prettier --write`.         |
+| `--approve`, `-a`        |     no     | Approve scripts via `pnpm approve-builds --all` or `npm approve-scripts --all`.              |
 | `--only <id>`            |    yes     | Run **only** the named module(s); everything else is skipped.                                |
 | `--skip <id>`            |    yes     | Run everything **except** the named module(s).                                               |
 | `--exclude`, `-e <path>` |    yes     | Skip a repo-relative path this run only, without editing config (see [Excludes](#excludes)). |
