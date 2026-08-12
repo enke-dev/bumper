@@ -287,15 +287,3 @@ export async function commitAll(
     throw new Error(`git commit failed: ${commit.stderr.trim()}`);
   }
 }
-
-/** Stage everything and amend the last commit, keeping its message. Throws on git failure. */
-export async function amendAll(cwd: string, run: typeof exec = exec): Promise<void> {
-  const add = await run(['git', 'add', '-A'], { cwd });
-  if (add.exitCode !== 0) {
-    throw new Error(`git add failed: ${add.stderr.trim()}`);
-  }
-  const commit = await run(['git', 'commit', '--amend', '--no-edit'], { cwd });
-  if (commit.exitCode !== 0) {
-    throw new Error(`git commit --amend failed: ${commit.stderr.trim()}`);
-  }
-}
