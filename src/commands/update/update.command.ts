@@ -83,7 +83,9 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
 
   if (values.commit) {
     if (dryRun) {
-      process.stdout.write(`${DIM}--commit ignored under --dry-run (nothing was changed)${RESET}\n`);
+      process.stdout.write(
+        `${DIM}--commit ignored under --dry-run (nothing was changed)${RESET}\n`
+      );
     } else {
       await commitChanges(ctx.cwd);
     }
