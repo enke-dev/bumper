@@ -81,10 +81,12 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
     await runFormat(ctx.cwd, ctx.packageManager, dryRun);
   }
 
-  if (values.commit && !dryRun) {
-    await commitChanges(ctx.cwd);
-  } else if (values.commit && dryRun) {
-    process.stdout.write(`${DIM}--commit ignored under --dry-run (nothing was changed)${RESET}\n`);
+  if (values.commit) {
+    if (dryRun) {
+      process.stdout.write(`${DIM}--commit ignored under --dry-run (nothing was changed)${RESET}\n`);
+    } else {
+      await commitChanges(ctx.cwd);
+    }
   }
 
   if (latest !== null) {
