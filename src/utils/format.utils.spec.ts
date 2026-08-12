@@ -61,7 +61,7 @@ describe('resolveFormatCmd', () => {
       await writeFile(prettierBin, '#!/bin/sh\n');
       const { chmod } = await import('node:fs/promises');
       await chmod(prettierBin, 0o755);
-      const cmd = await resolveFormatCmd(dir, PackageManager.Npm);
+      const cmd = await resolveFormatCmd(dir, PackageManager.Npm, () => false);
       assert.deepEqual(cmd, [prettierBin, '--write', '.']);
     });
   });
@@ -69,7 +69,7 @@ describe('resolveFormatCmd', () => {
   test('returns null when no format script and no formatter binary found', async () => {
     await withTempDir('fmt-none', async dir => {
       await writeFile(join(dir, 'package.json'), JSON.stringify({}));
-      const cmd = await resolveFormatCmd(dir, PackageManager.Npm);
+      const cmd = await resolveFormatCmd(dir, PackageManager.Npm, () => false);
       assert.equal(cmd, null);
     });
   });
@@ -122,7 +122,7 @@ describe('runFormat', () => {
         calls.push(cmd);
         return ok;
       };
-      await runFormat(dir, PackageManager.Npm, false, fakeExec);
+      await runFormat(dir, PackageManager.Npm, false, fakeExec, () => false);
       assert.equal(calls.length, 0);
     });
   });

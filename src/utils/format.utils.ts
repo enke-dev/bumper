@@ -16,7 +16,8 @@ const LOCAL_BINS = ['node_modules/.bin/eslint', 'node_modules/.bin/prettier'];
 /** Resolve the format command for a repo: `format` script > eslint --fix > prettier --write. */
 export async function resolveFormatCmd(
   cwd: string,
-  packageManager: PackageManager
+  packageManager: PackageManager,
+  checkTool: typeof toolExists = toolExists
 ): Promise<string[] | null> {
   const pkg = await readPackageJson(cwd);
   if (pkg?.scripts?.['format']) {
@@ -26,14 +27,14 @@ export async function resolveFormatCmd(
   if (await pathExists(localEslint)) {
     return [localEslint, '--fix', '.'];
   }
-  if (toolExists('eslint')) {
+  if (checkTool('eslint')) {
     return ['eslint', '--fix', '.'];
   }
   const localPrettier = join(cwd, 'node_modules/.bin/prettier');
   if (await pathExists(localPrettier)) {
     return [localPrettier, '--write', '.'];
   }
-  if (toolExists('prettier')) {
+  if (checkTool('prettier')) {
     return ['prettier', '--write', '.'];
   }
   return null;
@@ -44,9 +45,10 @@ export async function runFormat(
   cwd: string,
   packageManager: PackageManager,
   dryRun: boolean,
-  run: typeof exec = exec
+  run: typeof exec = exec,
+  checkTool: typeof toolExists = toolExists
 ): Promise<void> {
-  const cmd = await resolveFormatCmd(cwd, packageManager);
+  const cmd = await resolveFormatCmd(cwd, packageManager, checkTool);
   if (cmd === null) {
     return;
   }
