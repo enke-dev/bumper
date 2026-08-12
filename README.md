@@ -136,6 +136,8 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | ------------------------ | :--------: | -------------------------------------------------------------------------------------------- |
 | `--dry-run`              |     no     | Print every intended step, change nothing on disk.                                           |
 | `--commit`, `-c`         |     no     | After updating, commit the changes as `chore: update dependencies` with a summary.           |
+| `--format`, `-f`         |     no     | Run the repo's `format` npm script; or fall back to `eslint --fix` / `prettier --write`. Amends the commit when combined with `-c`. |
+| `--approve`, `-a`        |     no     | Approve install scripts via `pnpm approve-builds --all` or `npm approve-scripts --all`. Amends the commit when combined with `-c`. |
 | `--only <id>`            |    yes     | Run **only** the named module(s); everything else is skipped.                                |
 | `--skip <id>`            |    yes     | Run everything **except** the named module(s).                                               |
 | `--exclude`, `-e <path>` |    yes     | Skip a repo-relative path this run only, without editing config (see [Excludes](#excludes)). |
@@ -153,6 +155,9 @@ bumper update --exclude examples                      # skip a path this run, wi
 bumper update --exclude examples --exclude fixtures   # repeat the flag for several
 bumper update --ignore-config                         # ignore stored excludes/toggles, pure auto-detect
 bumper update --commit                                # update, then commit with a summary
+bumper update --commit --format                       # update, format, commit (format changes amend)
+bumper update --commit --approve                      # update, approve scripts, commit (amends)
+bumper update -c -f -a                                # shorthand for all three
 ```
 
 With `--commit` (`-c`), bumper stages everything and commits as `chore: update dependencies` once
@@ -161,6 +166,16 @@ the run finishes, with a markdown body grouping what changed — dependency spec
 files listed by path. The changes are read back from git after the run, so the summary reflects
 exactly what landed. Skipped (with a note) when the target isn't a git repo, when nothing changed,
 or under `--dry-run`.
+
+`--format` (`-f`) runs the repo's own `format` npm script when one exists; otherwise it falls back
+to `eslint --fix .` or `prettier --write .`, whichever binary is found first in the local
+`node_modules/.bin` or on `PATH`. When combined with `--commit`, any changes produced by the
+formatter are folded into the update commit via `git commit --amend`.
+
+`--approve` (`-a`) runs the package manager's bulk script-approval command after the update —
+`pnpm approve-builds --all` for pnpm, `npm approve-scripts --all` for npm (skipped for bun and
+older managers that don't support the command). When combined with `--commit`, approval changes
+amend the update commit.
 
 `--ignore-config` bypasses `~/.bumperrc` completely: no entry is read for the target repo and, for
 an unknown repo, none is written. Stored excludes and module toggles are skipped — use it to run
