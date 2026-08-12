@@ -5,7 +5,6 @@ import { configPath, loadConfig } from '../../config/config.js';
 import { buildContext } from '../../context/context.js';
 import { runUpdate } from '../../modules/module.registry.js';
 import {
-  amendAll,
   collectChangedFiles,
   commitAll,
   isEmptySummary,
@@ -26,31 +25,20 @@ const APPROVE_CMDS: Partial<Record<string, string[]>> = {
   npm: ['npm', 'approve-scripts', '--all'],
 };
 
-/** Stage + commit the run's changes with a grouped markdown summary, or report why it was
- * skipped. Returns true when a commit was created. */
-async function commitChanges(cwd: string): Promise<boolean> {
+/** Stage + commit everything in the work tree with a grouped markdown summary, or report why
+ * it was skipped. */
+async function commitChanges(cwd: string): Promise<void> {
   if (!(await isGitRepo(cwd))) {
     process.stdout.write(`${YELLOW}--commit skipped: ${cwd} is not a git repository${RESET}\n`);
-    return false;
+    return;
   }
   const summary = summarizeChanges(await collectChangedFiles(cwd));
   if (isEmptySummary(summary)) {
     process.stdout.write(`${DIM}Nothing changed — no commit created${RESET}\n`);
-    return false;
+    return;
   }
   await commitAll(cwd, COMMIT_SUBJECT, renderCommitBody(summary));
   process.stdout.write(`${GREEN}✓${RESET} Committed "${COMMIT_SUBJECT}"\n`);
-  return true;
-}
-
-/** Stage + amend the last commit if the work tree is dirty, otherwise no-op. */
-async function amendIfDirty(cwd: string): Promise<void> {
-  const changed = await collectChangedFiles(cwd);
-  if (changed.length === 0) {
-    return;
-  }
-  await amendAll(cwd);
-  process.stdout.write(`${GREEN}✓${RESET} Amended commit\n`);
 }
 
 async function run({ values, positionals }: CommandContext): Promise<void> {
@@ -77,10 +65,11 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
       : Promise.resolve<string | null>(null),
   ]);
 
-  if (values.commit && !dryRun) {
-    await commitChanges(ctx.cwd);
-  } else if (values.commit && dryRun) {
-    process.stdout.write(`${DIM}--commit ignored under --dry-run (nothing was changed)${RESET}\n`);
+  if (values.approve) {
+    if (dryRun) {
+      process.stdout.write(`${DIM}--approve dry-run: ${RESET}`);
+    }
+    await approveScripts(ctx, APPROVE_CMDS[ctx.packageManager] ?? []);
   }
 
   if (values.format) {
@@ -88,20 +77,12 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
       process.stdout.write(`${DIM}--format dry-run: ${RESET}`);
     }
     await runFormat(ctx.cwd, ctx.packageManager, dryRun);
-    if (values.commit && !dryRun) {
-      await amendIfDirty(ctx.cwd);
-    }
   }
 
-  if (values.approve) {
-    const approveCmd = APPROVE_CMDS[ctx.packageManager] ?? [];
-    if (dryRun) {
-      process.stdout.write(`${DIM}--approve dry-run: ${RESET}`);
-    }
-    await approveScripts(ctx, approveCmd);
-    if (values.commit && !dryRun) {
-      await amendIfDirty(ctx.cwd);
-    }
+  if (values.commit && !dryRun) {
+    await commitChanges(ctx.cwd);
+  } else if (values.commit && dryRun) {
+    process.stdout.write(`${DIM}--commit ignored under --dry-run (nothing was changed)${RESET}\n`);
   }
 
   if (latest !== null) {
@@ -121,9 +102,9 @@ export const updateCommand: Command = {
     summary: 'Run every applicable module in order',
     options: [
       '--dry-run       Print intended steps without changing anything',
-      '--commit, -c    Commit the changes as "chore: update dependencies" with a summary',
-      "--format, -f    Run the repo's \"format\" script, or eslint --fix / prettier --write; amends with -c",
-      '--approve, -a   Approve install scripts (pnpm/npm); amends with -c',
+      '--commit, -c    Commit all changes as "chore: update dependencies" with a summary',
+      "--format, -f    Run the repo's \"format\" script, or eslint --fix / prettier --write",
+      '--approve, -a   Approve install scripts (pnpm/npm)',
       '--only id       Module id to run exclusively (repeat for several)',
       '--skip id       Module id to skip (repeat for several)',
       '--exclude, -e path  Repo-relative path skipped this run, not persisted (repeat for several)',
