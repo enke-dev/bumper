@@ -256,6 +256,8 @@ All inputs are optional.
 | `only`      | _(all modules)_              | Run only the listed module ids (comma-separated, e.g. `node,pnpm`).                                          |
 | `skip`      | _(none)_                     | Skip the listed module ids (comma-separated, e.g. `docker-node`).                                            |
 | `exclude`   | _(none)_                     | Space-separated repo-relative paths to exclude (e.g. `examples fixtures`).                                   |
+| `format`    | `false`                      | Run the repo's formatter after the update (equivalent to `--format` / `-f`).                                 |
+| `approve`   | `false`                      | Approve install scripts after the update, pnpm/npm only (equivalent to `--approve` / `-a`).                  |
 | `token`     | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows). |
 
 Module ids are the values from the `id` column in the [Modules](#modules) table.
@@ -264,7 +266,7 @@ Module ids are the values from the `id` column in the [Modules](#modules) table.
 
 | Output      | Description                                                      |
 | ----------- | ---------------------------------------------------------------- |
-| `updated`   | `"true"` when bumper produced a new commit, otherwise `"false"`. |
+| `updated`   | `true` when bumper produced a new commit, otherwise `false`.     |
 | `branch`    | The update branch name.                                          |
 | `base`      | The resolved base branch.                                        |
 | `pr-number` | The created or updated PR number (empty when nothing changed).   |
