@@ -264,12 +264,12 @@ Module ids are the values from the `id` column in the [Modules](#modules) table.
 
 ### Outputs
 
-| Output      | Description                                                      |
-| ----------- | ---------------------------------------------------------------- |
-| `updated`   | `true` when bumper produced a new commit, otherwise `false`.     |
-| `branch`    | The update branch name.                                          |
-| `base`      | The resolved base branch.                                        |
-| `pr-number` | The created or updated PR number (empty when nothing changed).   |
+| Output      | Description                                                    |
+| ----------- | -------------------------------------------------------------- |
+| `updated`   | `true` when bumper produced a new commit, otherwise `false`.   |
+| `branch`    | The update branch name.                                        |
+| `base`      | The resolved base branch.                                      |
+| `pr-number` | The created or updated PR number (empty when nothing changed). |
 
 ### Running steps afterwards
 
