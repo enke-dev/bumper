@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import pkg from '../../../package.json';
 import { configPath, loadConfig } from '../../config/config.js';
 import { buildContext } from '../../context/context.js';
+import type { PackageManager } from '../../context/context.types.js';
 import { runUpdate } from '../../modules/module.registry.js';
 import {
   collectChangedFiles,
@@ -20,7 +21,7 @@ import type { Command, CommandContext } from '../command.types.js';
 
 const COMMIT_SUBJECT = 'chore: update dependencies';
 
-const APPROVE_CMDS: Partial<Record<string, string[]>> = {
+const APPROVE_CMDS: Partial<Record<PackageManager, string[]>> = {
   pnpm: ['pnpm', 'approve-builds', '--all'],
   npm: ['npm', 'approve-scripts', '--all'],
 };

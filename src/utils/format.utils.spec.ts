@@ -73,6 +73,37 @@ describe('resolveFormatCmd', () => {
       assert.equal(cmd, null);
     });
   });
+
+  test('falls back to global eslint when no local binaries exist', async () => {
+    await withTempDir('fmt-global-eslint', async dir => {
+      await writeFile(join(dir, 'package.json'), JSON.stringify({}));
+      const cmd = await resolveFormatCmd(dir, PackageManager.Npm, tool => tool === 'eslint');
+      assert.deepEqual(cmd, ['eslint', '--fix', '.']);
+    });
+  });
+
+  test('falls back to global prettier when no local binaries and no global eslint', async () => {
+    await withTempDir('fmt-global-prettier', async dir => {
+      await writeFile(join(dir, 'package.json'), JSON.stringify({}));
+      const cmd = await resolveFormatCmd(dir, PackageManager.Npm, tool => tool === 'prettier');
+      assert.deepEqual(cmd, ['prettier', '--write', '.']);
+    });
+  });
+
+  test('local prettier is preferred over global eslint', async () => {
+    await withTempDir('fmt-local-prettier-over-global-eslint', async dir => {
+      await writeFile(join(dir, 'package.json'), JSON.stringify({}));
+      const binDir = join(dir, 'node_modules/.bin');
+      await mkdir(binDir, { recursive: true });
+      const prettierBin = join(binDir, 'prettier');
+      await writeFile(prettierBin, '#!/bin/sh\n');
+      const { chmod } = await import('node:fs/promises');
+      await chmod(prettierBin, 0o755);
+      // global eslint is available, but local prettier should win
+      const cmd = await resolveFormatCmd(dir, PackageManager.Npm, tool => tool === 'eslint');
+      assert.deepEqual(cmd, [prettierBin, '--write', '.']);
+    });
+  });
 });
 
 describe('runFormat', () => {
