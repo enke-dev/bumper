@@ -29,7 +29,11 @@ const APPROVE_CMDS: Partial<Record<string, string[]>> = {
  * Stage + commit everything in the work tree with a grouped markdown summary, or report why
  * it was skipped.
  */
-async function commitChanges(cwd: string): Promise<void> {
+async function commitChanges(cwd: string, dryRun: boolean): Promise<void> {
+  if (dryRun) {
+    process.stdout.write(`${DIM}--commit ignored under --dry-run (nothing was changed)${RESET}\n`);
+    return;
+  }
   if (!(await isGitRepo(cwd))) {
     process.stdout.write(`${YELLOW}--commit skipped: ${cwd} is not a git repository${RESET}\n`);
     return;
@@ -82,13 +86,7 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
   }
 
   if (values.commit) {
-    if (dryRun) {
-      process.stdout.write(
-        `${DIM}--commit ignored under --dry-run (nothing was changed)${RESET}\n`
-      );
-    } else {
-      await commitChanges(ctx.cwd);
-    }
+    await commitChanges(ctx.cwd, dryRun);
   }
 
   if (latest !== null) {

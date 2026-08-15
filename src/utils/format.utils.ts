@@ -13,6 +13,15 @@ const RUN_SCRIPT: Record<PackageManager, string[]> = {
 
 const LOCAL_BINS = ['node_modules/.bin/eslint', 'node_modules/.bin/prettier'];
 
+/** Return the path of a local binary, checking both the plain name and the Windows `.cmd` shim. */
+async function resolveLocalBin(cwd: string, name: string): Promise<string | null> {
+  const plain = join(cwd, 'node_modules/.bin', name);
+  if (await pathExists(plain)) return plain;
+  const cmd = join(cwd, 'node_modules/.bin', `${name}.cmd`);
+  if (await pathExists(cmd)) return cmd;
+  return null;
+}
+
 /** Resolve the format command for a repo: `format` script > eslint --fix > prettier --write. */
 export async function resolveFormatCmd(
   cwd: string,
@@ -23,16 +32,16 @@ export async function resolveFormatCmd(
   if (pkg?.scripts?.['format']) {
     return [...RUN_SCRIPT[packageManager], 'format'];
   }
-  const localEslint = join(cwd, 'node_modules/.bin/eslint');
-  if (await pathExists(localEslint)) {
+  const localEslint = await resolveLocalBin(cwd, 'eslint');
+  if (localEslint !== null) {
     return [localEslint, '--fix', '.'];
+  }
+  const localPrettier = await resolveLocalBin(cwd, 'prettier');
+  if (localPrettier !== null) {
+    return [localPrettier, '--write', '.'];
   }
   if (checkTool('eslint')) {
     return ['eslint', '--fix', '.'];
-  }
-  const localPrettier = join(cwd, 'node_modules/.bin/prettier');
-  if (await pathExists(localPrettier)) {
-    return [localPrettier, '--write', '.'];
   }
   if (checkTool('prettier')) {
     return ['prettier', '--write', '.'];
