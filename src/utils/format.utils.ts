@@ -16,9 +16,13 @@ const LOCAL_BINS = ['node_modules/.bin/eslint', 'node_modules/.bin/prettier'];
 /** Return the path of a local binary, checking both the plain name and the Windows `.cmd` shim. */
 async function resolveLocalBin(cwd: string, name: string): Promise<string | null> {
   const plain = join(cwd, 'node_modules/.bin', name);
-  if (await pathExists(plain)) return plain;
+  if (await pathExists(plain)) {
+    return plain;
+  }
   const cmd = join(cwd, 'node_modules/.bin', `${name}.cmd`);
-  if (await pathExists(cmd)) return cmd;
+  if (await pathExists(cmd)) {
+    return cmd;
+  }
   return null;
 }
 

@@ -1,3 +1,4 @@
+import type { SemVer } from 'verkit';
 import { coerce, compare } from 'verkit';
 
 /**
@@ -53,8 +54,9 @@ export function pickNewestTag(currentTag: string, available: readonly string[]):
     )
     .map(candidate => ({ tag: candidate.tag, version: coerce(candidate.parts.core) }))
     .filter(
-      (candidate): candidate is { tag: string; version: string } => candidate.version !== null
+      (candidate): candidate is { tag: string; version: SemVer | null } =>
+        candidate.version !== null
     )
-    .sort((a, b) => compare(b.version, a.version))[0];
-  return newest && compare(newest.version, currentVersion) > 0 ? newest.tag : null;
+    .sort((a, b) => compare(b.version as SemVer, a.version as SemVer))[0];
+  return newest && compare(newest.version as SemVer, currentVersion) > 0 ? newest.tag : null;
 }
