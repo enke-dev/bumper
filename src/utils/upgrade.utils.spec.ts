@@ -6,7 +6,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
-import { compareReversed, getPrerelease, satisfies } from 'verkit';
+import { compareReversed, isStable, satisfies } from 'verkit';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { PackageManager } from '../context/context.types.js';
@@ -32,7 +32,7 @@ const lookups: RegistryLookups = {
   latestVersion: async pkg => latest[pkg] ?? null,
   maxSatisfyingRanges: async (pkg, ranges) =>
     (versions[pkg] ?? [])
-      .filter(v => getPrerelease(v)?.length === 0) // mirror the real impl: stable versions only
+      .filter(v => isStable(v)) // mirror the real impl: stable versions only
       .filter(v => ranges.every(range => satisfies(v, range)))
       .sort(compareReversed)[0] ?? null,
   peerDependencies: async pkg => peers[pkg] ?? {},
