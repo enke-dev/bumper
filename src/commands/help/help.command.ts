@@ -4,7 +4,7 @@ import type { Command, CommandContext } from '../command.types.js';
 
 const HEADER = `${BOLD}bumper${RESET} — central, module-based repo updater`;
 
-const GLOBAL_OPTIONS = ['--help, -h     Show this help'];
+const GLOBAL_OPTIONS = ['--help, -h     Show this help', '--version, -v  Print the version'];
 
 /** Compose the full help text from every command's partials. */
 function render(): string {

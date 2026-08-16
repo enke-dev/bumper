@@ -15,6 +15,7 @@ export const cliOptions = {
   format: { type: 'boolean', short: 'f' },
   approve: { type: 'boolean', short: 'a' },
   help: { type: 'boolean', short: 'h' },
+  version: { type: 'boolean', short: 'v' },
 } as const;
 
 /** Parsed `values` from parseArgs, inferred from {@link cliOptions}. */

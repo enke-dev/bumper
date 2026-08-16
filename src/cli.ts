@@ -5,6 +5,7 @@ import pkg from '../package.json';
 import { findCommand } from './commands/command.registry.js';
 import { cliOptions } from './commands/command.types.js';
 import { commandHelp } from './commands/help/help.command.js';
+import { versionCommand } from './commands/version/version.command.js';
 import { DIM, RESET } from './utils/output.utils.js';
 
 // Node flags `fs.glob` as experimental and prints a warning on every use. We depend
@@ -27,12 +28,19 @@ async function main(): Promise<void> {
     options: cliOptions,
   });
 
+  const [name, ...rest] = positionals;
+
+  // `version` / `--version` is bare, scriptable output — no banner in front of it
+  if (values.version === true || name === 'version') {
+    versionCommand.run({ values, positionals: rest });
+    return;
+  }
+
   // single-line version banner; skipped for --json so machine output stays clean
   if (!values.json) {
     process.stdout.write(`${DIM}bumper v${pkg.version}${RESET}\n`);
   }
 
-  const [name, ...rest] = positionals;
   if (values.help || name === undefined || name === 'help') {
     commandHelp();
     return;

@@ -112,7 +112,8 @@ no need to link again. `bun link` writes the platform-appropriate shim, so this 
 
 ```sh
 bumper                        # no command → shows help
-bumper help                   # show help (also: bumper --help)
+bumper help                   # show help (also: bumper --help, -h)
+bumper version                # print the installed version (also: bumper --version, -v)
 bumper detect                 # show context + applicable modules for the cwd
 bumper detect /path --json    # machine-readable detection
 bumper update                 # run every applicable module, in order
@@ -120,7 +121,10 @@ bumper update /path/to/repo   # target another repo (defaults to cwd)
 bumper upgrade                # update the bumper binary itself (standalone install only)
 ```
 
-Every invocation prints a one-line `bumper v<version>` banner (suppressed under `--json`). During
+`bumper version` (or `--version` / `-v`) prints the bare version number and nothing else — no
+banner, no decoration — so it can be consumed by scripts.
+
+Every other invocation prints a one-line `bumper v<version>` banner (suppressed under `--json`). During
 `update`, bumper also checks the registry for a newer release of itself — the lookup runs
 concurrently with the module work, so it adds no perceptible latency — and, if one exists, prints a
 hint with the install command afterwards. The check is silent when offline/unresolvable. Skip it

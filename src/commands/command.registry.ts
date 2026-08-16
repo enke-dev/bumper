@@ -4,6 +4,7 @@ import { detectCommand } from './detect/detect.command.js';
 import { helpCommand } from './help/help.command.js';
 import { updateCommand } from './update/update.command.js';
 import { upgradeCommand } from './upgrade/upgrade.command.js';
+import { versionCommand } from './version/version.command.js';
 
 /** Every command in display order (help last). */
 export const commands: Command[] = [
@@ -11,6 +12,7 @@ export const commands: Command[] = [
   updateCommand,
   configCommand,
   upgradeCommand,
+  versionCommand,
   helpCommand,
 ];
 
