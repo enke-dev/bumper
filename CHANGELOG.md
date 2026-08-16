@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+## [0.11.1](https://github.com/enke-dev/bumper/compare/0.11.0...0.11.1) (2026-08-16)
+
+### Bug Fixes
+
+* add version command and --version/-v flag ([dbd6ad9](https://github.com/enke-dev/bumper/commit/dbd6ad984d3908340e6e1d78139fc25171663010))
+
 # [0.11.0](https://github.com/enke-dev/bumper/compare/0.10.2...0.11.0) (2026-08-16)
 
 ### Features
