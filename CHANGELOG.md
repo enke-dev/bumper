@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+# [0.11.0](https://github.com/enke-dev/bumper/compare/0.10.2...0.11.0) (2026-08-16)
+
+### Features
+
+* add --format (-f) and --approve (-a) flags to bumper update ([#10](https://github.com/enke-dev/bumper/issues/10)) ([f2f1ded](https://github.com/enke-dev/bumper/commit/f2f1ded8a78ad047139d51cea96c765e1134bdf2))
+
 ## [0.10.2](https://github.com/enke-dev/bumper/compare/0.10.1...0.10.2) (2026-08-13)
 
 ## [0.10.1](https://github.com/enke-dev/bumper/compare/0.10.0...0.10.1) (2026-08-07)
