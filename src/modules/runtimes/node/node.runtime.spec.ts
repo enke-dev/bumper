@@ -6,7 +6,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
-import { contextFor, LTS } from '../../../testing/module-context.factory.js';
+import { contextFor, NODE_LTS } from '../../../testing/module-context.factory.js';
 import { withFixture } from '../../../testing/with-fixture.harness.js';
 import { pathExists, readPackageJson } from '../../../utils/fs.utils.js';
 import { nodeRuntime } from './node.runtime.js';
@@ -16,7 +16,7 @@ describe('node runtime feature', () => {
     await withFixture('node-npm', async dir => {
       await nodeRuntime.update(contextFor(dir));
       const written = await readFile(join(dir, '.node-version'), 'utf8');
-      assert.equal(written, `v${LTS.version}\n`);
+      assert.equal(written, `v${NODE_LTS.version}\n`);
     });
   });
 
@@ -29,7 +29,7 @@ describe('node runtime feature', () => {
       // a repo that keeps one gets it aligned
       await writeFile(join(dir, '.nvmrc'), 'v18.0.0\n');
       await nodeRuntime.update(contextFor(dir));
-      assert.equal(await readFile(join(dir, '.nvmrc'), 'utf8'), `v${LTS.version}\n`);
+      assert.equal(await readFile(join(dir, '.nvmrc'), 'utf8'), `v${NODE_LTS.version}\n`);
     });
   });
 
@@ -38,7 +38,7 @@ describe('node runtime feature', () => {
       // fixture declares `>=20` → major-granular, operator preserved
       await nodeRuntime.update(contextFor(dir));
       const pkg = await readPackageJson(dir);
-      assert.equal(pkg?.engines?.['node'], `>=${LTS.major}`);
+      assert.equal(pkg?.engines?.['node'], `>=${NODE_LTS.major}`);
     });
   });
 

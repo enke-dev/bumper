@@ -6,7 +6,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
-import { contextFor, LTS } from '../../../testing/module-context.factory.js';
+import { contextFor, NODE_LTS } from '../../../testing/module-context.factory.js';
 import { withFixture } from '../../../testing/with-fixture.harness.js';
 import { withTempDir } from '../../../testing/with-temp-dir.harness.js';
 import { dockerNodeFeature } from './docker-node.feature.js';
@@ -16,8 +16,8 @@ describe('docker-node feature', () => {
     await withFixture('node-npm', async dir => {
       await dockerNodeFeature.update(contextFor(dir));
       const dockerfile = await readFile(join(dir, 'Dockerfile'), 'utf8');
-      assert.ok(dockerfile.includes(`node:${LTS.version}-alpine`), 'FROM image tag aligned');
-      assert.ok(dockerfile.includes(`NODE_VERSION=${LTS.version}`), 'NODE_VERSION aligned');
+      assert.ok(dockerfile.includes(`node:${NODE_LTS.version}-alpine`), 'FROM image tag aligned');
+      assert.ok(dockerfile.includes(`NODE_VERSION=${NODE_LTS.version}`), 'NODE_VERSION aligned');
       assert.ok(!dockerfile.includes('20.11.0'), 'no stale version left behind');
     });
   });
@@ -43,7 +43,7 @@ describe('docker-node feature', () => {
 
       assert.equal(await readFile(excludedFile, 'utf8'), before, 'excluded Dockerfile untouched');
       const root = await readFile(join(dir, 'Dockerfile'), 'utf8');
-      assert.ok(root.includes(`NODE_VERSION=${LTS.version}`), 'root Dockerfile still aligned');
+      assert.ok(root.includes(`NODE_VERSION=${NODE_LTS.version}`), 'root Dockerfile still aligned');
     });
   });
 

@@ -10,7 +10,7 @@ They double as living documentation of what `bumper detect` recognises.
 | --------------- | ------- | --------------- | -------- | ------------------------------------------------------------ |
 | `node-npm`      | node    | npm             | no       | `package-lock.json`, `.node-version`, `Dockerfile`, workflow |
 | `node-pnpm`     | node    | pnpm            | no       | `pnpm-lock.yaml`, `.node-version`                            |
-| `bun`           | bun     | bun             | no       | `bun.lock`, `packageManager: bun@…`                          |
+| `bun`           | bun     | bun             | no       | `bun.lock`, `packageManager: bun@…`, `@types/bun`            |
 | `pnpm-monorepo` | node    | pnpm            | yes      | `pnpm-workspace.yaml`, `packages/a`, `packages/b`            |
 
 Try it against any of them:

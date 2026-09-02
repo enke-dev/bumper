@@ -32,6 +32,14 @@ export interface NodeLts {
   npm?: string;
 }
 
+/** Resolved latest Bun release, shared across modules. */
+export interface BunRelease {
+  /** Full version, no leading `v`, e.g. `1.4.0`. */
+  version: string;
+  /** Major version, e.g. `1`. */
+  major: number;
+}
+
 /**
  * Everything a {@link Module} needs to detect and act.
  * Built once per run by `buildContext()` from the detectors + resolved config.
@@ -48,6 +56,8 @@ export interface ModuleContext {
   versionManager: VersionManager;
   /** Latest Node LTS, resolved lazily before node-dependent modules run. */
   nodeLts?: NodeLts;
+  /** Latest Bun release, resolved lazily before bun-dependent modules run. */
+  bunLatest?: BunRelease;
   /** Resolved per-repo config (excludes, module toggles). */
   config: RepoConfig;
   /**

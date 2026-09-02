@@ -266,7 +266,9 @@ async function resolveLatest(
 
 /** Bump the root `packageManager` field (e.g. `pnpm@x`, `bun@x`) to latest. npm is excluded:
  * it isn't published/installed independently of Node, so its field is aligned to the npm that
- * ships with the pinned Node LTS by the npm package-manager module, not to registry-latest. */
+ * ships with the pinned Node LTS by the npm package-manager module, not to registry-latest. A
+ * `bun@x` field reuses the release the bun runtime module already resolved (when it ran), so the
+ * field and `.bun-version` can't drift apart within one run. */
 async function bumpPackageManagerField(
   ctx: ModuleContext,
   root: PackageJson | undefined,
@@ -277,7 +279,10 @@ async function bumpPackageManagerField(
   if (!root || !name || name === 'npm') {
     return;
   }
-  const version = await lookups.latestVersion(name, viewTool(ctx.packageManager), ctx.cwd);
+  const version =
+    name === 'bun' && ctx.bunLatest
+      ? ctx.bunLatest.version
+      : await lookups.latestVersion(name, viewTool(ctx.packageManager), ctx.cwd);
   if (!version) {
     return;
   }

@@ -2,12 +2,14 @@
 // both `bun test` and `node --test`. The whole suite follows this `.spec.ts` convention —
 // no `bun:` imports in tests or source — so both runtimes exercise identical code paths.
 import assert from 'node:assert/strict';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
 import { defaultRepoConfig } from '../config/config.js';
 import { detectModules } from '../modules/module.registry.js';
 import { EXAMPLES } from '../testing/with-fixture.harness.js';
+import { withTempDir } from '../testing/with-temp-dir.harness.js';
 import type { ModuleContext } from './context.types.js';
 import { PackageManager, Runtime, VersionManager } from './context.types.js';
 import { detectPackageManager } from './detectors/package-manager.detector.js';
@@ -67,6 +69,7 @@ describe('detection: node + pnpm', () => {
     assert.deepEqual([...used].sort(), ['node', 'pnpm', 'types-node']);
     assert.ok(!used.has('npm'));
     assert.ok(!used.has('bun'));
+    assert.ok(!used.has('bun-runtime'));
   });
 });
 
@@ -76,11 +79,24 @@ describe('detection: bun', () => {
     assert.equal(ctx.runtime, Runtime.Bun);
     assert.equal(ctx.packageManager, PackageManager.Bun);
     assert.ok(used.has('bun'));
+    assert.ok(used.has('bun-runtime'), 'a bun runtime pins .bun-version');
+    assert.ok(used.has('types-bun'), '@types/bun is present so types-bun applies');
     assert.ok(used.has('types-node'), '@types/node is present so types-node applies');
     // no .node-version and a bun runtime → the node runtime module stays off
     assert.ok(!used.has('node'));
     assert.ok(!used.has('npm'));
     assert.ok(!used.has('pnpm'));
+  });
+});
+
+describe('detectRuntime: .bun-version', () => {
+  test('a .bun-version pin alone signals the bun runtime (no lockfile, no packageManager)', async () => {
+    await withTempDir('bun-version', async dir => {
+      await writeFile(join(dir, 'package.json'), '{"name":"x"}\n');
+      assert.equal(await detectRuntime(dir), Runtime.Node);
+      await writeFile(join(dir, '.bun-version'), '1.3.0\n');
+      assert.equal(await detectRuntime(dir), Runtime.Bun);
+    });
   });
 });
 

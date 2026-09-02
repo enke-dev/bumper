@@ -5,8 +5,8 @@
 # Bumper
 
 Central, module-based repo updater that detects a repo's runtime + package manager and bumps everything: Node LTS,
-`@types/node`, all dependencies, the package manager itself, GitHub Actions pins, Node versions in
-Docker/Compose files, and other base-image tags referenced there.
+`@types/node`, the Bun release + `@types/bun`, all dependencies, the package manager itself, GitHub
+Actions pins, Node versions in Docker/Compose files, and other base-image tags referenced there.
 
 ## tl;dr
 
@@ -148,8 +148,8 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | `--ignore-config`        |     no     | Ignore `~/.bumperrc` for this run — auto-detect everything, read + write nothing.            |
 | `--json`                 |     no     | `detect` only — emit machine-readable detection output.                                      |
 
-`--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `types-node`,
-`bun`, `npm`, `pnpm`, `docker-node`, `docker-images`, `github-actions`).
+`--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `bun-runtime`,
+`types-node`, `types-bun`, `bun`, `npm`, `pnpm`, `docker-node`, `docker-images`, `github-actions`).
 
 ```sh
 bumper update --dry-run                               # preview, no writes
@@ -194,8 +194,10 @@ then the remaining file-rewriting features:
 | id               | kind            | detects                         | does                                                                                                                                  |
 | ---------------- | --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `node`           | runtime         | node runtime / `.node-version`  | install latest LTS via fnm/asdf, write `.node-version` + any `.nvmrc`, align `engines.node`                                           |
+| `bun-runtime`    | runtime         | bun runtime / `.bun-version`    | resolve latest Bun release, write `.bun-version` (root + members that pin one), align `engines.bun`                                   |
 | `types-node`     | feature         | `@types/node` in any package    | pin spec to exact latest in the Node LTS major line                                                                                   |
-| `bun`            | package-manager | bun packageManager / lockfile   | self-upgrade, bump specs, pin `.bun-version`, reinstall                                                                               |
+| `types-bun`      | feature         | `@types/bun` in any package     | pin spec to the newest `@types/bun` not exceeding the pinned Bun release (the exact match when published)                             |
+| `bun`            | package-manager | bun packageManager / lockfile   | self-upgrade, bump specs + `bun@x` packageManager field to the pinned release, reinstall                                              |
 | `npm`            | package-manager | npm packageManager / lockfile   | bump specs to latest, clean reinstall, `approve-scripts --all`                                                                        |
 | `pnpm`           | package-manager | pnpm packageManager / lockfile  | self-update, bump specs to latest, clean reinstall, `approve-builds --all`                                                            |
 | `docker-node`    | feature         | `Dockerfile*` / `compose*.yaml` | align `node:<ver>` / `NODE_VERSION=` to LTS                                                                                           |

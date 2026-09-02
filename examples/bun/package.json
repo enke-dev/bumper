@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "packageManager": "bun@1.1.30",
+  "engines": {
+    "bun": ">=1.1"
+  },
   "dependencies": {
     "semver": "^7.6.0"
   },
   "devDependencies": {
+    "@types/bun": "1.1.30",
     "@types/node": "^20.0.0"
   }
 }
