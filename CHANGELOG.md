@@ -1,5 +1,15 @@
 # @enke.dev/bumper
 
+# [0.12.0](https://github.com/enke-dev/bumper/compare/0.11.2...0.12.0) (2026-09-02)
+
+### Bug Fixes
+
+* **format:** scope formatter changes to files the update touched ([2b57d64](https://github.com/enke-dev/bumper/commit/2b57d64eaddb7f5793e2a03d7152b8ab3a69e3cd))
+
+### Features
+
+* support .bun-version and @types/bun ([5cd9a8a](https://github.com/enke-dev/bumper/commit/5cd9a8ab664b03500229c577b71b45a8ef8c6e0d))
+
 ## [0.11.2](https://github.com/enke-dev/bumper/compare/0.11.1...0.11.2) (2026-09-01)
 
 ## [0.11.1](https://github.com/enke-dev/bumper/compare/0.11.0...0.11.1) (2026-08-16)
