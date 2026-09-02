@@ -1,9 +1,10 @@
 import { join } from 'node:path';
 
 import type { PackageManager } from '../context/context.types.js';
+import { dirtyPaths, isGitRepo } from './commit.utils.js';
 import { exec, toolExists } from './exec.utils.js';
 import { pathExists, readPackageJson } from './fs.utils.js';
-import { planLine } from './output.utils.js';
+import { DIM, planLine, RESET } from './output.utils.js';
 
 const RUN_SCRIPT: Record<PackageManager, string[]> = {
   npm: ['npm', 'run'],
@@ -53,7 +54,45 @@ export async function resolveFormatCmd(
   return null;
 }
 
-/** Run the auto-detected format command for a repo. No-op when none is found. */
+/**
+ * Undo formatter edits to files the update itself never touched. `--format` exists to tidy
+ * bumper's own rewrites (manifests, lockfiles), but every formatter we can resolve runs repo-wide
+ * (`eslint --fix .`, `prettier --write .`, an arbitrary `format` script), so it also picks up
+ * unrelated files — including ones bumper was told to leave alone: with `--skip github-actions`
+ * (the default `GITHUB_TOKEN` can't push `.github/workflows/*` without the `workflows` scope) a
+ * reformatted workflow file still lands in the commit and the push is rejected. Reverting
+ * everything outside the pre-format dirty set keeps the formatter scoped to the update, whatever
+ * modules were skipped or paths excluded — and keeps unrelated reformat noise out of the PR.
+ * Tracked files are restored from HEAD; files the formatter created are removed.
+ */
+async function revertFormatterOnlyChanges(
+  cwd: string,
+  before: ReadonlySet<string>,
+  run: typeof exec
+): Promise<void> {
+  const after = await dirtyPaths(cwd, run);
+  const strays = after.filter(entry => !before.has(entry.path));
+  if (strays.length === 0) {
+    return;
+  }
+  const tracked = strays.filter(entry => !entry.untracked).map(entry => entry.path);
+  const untracked = strays.filter(entry => entry.untracked).map(entry => entry.path);
+  if (tracked.length > 0) {
+    await run(['git', 'checkout', '--', ...tracked], { cwd });
+  }
+  if (untracked.length > 0) {
+    await run(['git', 'clean', '-f', '--', ...untracked], { cwd });
+  }
+  process.stdout.write(
+    `${DIM}reverted formatter changes to ${strays.length} file(s) the update didn't touch${RESET}\n`
+  );
+}
+
+/**
+ * Run the auto-detected format command for a repo, then discard its edits to files the update
+ * didn't change (see {@link revertFormatterOnlyChanges}). No-op when no formatter is found; the
+ * scoping is skipped outside a git repo, where there is no baseline to restore from.
+ */
 export async function runFormat(
   cwd: string,
   packageManager: PackageManager,
@@ -66,10 +105,15 @@ export async function runFormat(
     return;
   }
   if (dryRun) {
-    planLine(cmd.join(' '));
+    planLine(`${cmd.join(' ')} (changes to files the update didn't touch are reverted)`);
     return;
   }
+  const scoped = await isGitRepo(cwd, run);
+  const before = new Set(scoped ? (await dirtyPaths(cwd, run)).map(entry => entry.path) : []);
   await run(cmd, { cwd });
+  if (scoped) {
+    await revertFormatterOnlyChanges(cwd, before, run);
+  }
 }
 
 /** Check whether local eslint/prettier binaries exist (used in tests). */

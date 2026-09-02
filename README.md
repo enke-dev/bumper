@@ -177,7 +177,10 @@ older managers that don't support the command). Runs before the formatter and be
 
 `--format` (`-f`) runs the repo's own `format` npm script when one exists; otherwise it falls back
 to `eslint --fix .` or `prettier --write .`, whichever binary is found first in the local
-`node_modules/.bin` or on `PATH`. Runs after approve and before the commit.
+`node_modules/.bin` or on `PATH`. Runs after approve and before the commit. The formatter's edits
+are **scoped to files the update touched** — in a git repo, changes it makes to any other file are
+reverted afterwards (and files it creates removed), so skipped modules and excluded paths stay
+untouched and the commit carries no unrelated reformat noise.
 
 `--ignore-config` bypasses `~/.bumperrc` completely: no entry is read for the target repo and, for
 an unknown repo, none is written. Stored excludes and module toggles are skipped — use it to run
@@ -267,6 +270,10 @@ All inputs are optional.
 | `token`     | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows). |
 
 Module ids are the values from the `id` column in the [Modules](#modules) table.
+
+> **Note** — the default `GITHUB_TOKEN` can't push changes to `.github/workflows/*` (that needs the
+> `workflows` scope), so with it either pass `skip: github-actions` or provide a PAT/app token via
+> `token`. The formatter respects the skip: its edits to workflow files are reverted, not committed.
 
 ### Outputs
 

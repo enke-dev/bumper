@@ -7,7 +7,9 @@ import { describe, test } from 'node:test';
 import { PackageManager } from '../context/context.types.js';
 import { withTempDir } from '../testing/with-temp-dir.harness.js';
 import type { ExecResult } from './exec.utils.js';
+import { exec } from './exec.utils.js';
 import { resolveFormatCmd, runFormat } from './format.utils.js';
+import { pathExists } from './fs.utils.js';
 
 const ok: ExecResult = { exitCode: 0, stdout: '', stderr: '' };
 
@@ -140,8 +142,51 @@ describe('runFormat', () => {
         return ok;
       };
       await runFormat(dir, PackageManager.Pnpm, false, fakeExec);
-      assert.equal(calls.length, 1);
-      assert.deepEqual(calls[0], ['pnpm', 'run', 'format']);
+      // besides the git probe (not a repo here → no scoping), exactly the format command runs
+      const formatCalls = calls.filter(cmd => cmd[0] !== 'git');
+      assert.equal(formatCalls.length, 1);
+      assert.deepEqual(formatCalls[0], ['pnpm', 'run', 'format']);
+    });
+  });
+
+  test('reverts formatter edits to files the update never touched (git repo)', async () => {
+    await withTempDir('fmt-scope', async dir => {
+      const git = (...args: string[]) => exec(['git', ...args], { cwd: dir });
+      await writeFile(join(dir, 'package.json'), '{"scripts":{"format":"x"}}\n');
+      await mkdir(join(dir, '.github/workflows'), { recursive: true });
+      await writeFile(join(dir, '.github/workflows/ci.yml'), 'on:   push\n');
+      await git('init', '-q');
+      await git('-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A');
+      await git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'init');
+      // the update's own change: package.json rewritten (unformatted)
+      await writeFile(join(dir, 'package.json'), '{"scripts":{"format":"x"},"version":"2"}\n');
+
+      // git commands run for real; the "formatter" reformats package.json AND the workflow file,
+      // and drops a stray report file
+      const run = async (cmd: string[], opts?: { cwd?: string }): Promise<ExecResult> => {
+        if (cmd[0] === 'git') {
+          return exec(cmd, opts);
+        }
+        await writeFile(
+          join(dir, 'package.json'),
+          '{ "scripts": { "format": "x" }, "version": "2" }\n'
+        );
+        await writeFile(join(dir, '.github/workflows/ci.yml'), 'on: push\n');
+        await writeFile(join(dir, 'report.txt'), 'formatted 2 files\n');
+        return ok;
+      };
+      await runFormat(dir, PackageManager.Npm, false, run);
+
+      const { readFile } = await import('node:fs/promises');
+      // touched by the update → formatter result kept
+      assert.equal(
+        await readFile(join(dir, 'package.json'), 'utf8'),
+        '{ "scripts": { "format": "x" }, "version": "2" }\n'
+      );
+      // untouched by the update → formatter edit reverted to HEAD
+      assert.equal(await readFile(join(dir, '.github/workflows/ci.yml'), 'utf8'), 'on:   push\n');
+      // created by the formatter → removed
+      assert.equal(await pathExists(join(dir, 'report.txt')), false);
     });
   });
 

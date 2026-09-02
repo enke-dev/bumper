@@ -240,20 +240,35 @@ export async function isGitRepo(cwd: string, run: typeof exec = exec): Promise<b
 }
 
 /** Files changed in the work tree vs HEAD (modified + added + untracked), with before/after content. */
+/** A work-tree path that differs from HEAD; `untracked` when git doesn't know the file yet. */
+export interface DirtyPath {
+  path: string;
+  untracked: boolean;
+}
+
+/** Every path `git status` reports as changed (modified, added, deleted, renamed, untracked),
+ * repo-relative. Renames report their target. */
+export async function dirtyPaths(cwd: string, run: typeof exec = exec): Promise<DirtyPath[]> {
+  const { stdout } = await run(['git', 'status', '--porcelain', '--untracked-files=all'], { cwd });
+  return (
+    stdout
+      .split('\n')
+      .filter(Boolean)
+      // porcelain lines are "XY <path>"; slice past the 2-char status + space, take rename targets
+      .map(line => {
+        const raw = line.slice(3).trim();
+        const path = raw.includes(' -> ') ? (raw.split(' -> ').pop() ?? raw).trim() : raw;
+        return { path, untracked: line.startsWith('??') };
+      })
+      .filter(entry => entry.path !== '')
+  );
+}
+
 export async function collectChangedFiles(
   cwd: string,
   run: typeof exec = exec
 ): Promise<FileDiff[]> {
-  const { stdout } = await run(['git', 'status', '--porcelain', '--untracked-files=all'], { cwd });
-  const paths = stdout
-    .split('\n')
-    .filter(Boolean)
-    // porcelain lines are "XY <path>"; slice past the 2-char status + space, take rename targets
-    .map(line => {
-      const raw = line.slice(3).trim();
-      return raw.includes(' -> ') ? (raw.split(' -> ').pop() ?? raw).trim() : raw;
-    })
-    .filter(Boolean);
+  const paths = (await dirtyPaths(cwd, run)).map(entry => entry.path);
 
   return Promise.all(
     paths.map(async path => {
