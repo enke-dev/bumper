@@ -57,6 +57,7 @@ describe('detection: node + npm', () => {
       'npm',
       'types-node',
     ]);
+    assert.ok(!used.has('docker-bun'), 'a node-only Dockerfile does not enable docker-bun');
   });
 });
 
@@ -82,6 +83,7 @@ describe('detection: bun', () => {
     assert.ok(used.has('bun-runtime'), 'a bun runtime pins .bun-version');
     assert.ok(used.has('types-bun'), '@types/bun is present so types-bun applies');
     assert.ok(used.has('types-node'), '@types/node is present so types-node applies');
+    assert.ok(used.has('docker-bun'), 'Dockerfile pins oven/bun so docker-bun applies');
     // no .node-version and a bun runtime → the node runtime module stays off
     assert.ok(!used.has('node'));
     assert.ok(!used.has('npm'));
