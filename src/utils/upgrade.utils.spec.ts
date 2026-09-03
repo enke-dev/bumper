@@ -259,6 +259,30 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.dependencies?.['bar'], '4.0.0');
   });
 
+  test('a nested override is scoped: it neither lifts the peer cap nor outruns it', async () => {
+    // A nested key pins the package for one parent only, so it must not lift a peer cap the way a
+    // top-level override does, and its pin has to follow the capped version rather than latest.
+    latest = { typescript: '7.0.2', lint: '1.0.0', 'lit-tools': '0.8.2' };
+    versions = { typescript: ['6.0.3', '6.0.5', '7.0.2'] };
+    peers = { lint: { typescript: '>=4.8.4 <6.1.0' } };
+    await writePkg({
+      name: 'root',
+      devDependencies: { typescript: '6.0.3', lint: '1.0.0', 'lit-tools': '0.8.2' },
+      overrides: { 'lit-tools': { typescript: '6.0.3' } },
+    });
+
+    await upgradeAllWorkspaces(ctx(), lookups);
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.devDependencies?.['typescript'], '6.0.5', 'capped by the peer, not lifted');
+    const overrides = pkg?.['overrides'] as Record<string, unknown>;
+    assert.deepEqual(
+      overrides['lit-tools'],
+      { typescript: '6.0.5' },
+      'the scoped pin follows the capped version, not latest'
+    );
+  });
+
   test('realigns literal version pins inside override trees', async () => {
     // A root that only overrides (e.g. a monorepo whose members hold the dependency) can't use the
     // `$name` back-reference, so the pin is literal — and must not rot behind the bump. Only

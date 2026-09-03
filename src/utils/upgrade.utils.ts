@@ -75,16 +75,24 @@ function collectDependencyNames(pkgs: Map<string, PackageJson>): string[] {
 /** Fields through which a root manifest force-resolves a package version, per package manager. */
 const OVERRIDE_FIELDS = ['overrides', 'resolutions'] as const;
 
-/** Collect every package name keyed anywhere in an override tree (npm allows nesting). */
-function overrideKeys(node: unknown): string[] {
+/** The package an override key names: `**\/pkg` (yarn glob) and `pkg@1.x` (npm, scoped by range)
+ * both mean `pkg`. */
+function overrideKeyName(key: string): string {
+  return key.replace(/^(\*\*\/)+/, '').replace(/(?<!^)@[^@]*$/, '');
+}
+
+/**
+ * The package names an override tree force-resolves *repo-wide*: its top-level keys only. A nested
+ * key - `{ "lit-tools": { "typescript": "6.0.3" } }` - scopes `typescript` to `lit-tools`' own
+ * dependency and settles nothing for the rest of the repo, so it must not lift a peer cap on
+ * `typescript`. That is exactly how a scoped pin once let `typescript` jump to 7.0 past the
+ * `<6.1` peer of `typescript-eslint` and the `~6.0` one of the Nest CLI.
+ */
+function overriddenTopLevelNames(node: unknown): string[] {
   if (node === null || typeof node !== 'object') {
     return [];
   }
-  return Object.entries(node as Record<string, unknown>).flatMap(([key, value]) => [
-    // `**/pkg` (yarn glob) and `pkg@1.x` (npm, scoped by range) both name the same package
-    key.replace(/^(\*\*\/)+/, '').replace(/(?<!^)@[^@]*$/, ''),
-    ...overrideKeys(value),
-  ]);
+  return Object.keys(node as Record<string, unknown>).map(overrideKeyName);
 }
 
 /**
@@ -131,7 +139,9 @@ async function overriddenNames(cwd: string, root: PackageJson | undefined): Prom
   const workspaceFile = join(cwd, 'pnpm-workspace.yaml');
   const yaml = (await pathExists(workspaceFile)) ? await readFile(workspaceFile, 'utf8') : '';
   return new Set(
-    [...overrideTrees(root).flatMap(overrideKeys), ...parsePnpmOverrides(yaml)].filter(Boolean)
+    [...overrideTrees(root).flatMap(overriddenTopLevelNames), ...parsePnpmOverrides(yaml)].filter(
+      Boolean
+    )
   );
 }
 
@@ -146,29 +156,34 @@ function overrideTrees(root: PackageJson | undefined): unknown[] {
 
 /**
  * Realign concrete version pins *inside* the override trees to the same target the dependency
- * buckets get. An override exists to force a version, so leaving it behind rots the pin: the repo
+ * buckets got. An override exists to force a version, so leaving it behind rots the pin: the repo
  * bumps prettier while its `overrides` still forces the release from months ago. A monorepo root
  * that only overrides (no dependency of its own) can't use the `$name` back-reference, so a
  * literal version is the only option there — and it has to be maintained.
  *
- * Only string leaves that are pinnable and whose package already resolved a `latest` this run are
- * touched; `$name` references, ranges and unresolvable names are left exactly as authored.
+ * `resolved` is the version each package actually landed on across the manifests - the capped one
+ * where a peer range applied - falling back to `latest` for packages no bucket carries. A pin
+ * mirrors a dependency, so it must not outrun it: a scoped `typescript` override has to stay on
+ * the 6.x the buckets were capped to, not jump to the 7.0 `latest`.
+ *
+ * Only string leaves that are pinnable and whose package resolved a version this run are touched;
+ * `$name` references, ranges and unresolvable names are left exactly as authored.
  */
 function rewriteOverrideTree(
   node: unknown,
   managed: ReadonlySet<string>,
-  latest: Map<string, string | null>
+  resolved: Map<string, string | null>
 ): boolean {
   if (node === null || typeof node !== 'object') {
     return false;
   }
   const tree = node as Record<string, unknown>;
   return Object.entries(tree).reduce((changed, [key, value]) => {
-    const name = key.replace(/^(\*\*\/)+/, '').replace(/(?<!^)@[^@]*$/, '');
+    const name = overrideKeyName(key);
     if (typeof value !== 'string') {
-      return rewriteOverrideTree(value, managed, latest) || changed;
+      return rewriteOverrideTree(value, managed, resolved) || changed;
     }
-    const version = managed.has(name) || !isPinnable(value) ? null : latest.get(name);
+    const version = managed.has(name) || !isPinnable(value) ? null : resolved.get(name);
     if (!version) {
       return changed;
     }
@@ -325,24 +340,28 @@ export async function upgradeAllWorkspaces(
   );
 
   const root = pkgs.get(ctx.cwd);
+  // The version each package landed on in any bucket, capped where a peer applied; the override
+  // trees are realigned to these afterwards, so a pin follows its dependency rather than `latest`.
+  const applied = new Map<string, string>();
+  const specsChanged = new Map<string, boolean>();
   await Promise.all(
     [...pkgs].map(async ([dir, pkg]) => {
-      const specsChanged = await rewriteSpecs(
-        pkg,
-        managed,
-        latest,
-        peerCaps,
-        tool,
-        ctx.cwd,
-        lookups
+      specsChanged.set(
+        dir,
+        await rewriteSpecs(pkg, managed, latest, peerCaps, tool, ctx.cwd, lookups, applied)
       );
-      // Override trees live in the root manifest only, whichever field spelling is used.
-      const overridesChanged =
-        pkg === root &&
-        overrideTrees(root)
-          .map(tree => rewriteOverrideTree(tree, managed, latest))
-          .some(Boolean);
-      if (specsChanged || overridesChanged) {
+    })
+  );
+  // Override trees live in the root manifest only, whichever field spelling is used.
+  const resolved = new Map<string, string | null>([...latest, ...applied]);
+  const overridesChanged =
+    root !== undefined &&
+    overrideTrees(root)
+      .map(tree => rewriteOverrideTree(tree, managed, resolved))
+      .some(Boolean);
+  await Promise.all(
+    [...pkgs].map(async ([dir, pkg]) => {
+      if (specsChanged.get(dir) || (pkg === root && overridesChanged)) {
         await writePackageJson(dir, pkg);
       }
     })
@@ -376,7 +395,9 @@ function cappedRanges(pkg: PackageJson, managed: ReadonlySet<string>): Map<strin
  * or the newest version satisfying its capping ranges when any apply. Caps are a range the
  * manifest itself declares for the package plus every `peerCaps` constraint from a dependency;
  * all are intersected (semver AND) by {@link RegistryLookups.maxSatisfyingRanges}. Returns true
- * if anything changed. `reduce` (not `some`) so every bucket + entry is visited. */
+ * if anything changed. `reduce` (not `some`) so every bucket + entry is visited. Every version an
+ * entry ends up on - rewritten or deliberately kept - is recorded in `applied`, the lowest
+ * winning when manifests disagree, so the override trees can follow the buckets. */
 async function rewriteSpecs(
   pkg: PackageJson,
   managed: ReadonlySet<string>,
@@ -384,7 +405,8 @@ async function rewriteSpecs(
   peerCaps: ReadonlyMap<string, string[]>,
   tool: string,
   cwd: string,
-  lookups: RegistryLookups
+  lookups: RegistryLookups,
+  applied: Map<string, string>
 ): Promise<boolean> {
   const present = allDependencies(pkg);
   // Collect every capping range per package as a list — never joined into one string (see
@@ -431,9 +453,11 @@ async function rewriteSpecs(
         const currentViolatesCaps =
           capped_ && !(capRanges.get(name) ?? []).every(range => satisfies(current, range));
         if (!currentViolatesCaps) {
+          recordApplied(applied, name, current);
           return acc;
         }
       }
+      recordApplied(applied, name, version);
       const next = `${operatorOf(spec)}${version}`;
       if (next === spec) {
         return acc;
@@ -443,4 +467,12 @@ async function rewriteSpecs(
     }, false);
     return bucketChanged || entryChanged;
   }, false);
+}
+
+/** Remember the version `name` landed on; when manifests disagree the lowest (most constrained) wins. */
+function recordApplied(applied: Map<string, string>, name: string, version: string): void {
+  const previous = applied.get(name);
+  if (previous === undefined || isLess(version, previous)) {
+    applied.set(name, version);
+  }
 }
