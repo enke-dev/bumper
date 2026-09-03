@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+# [0.13.0](https://github.com/enke-dev/bumper/compare/0.12.0...0.13.0) (2026-09-03)
+
+### Features
+
+* bun version in docker files ([83dab75](https://github.com/enke-dev/bumper/commit/83dab750d392fcc8ad17d49a1518032d75a7e8c0))
+
 # [0.12.0](https://github.com/enke-dev/bumper/compare/0.11.2...0.12.0) (2026-09-02)
 
 ### Bug Fixes

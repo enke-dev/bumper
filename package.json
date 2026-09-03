@@ -1,6 +1,6 @@
 {
   "name": "@enke.dev/bumper",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "license": "MIT",
   "packageManager": "bun@1.4.0",
   "publishConfig": {
