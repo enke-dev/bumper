@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+## [0.13.1](https://github.com/enke-dev/bumper/compare/0.13.0...0.13.1) (2026-09-03)
+
+### Bug Fixes
+
+* **upgrade:** scope nested overrides to their parent package ([905ab7e](https://github.com/enke-dev/bumper/commit/905ab7e9ddc36109d184ce8584a01b944700b150))
+
 # [0.13.0](https://github.com/enke-dev/bumper/compare/0.12.0...0.13.0) (2026-09-03)
 
 ### Features
