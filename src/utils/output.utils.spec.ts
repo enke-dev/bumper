@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 
-import { planLine, runStep } from './output.utils.js';
+import { planLine, runStep, stepNote, wasReported } from './output.utils.js';
 
 /** Swap a writable stream's `write` for a buffer; runtime-agnostic (no bun/jest spy API). */
 function capture(stream: NodeJS.WriteStream): { output: () => string; restore: () => void } {
@@ -64,6 +64,17 @@ describe('runStep', () => {
     assert.ok(err.output().includes('kaboom'));
   });
 
+  test('marks the error as reported so the CLI does not print it twice', async () => {
+    out = capture(process.stdout);
+    err = capture(process.stderr);
+    const failure = new Error('kaboom');
+    assert.equal(wasReported(failure), false);
+    await runStep('build', async () => {
+      throw failure;
+    }).catch(() => undefined);
+    assert.equal(wasReported(failure), true);
+  });
+
   test('stringifies a non-Error rejection', async () => {
     out = capture(process.stdout);
     err = capture(process.stderr);
@@ -71,5 +82,18 @@ describe('runStep', () => {
       throw 'plain string';
     }).catch(() => undefined);
     assert.ok(err.output().includes('plain string'));
+  });
+});
+
+describe('stepNote', () => {
+  let out: ReturnType<typeof capture>;
+  afterEach(() => out?.restore());
+
+  test("writes an arrow-prefixed line that clears the step's in-progress line", () => {
+    out = capture(process.stdout);
+    stepNote('retrying install in 15s');
+    assert.ok(out.output().includes('→ retrying install in 15s'));
+    assert.ok(out.output().startsWith('\r'), 'the in-progress line is cleared first');
+    assert.ok(out.output().endsWith('\n'));
   });
 });

@@ -6,7 +6,7 @@ import { findCommand } from './commands/command.registry.js';
 import { cliOptions } from './commands/command.types.js';
 import { commandHelp } from './commands/help/help.command.js';
 import { versionCommand } from './commands/version/version.command.js';
-import { DIM, RESET } from './utils/output.utils.js';
+import { DIM, RESET, wasReported } from './utils/output.utils.js';
 
 // Node flags `fs.glob` as experimental and prints a warning on every use. We depend
 // on it deliberately (the one glob API portable across Node + Bun), so silence just
@@ -58,7 +58,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`\x1b[31m${message}\x1b[0m\n`);
+  // a failing step already printed its own (often multi-line) output; don't repeat it
+  if (!wasReported(error)) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`\x1b[31m${message}\x1b[0m\n`);
+  }
   process.exitCode = 1;
 });
