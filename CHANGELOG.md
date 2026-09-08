@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.13.2](https://github.com/enke-dev/bumper/compare/0.13.1...0.13.2) (2026-09-08)
+
+### Bug Fixes
+
+* **deps:** retry install when registry lags behind publish ([6522d34](https://github.com/enke-dev/bumper/commit/6522d34a375ab949df91d4f3f93341953e251dba))
+* **output:** don't print step errors twice ([f9d2426](https://github.com/enke-dev/bumper/commit/f9d24264c13c64570092d846e5259f876e9677b7))
+
 ## [0.13.1](https://github.com/enke-dev/bumper/compare/0.13.0...0.13.1) (2026-09-03)
 
 ### Bug Fixes
