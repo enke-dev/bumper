@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { ModuleContext } from '../context/context.types.js';
 import { PackageManager } from '../context/context.types.js';
 import { execOk, toolExists } from './exec.utils.js';
-import { planLine } from './output.utils.js';
+import { planLine, stepNote } from './output.utils.js';
 
 /** Lockfiles owned by each package manager, removed on a clean install so the reinstall
  * re-resolves against the freshly rewritten `package.json`. */
@@ -13,6 +13,55 @@ const LOCKFILES: Record<PackageManager, readonly string[]> = {
   [PackageManager.Pnpm]: ['pnpm-lock.yaml'],
   [PackageManager.Bun]: ['bun.lock', 'bun.lockb'],
 };
+
+/**
+ * Resolution failures that mean "this version exists, the registry just isn't serving it yet".
+ * A monorepo release (typescript-eslint, vitest, …) publishes its packages seconds apart, and
+ * npmjs propagates them independently — so a bump can resolve the umbrella package to a version
+ * whose sibling dependency is still a 404, and the install dies with a version that is genuinely
+ * published. Matched on the manager's own error identifiers/wording (pnpm code, npm code, bun
+ * message) rather than the package name, so an unrelated failure isn't retried.
+ */
+const PROPAGATION_LAG_MARKERS = [
+  'ERR_PNPM_NO_MATCHING_VERSION', // pnpm
+  'ETARGET', // npm
+  'No version matching', // bun
+];
+
+/** One retry only, and short: propagation is seconds, and CI runner time is the budget. The
+ * alternative — failing the bump and rerunning `bumper update` from scratch — costs minutes. */
+const PROPAGATION_RETRY_DELAY_MS = 15_000;
+
+/** Whether a failed install output carries a propagation-lag marker. Exported for tests. */
+export function isPropagationLag(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return PROPAGATION_LAG_MARKERS.some(marker => message.includes(marker));
+}
+
+/**
+ * Run the install, retrying **once** after a short wait if it failed only because a just-published
+ * version hasn't propagated across the registry yet (see {@link PROPAGATION_LAG_MARKERS}). Every
+ * other failure throws immediately, so a real unsatisfiable range still fails fast. `delayMs` is
+ * only overridden by tests, so the retry path runs without the real wait.
+ */
+export async function installWithRetry(
+  cmd: string[],
+  cwd: string,
+  delayMs: number = PROPAGATION_RETRY_DELAY_MS
+): Promise<void> {
+  try {
+    await execOk(cmd, { cwd });
+  } catch (error) {
+    if (!isPropagationLag(error)) {
+      throw error;
+    }
+    stepNote(
+      `a bumped version is not served by the registry yet; retrying install in ${Math.round(delayMs / 1000)}s`
+    );
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+    await execOk(cmd, { cwd });
+  }
+}
 
 /**
  * Remove the root `node_modules` *and the package manager's lockfile*, then reinstall. Dropping
@@ -44,8 +93,8 @@ export async function cleanInstall(ctx: ModuleContext, installCmd: string[]): Pr
   }
   await rm(join(ctx.cwd, 'node_modules'), { recursive: true, force: true });
   await Promise.all(lockfiles.map(file => rm(join(ctx.cwd, file), { force: true })));
-  await execOk(cmd, { cwd: ctx.cwd });
-  await execOk(cmd, { cwd: ctx.cwd });
+  await installWithRetry(cmd, ctx.cwd);
+  await installWithRetry(cmd, ctx.cwd);
 }
 
 /**

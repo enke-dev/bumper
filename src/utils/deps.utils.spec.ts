@@ -8,7 +8,13 @@ import { afterEach, describe, test } from 'node:test';
 import type { ModuleContext } from '../context/context.types.js';
 import { PackageManager } from '../context/context.types.js';
 import { withTempDir } from '../testing/with-temp-dir.harness.js';
-import { approveScripts, cleanInstall, selfUpdate } from './deps.utils.js';
+import {
+  approveScripts,
+  cleanInstall,
+  installWithRetry,
+  isPropagationLag,
+  selfUpdate,
+} from './deps.utils.js';
 
 function ctx(overrides: Partial<ModuleContext> = {}): ModuleContext {
   return { cwd: '/nonexistent-bumper-cwd', dryRun: true, ...overrides } as ModuleContext;
@@ -71,6 +77,56 @@ describe('cleanInstall', () => {
       ]);
       const runs = (await readFile(counter, 'utf8')).trim().split('\n');
       assert.equal(runs.length, 2, 'install command runs exactly twice');
+    });
+  });
+});
+
+describe('isPropagationLag', () => {
+  test('matches each package manager\'s "published but not served yet" failure', () => {
+    assert.equal(isPropagationLag(new Error('Error: ERR_PNPM_NO_MATCHING_VERSION')), true);
+    assert.equal(isPropagationLag(new Error('npm error code ETARGET')), true);
+    assert.equal(isPropagationLag('error: No version matching "8.70.0" found'), true);
+  });
+
+  test('ignores unrelated install failures', () => {
+    assert.equal(isPropagationLag(new Error('ERR_PNPM_PEER_DEP_ISSUES')), false);
+    assert.equal(isPropagationLag(new Error('npm error code ERESOLVE')), false);
+  });
+});
+
+describe('installWithRetry', () => {
+  test('retries once when the registry has not served a bumped version yet', async () => {
+    await withTempDir('retry', async dir => {
+      // fails with pnpm's lag code on the first run, succeeds afterwards
+      const counter = join(dir, 'runs');
+      const script = join(dir, 'install.sh');
+      await writeFile(
+        script,
+        `#!/bin/sh\necho run >> "${counter}"\n` +
+          `test "$(wc -l < "${counter}")" -gt 1 && exit 0\n` +
+          'echo "Error: ERR_PNPM_NO_MATCHING_VERSION" >&2\nexit 1\n'
+      );
+      await chmod(script, 0o755);
+      out = captureStdout();
+      await installWithRetry([script], dir, 0);
+      const runs = (await readFile(counter, 'utf8')).trim().split('\n');
+      assert.equal(runs.length, 2, 'install runs a second time after the lag failure');
+      assert.ok(out.output().includes('retrying install'), 'the retry is announced');
+    });
+  });
+
+  test('fails fast on an unrelated install failure', async () => {
+    await withTempDir('no-retry', async dir => {
+      const counter = join(dir, 'runs');
+      const script = join(dir, 'install.sh');
+      await writeFile(
+        script,
+        `#!/bin/sh\necho run >> "${counter}"\necho "npm error code ERESOLVE" >&2\nexit 1\n`
+      );
+      await chmod(script, 0o755);
+      await assert.rejects(installWithRetry([script], dir, 0), /ERESOLVE/);
+      const runs = (await readFile(counter, 'utf8')).trim().split('\n');
+      assert.equal(runs.length, 1, 'no retry for a genuine resolution failure');
     });
   });
 });
