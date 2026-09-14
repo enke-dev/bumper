@@ -77,7 +77,10 @@ export async function updateTypesNode(
     TYPES_NODE_PACKAGE,
     majorSpec,
     viewTool(ctx.packageManager),
-    ctx.cwd
+    ctx.cwd,
+    // the pin must clear the package manager's minimum-release-age gate too, or the install
+    // that follows refuses the very version this feature just wrote.
+    { policy: ctx.releaseAge }
   );
   if (!version) {
     return;

@@ -8,12 +8,16 @@ import { PackageManager } from '../context/context.types.js';
 import type { ExecResult } from './exec.utils.js';
 import {
   curlJson,
+  latestEligibleVersion,
   latestVersion,
   latestVersionInRange,
   maxSatisfyingRanges,
+  NO_GATE,
   peerDependenciesOf,
+  publishTimes,
   viewTool,
 } from './npm-registry.utils.js';
+import type { ReleaseAgePolicy } from './release-age.utils.js';
 
 const ok = (stdout: string): ExecResult => ({ exitCode: 0, stdout, stderr: '' });
 const fail = (): ExecResult => ({ exitCode: 1, stdout: '', stderr: 'boom' });
@@ -84,28 +88,37 @@ describe('latestVersion', () => {
 
 describe('latestVersionInRange', () => {
   test('returns a bare version for a single match', async () => {
-    const version = await latestVersionInRange('lit', '>=1 <2', 'npm', '/repo', async () =>
+    const version = await latestVersionInRange('lit', '>=1 <2', 'npm', '/repo', NO_GATE, async () =>
       ok('1.9.0\n')
     );
     assert.equal(version, '1.9.0');
   });
 
   test('extracts the version from the last "pkg@x \'x\'" line', async () => {
-    const version = await latestVersionInRange('lit', '>=1 <2', 'npm', '/repo', async () =>
+    const version = await latestVersionInRange('lit', '>=1 <2', 'npm', '/repo', NO_GATE, async () =>
       ok("lit@1.2.0 '1.2.0'\nlit@1.4.0 '1.4.0'\n")
     );
     assert.equal(version, '1.4.0');
   });
 
   test('returns null on a non-zero exit', async () => {
-    const version = await latestVersionInRange('lit', '>=1 <2', 'npm', '/repo', async () => fail());
+    const version = await latestVersionInRange('lit', '>=1 <2', 'npm', '/repo', NO_GATE, async () =>
+      fail()
+    );
     assert.equal(version, null);
   });
 
   test('returns null when exec throws', async () => {
-    const version = await latestVersionInRange('lit', '>=1 <2', 'npm', '/repo', async () => {
-      throw new Error('spawn error');
-    });
+    const version = await latestVersionInRange(
+      'lit',
+      '>=1 <2',
+      'npm',
+      '/repo',
+      NO_GATE,
+      async () => {
+        throw new Error('spawn error');
+      }
+    );
     assert.equal(version, null);
   });
 });
@@ -116,11 +129,21 @@ describe('maxSatisfyingRanges', () => {
   const B = '^18.0.0 || ^19.0.0 || ^20.0.0';
 
   test('intersects OR-ranges correctly (highest satisfying ALL), order-independent', async () => {
-    const forward = await maxSatisfyingRanges('release-it', [A, B], 'npm', '/repo', async () =>
-      ok(VERSIONS)
+    const forward = await maxSatisfyingRanges(
+      'release-it',
+      [A, B],
+      'npm',
+      '/repo',
+      NO_GATE,
+      async () => ok(VERSIONS)
     );
-    const reversed = await maxSatisfyingRanges('release-it', [B, A], 'npm', '/repo', async () =>
-      ok(VERSIONS)
+    const reversed = await maxSatisfyingRanges(
+      'release-it',
+      [B, A],
+      'npm',
+      '/repo',
+      NO_GATE,
+      async () => ok(VERSIONS)
     );
     // both orders yield 19.2.4 — the string-join bug would let one order pick the forbidden 20.2.1
     assert.equal(forward, '19.2.4');
@@ -128,22 +151,37 @@ describe('maxSatisfyingRanges', () => {
   });
 
   test('returns the single highest version satisfying one range', async () => {
-    const version = await maxSatisfyingRanges('release-it', [B], 'npm', '/repo', async () =>
-      ok(VERSIONS)
+    const version = await maxSatisfyingRanges(
+      'release-it',
+      [B],
+      'npm',
+      '/repo',
+      NO_GATE,
+      async () => ok(VERSIONS)
     );
     assert.equal(version, '20.2.1');
   });
 
   test('excludes prereleases', async () => {
-    const version = await maxSatisfyingRanges('pkg', ['>=6.0.0-0 <7'], 'npm', '/repo', async () =>
-      ok('["6.0.0-beta.1","6.0.0"]')
+    const version = await maxSatisfyingRanges(
+      'pkg',
+      ['>=6.0.0-0 <7'],
+      'npm',
+      '/repo',
+      NO_GATE,
+      async () => ok('["6.0.0-beta.1","6.0.0"]')
     );
     assert.equal(version, '6.0.0');
   });
 
   test('handles a package with a single published version (bare string, not array)', async () => {
-    const version = await maxSatisfyingRanges('pkg', ['^4.0.0'], 'npm', '/repo', async () =>
-      ok('"4.6.6"')
+    const version = await maxSatisfyingRanges(
+      'pkg',
+      ['^4.0.0'],
+      'npm',
+      '/repo',
+      NO_GATE,
+      async () => ok('"4.6.6"')
     );
     assert.equal(version, '4.6.6');
   });
@@ -154,6 +192,7 @@ describe('maxSatisfyingRanges', () => {
       ['^17.0.0', '^20.0.0'],
       'npm',
       '/repo',
+      NO_GATE,
       async () => ok(VERSIONS)
     );
     assert.equal(version, null);
@@ -161,7 +200,7 @@ describe('maxSatisfyingRanges', () => {
 
   test('returns null for an empty range list without querying', async () => {
     let called = false;
-    const version = await maxSatisfyingRanges('pkg', [], 'npm', '/repo', async () => {
+    const version = await maxSatisfyingRanges('pkg', [], 'npm', '/repo', NO_GATE, async () => {
       called = true;
       return ok(VERSIONS);
     });
@@ -171,13 +210,13 @@ describe('maxSatisfyingRanges', () => {
 
   test('returns null on a non-zero exit', async () => {
     assert.equal(
-      await maxSatisfyingRanges('pkg', ['^1'], 'npm', '/repo', async () => fail()),
+      await maxSatisfyingRanges('pkg', ['^1'], 'npm', '/repo', NO_GATE, async () => fail()),
       null
     );
   });
 
   test('returns null when exec throws', async () => {
-    const version = await maxSatisfyingRanges('pkg', ['^1'], 'npm', '/repo', async () => {
+    const version = await maxSatisfyingRanges('pkg', ['^1'], 'npm', '/repo', NO_GATE, async () => {
       throw new Error('spawn error');
     });
     assert.equal(version, null);
@@ -216,5 +255,184 @@ describe('peerDependenciesOf', () => {
       throw new Error('spawn error');
     });
     assert.deepEqual(peers, {});
+  });
+});
+
+const NOW = Date.parse('2026-09-14T12:00:00Z');
+const HOUR = 3_600_000;
+
+/** A `view` executor answering `version`, `version time`, `versions --json` and `time --json`
+ * from one fixture — the same shapes npm/pnpm return. */
+function registry(latest: string, times: Record<string, string>) {
+  const time = { created: '2020-01-01T00:00:00Z', ...times };
+  return async (cmd: string[]): Promise<ExecResult> => {
+    if (cmd.includes('version') && cmd.includes('time')) {
+      return ok(JSON.stringify({ version: latest, time }));
+    }
+    if (cmd.includes('time')) {
+      return ok(JSON.stringify(time));
+    }
+    if (cmd.includes('versions')) {
+      return ok(JSON.stringify(Object.keys(times)));
+    }
+    return ok(`${latest}\n`);
+  };
+}
+
+const gate = (seconds: number, excludes: string[] = [], extra: Partial<ReleaseAgePolicy> = {}) => ({
+  policy: {
+    seconds,
+    excludes,
+    strict: true,
+    ignoreMissingTime: true,
+    source: 'test',
+    ...extra,
+  } satisfies ReleaseAgePolicy,
+  now: NOW,
+});
+
+const TIMES = {
+  '1.0.0': new Date(NOW - 40 * HOUR).toISOString(),
+  '1.1.0': new Date(NOW - 30 * HOUR).toISOString(),
+  '1.2.0': new Date(NOW - 2 * HOUR).toISOString(),
+};
+
+describe('publishTimes', () => {
+  test('drops the non-version keys and parses timestamps', async () => {
+    const times = await publishTimes('lit', 'npm', '/repo', registry('1.2.0', TIMES));
+    assert.deepEqual(Object.keys(times), ['1.0.0', '1.1.0', '1.2.0']);
+    assert.equal(times['1.2.0'], Date.parse(TIMES['1.2.0']));
+  });
+
+  test('is empty when the tool fails', async () => {
+    assert.deepEqual(await publishTimes('lit', 'npm', '/repo', async () => fail()), {});
+  });
+});
+
+describe('latestEligibleVersion', () => {
+  test('returns latest untouched without a gate — and never calls the registry twice', async () => {
+    const calls: string[][] = [];
+    const version = await latestEligibleVersion('lit', 'npm', '/repo', NO_GATE, async cmd => {
+      calls.push(cmd);
+      return ok('1.2.0\n');
+    });
+    assert.equal(version, '1.2.0');
+    assert.equal(calls.length, 1);
+  });
+
+  test('resolves version + times in a single registry call under a gate', async () => {
+    const calls: string[][] = [];
+    const answer = registry('1.2.0', TIMES);
+    const version = await latestEligibleVersion('lit', 'npm', '/repo', gate(86_400), async cmd => {
+      calls.push(cmd);
+      return answer(cmd);
+    });
+    assert.equal(version, '1.1.0');
+    assert.equal(calls.length, 1);
+  });
+
+  test('returns latest when it already cleared the cooldown', async () => {
+    const version = await latestEligibleVersion(
+      'lit',
+      'npm',
+      '/repo',
+      gate(HOUR / 1000),
+      registry('1.2.0', TIMES)
+    );
+    assert.equal(version, '1.2.0');
+  });
+
+  test('walks back to the newest version past the cooldown', async () => {
+    const version = await latestEligibleVersion(
+      'lit',
+      'npm',
+      '/repo',
+      gate(86_400),
+      registry('1.2.0', TIMES)
+    );
+    assert.equal(version, '1.1.0');
+  });
+
+  test('an exempt package keeps the fresh latest', async () => {
+    const version = await latestEligibleVersion(
+      'lit',
+      'npm',
+      '/repo',
+      gate(86_400, ['lit']),
+      registry('1.2.0', TIMES)
+    );
+    assert.equal(version, '1.2.0');
+  });
+
+  test('an unknown publish time is eligible by default', async () => {
+    const version = await latestEligibleVersion(
+      'lit',
+      'npm',
+      '/repo',
+      gate(86_400),
+      registry('9.9.9', TIMES)
+    );
+    assert.equal(version, '9.9.9');
+  });
+
+  test('ignoreMissingTime: false blocks a version without a publish time', async () => {
+    const version = await latestEligibleVersion(
+      'lit',
+      'npm',
+      '/repo',
+      gate(86_400, [], { ignoreMissingTime: false }),
+      registry('9.9.9', TIMES)
+    );
+    assert.equal(version, '1.1.0');
+  });
+
+  test('a strict gate leaves the dependency alone when nothing cleared the cooldown', async () => {
+    const version = await latestEligibleVersion(
+      'lit',
+      'npm',
+      '/repo',
+      gate(10 * 365 * 86_400),
+      registry('1.2.0', TIMES)
+    );
+    assert.equal(version, null);
+  });
+
+  test('a non-strict gate falls back to the blocked version, like pnpm does', async () => {
+    const version = await latestEligibleVersion(
+      'lit',
+      'npm',
+      '/repo',
+      gate(10 * 365 * 86_400, [], { strict: false }),
+      registry('1.2.0', TIMES)
+    );
+    assert.equal(version, '1.2.0');
+  });
+});
+
+describe('latestVersionInRange with a gate', () => {
+  test('stays inside the range while walking back', async () => {
+    const version = await latestVersionInRange(
+      'lit',
+      '1.x',
+      'npm',
+      '/repo',
+      gate(86_400),
+      registry('1.2.0', TIMES)
+    );
+    assert.equal(version, '1.1.0');
+  });
+});
+
+describe('maxSatisfyingRanges with a gate', () => {
+  test('skips a match that is still within the cooldown', async () => {
+    const version = await maxSatisfyingRanges(
+      'lit',
+      ['^1.0.0'],
+      'npm',
+      '/repo',
+      gate(86_400),
+      registry('1.2.0', TIMES)
+    );
+    assert.equal(version, '1.1.0');
   });
 });

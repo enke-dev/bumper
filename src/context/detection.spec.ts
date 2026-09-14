@@ -10,6 +10,7 @@ import { defaultRepoConfig } from '../config/config.js';
 import { detectModules } from '../modules/module.registry.js';
 import { EXAMPLES } from '../testing/with-fixture.harness.js';
 import { withTempDir } from '../testing/with-temp-dir.harness.js';
+import { NO_RELEASE_AGE } from '../utils/release-age.utils.js';
 import type { ModuleContext } from './context.types.js';
 import { PackageManager, Runtime, VersionManager } from './context.types.js';
 import { detectPackageManager } from './detectors/package-manager.detector.js';
@@ -36,6 +37,7 @@ async function detect(dir: string): Promise<{ ctx: ModuleContext; used: Set<stri
     workspaces,
     versionManager: VersionManager.None,
     config: defaultRepoConfig(),
+    releaseAge: NO_RELEASE_AGE,
     dryRun: false,
   };
   const modules = await detectModules(ctx);

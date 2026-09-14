@@ -1,4 +1,5 @@
 import type { RepoConfig } from '../config/config.types.js';
+import type { ReleaseAgePolicy } from '../utils/release-age.utils.js';
 
 /** JavaScript runtime a repo targets. */
 export enum Runtime {
@@ -60,6 +61,12 @@ export interface ModuleContext {
   bunLatest?: BunRelease;
   /** Resolved per-repo config (excludes, module toggles). */
   config: RepoConfig;
+  /**
+   * The minimum-release-age cooldown the repo's package manager enforces on install (bun's
+   * `bunfig.toml`, pnpm's `pnpm-workspace.yaml`/default). Version resolution stays inside it, so
+   * a bump can't pick a release the install would then refuse.
+   */
+  releaseAge: ReleaseAgePolicy;
   /**
    * Dependency names owned by the active modules; the generic bump skips them so each
    * owning module pins its own package. Populated by `runUpdate` before modules run.

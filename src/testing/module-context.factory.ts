@@ -5,6 +5,7 @@
 import { defaultRepoConfig } from '../config/config.js';
 import type { BunRelease, ModuleContext, NodeLts } from '../context/context.types.js';
 import { PackageManager, Runtime, VersionManager } from '../context/context.types.js';
+import { NO_RELEASE_AGE } from '../utils/release-age.utils.js';
 
 /** Pinned Node LTS so update paths never touch the network (`ensureNodeLts` reads `ctx.nodeLts`). */
 export const NODE_LTS: NodeLts = { version: '22.15.1', major: 22 };
@@ -23,6 +24,7 @@ export function contextFor(cwd: string, dryRun = false, exclude: string[] = []):
     nodeLts: { ...NODE_LTS },
     bunLatest: { ...BUN_LATEST },
     config: { ...defaultRepoConfig(), exclude },
+    releaseAge: NO_RELEASE_AGE,
     dryRun,
   };
 }

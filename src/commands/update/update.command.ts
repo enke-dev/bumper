@@ -48,18 +48,41 @@ async function commitChanges(cwd: string, dryRun: boolean): Promise<void> {
   process.stdout.write(`${GREEN}✓${RESET} Committed "${COMMIT_SUBJECT}"\n`);
 }
 
+/** `--min-release-age` as whole seconds. Anything non-numeric is rejected rather than silently
+ * ignored — a typo'd cooldown would otherwise resolve versions the install goes on to refuse. */
+function parseMinReleaseAge(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!/^\d+$/.test(value.trim())) {
+    throw new Error(`--min-release-age expects a number of seconds, got "${value}"`);
+  }
+  return Number(value.trim());
+}
+
 async function run({ values, positionals }: CommandContext): Promise<void> {
   const cwd = resolve(positionals[0] ?? process.cwd());
   const dryRun = values['dry-run'] ?? false;
   const ignoreConfig = values['ignore-config'] ?? false;
   const exclude = (values.exclude ?? []).map(entry => entry.trim()).filter(Boolean);
-  const { ctx, configCreated } = await buildContext(cwd, { dryRun, exclude, ignoreConfig });
+  const minReleaseAge = parseMinReleaseAge(values['min-release-age']);
+  const { ctx, configCreated } = await buildContext(cwd, {
+    dryRun,
+    exclude,
+    ignoreConfig,
+    minReleaseAge,
+  });
   if (configCreated) {
     process.stdout.write(`${DIM}Discovered new repo, wrote entry to ${configPath()}${RESET}\n`);
   }
   process.stdout.write(
     `${BOLD}${CYAN}Updating${RESET} ${ctx.cwd}${dryRun ? `${DIM} (dry run)${RESET}` : ''}\n`
   );
+  if (ctx.releaseAge.seconds > 0) {
+    process.stdout.write(
+      `${DIM}Resolving versions at least ${ctx.releaseAge.seconds}s old (${ctx.releaseAge.source})${RESET}\n`
+    );
+  }
 
   // check for a newer bumper concurrently with the update, so its network latency is absorbed by
   // the module work. --skip-update-check (this run) overrides the global skipVersionCheck (default off).
@@ -115,6 +138,8 @@ export const updateCommand: Command = {
       '--exclude, -e path  Repo-relative path skipped this run, not persisted (repeat for several)',
       '--ignore-config Ignore ~/.bumperrc; auto-detect everything, read + write nothing',
       '--skip-update-check  Skip the newer-bumper check for this run',
+      '--min-release-age n  Only resolve versions published at least n seconds ago',
+      "                     (default: the package manager's own cooldown; 0 disables)",
     ],
   }),
 };

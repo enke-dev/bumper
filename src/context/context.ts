@@ -1,5 +1,6 @@
 import { defaultRepoConfig, resolveForPath } from '../config/config.js';
 import { isExcluded } from '../utils/fs.utils.js';
+import { detectReleaseAge } from '../utils/release-age.utils.js';
 import type { ModuleContext } from './context.types.js';
 import { detectPackageManager } from './detectors/package-manager.detector.js';
 import { detectRuntime } from './detectors/runtime.detector.js';
@@ -12,6 +13,9 @@ export interface BuildContextOptions {
   exclude?: string[];
   /** Skip reading/writing `~/.bumperrc` entirely; run with pure auto-detection. */
   ignoreConfig?: boolean;
+  /** Force the minimum-release-age cooldown (seconds) instead of detecting the package
+   * manager's; `0` resolves without any cooldown. */
+  minReleaseAge?: number | undefined;
 }
 
 /** Run all detectors + resolve config into a single {@link ModuleContext}. */
@@ -32,6 +36,7 @@ export async function buildContext(
   ]);
   const { isMonorepo, workspaces } = await detectWorkspaces(cwd, packageManager);
   const versionManager = detectVersionManager();
+  const releaseAge = await detectReleaseAge(cwd, packageManager, options.minReleaseAge);
 
   const ctx: ModuleContext = {
     cwd,
@@ -41,6 +46,7 @@ export async function buildContext(
     workspaces: workspaces.filter(dir => !isExcluded(cwd, dir, exclude)),
     versionManager,
     config,
+    releaseAge,
     dryRun: options.dryRun ?? false,
   };
   return { ctx, configCreated: created, configExclude: stored.exclude };

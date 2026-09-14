@@ -75,7 +75,10 @@ export async function updateTypesBun(
     TYPES_BUN_PACKAGE,
     `<=${bunVersion}`,
     viewTool(ctx.packageManager),
-    ctx.cwd
+    ctx.cwd,
+    // the pin must clear the package manager's minimum-release-age gate too, or the install
+    // that follows refuses the very version this feature just wrote.
+    { policy: ctx.releaseAge }
   );
   if (!version) {
     return;

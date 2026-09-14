@@ -147,6 +147,7 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | `--skip <id>`            |    yes     | Run everything **except** the named module(s).                                               |
 | `--exclude`, `-e <path>` |    yes     | Skip a repo-relative path this run only, without editing config (see [Excludes](#excludes)). |
 | `--ignore-config`        |     no     | Ignore `~/.bumperrc` for this run — auto-detect everything, read + write nothing.            |
+| `--min-release-age <s>`  |     no     | Only resolve versions published at least `<s>` seconds ago; `0` disables the cooldown.       |
 | `--json`                 |     no     | `detect` only — emit machine-readable detection output.                                      |
 
 `--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `bun-runtime`,
@@ -160,6 +161,7 @@ bumper update --skip github-actions                   # everything but the actio
 bumper update --exclude examples                      # skip a path this run, without editing config
 bumper update --exclude examples --exclude fixtures   # repeat the flag for several
 bumper update --ignore-config                         # ignore stored excludes/toggles, pure auto-detect
+bumper update --min-release-age 604800                # only resolve versions at least a week old
 bumper update --commit                                # update, then commit with a summary
 bumper update --commit --format                       # update, format, then commit everything
 bumper update --commit --approve                      # update, approve scripts, then commit everything
@@ -187,6 +189,55 @@ untouched and the commit carries no unrelated reformat noise.
 `--ignore-config` bypasses `~/.bumperrc` completely: no entry is read for the target repo and, for
 an unknown repo, none is written. Stored excludes and module toggles are skipped — use it to run
 exactly what auto-detection finds, or to preview a repo without persisting a default entry.
+
+### Minimum release age
+
+Package managers can quarantine freshly published releases as a supply-chain guard: bun's
+`bunfig.toml` (`[install] minimumReleaseAge`, in **seconds**), pnpm's `pnpm-workspace.yaml`
+(`minimumReleaseAge`, in **minutes** — and enabled by default at 1440 from pnpm 11). An install
+then refuses any version published inside that window:
+
+```
+error: Version "@release-it/conventional-changelog@12.0.2" was published within minimum release age of 86400 seconds
+```
+
+bumper reads that setting before resolving anything and **stays inside the cooldown**: every
+dependency lands on the newest version that already cleared it, instead of on a `latest` the
+install would reject. The `minimumReleaseAgeExcludes` / `minimumReleaseAgeExclude` allowlists are
+honored too (`name`, `@scope/*` and `name@range` entries), and the run prints the cooldown it
+detected:
+
+```
+Resolving versions at least 86400s old (bunfig.toml)
+```
+
+pnpm's surrounding semantics are mirrored rather than reinvented, so a bump resolves what pnpm
+itself would:
+
+| pnpm setting                         | Default                            | What bumper does                                                                                                                                      |
+| ------------------------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `minimumReleaseAge`                  | `1440` minutes from pnpm 11        | Resolve inside the cooldown.                                                                                                                          |
+| `minimumReleaseAgeExclude`           | _(none)_                           | Exempt package, applied per name/glob/version.                                                                                                        |
+| `minimumReleaseAgeStrict`            | `true` if configured, else `false` | Strict: leave the dependency untouched when nothing cleared the cooldown. Non-strict: bump to the blocked version, which is what pnpm resolves there. |
+| `minimumReleaseAgeIgnoreMissingTime` | `true`                             | A version the registry reports no publish time for passes (or is blocked when `false`).                                                               |
+
+So a pnpm repo that never configured anything keeps installing exactly as pnpm would — the built-in
+cooldown is non-strict — while one that opted in gets the strict treatment it asked for. bun has no
+equivalent knobs and simply errors on a blocked version, so its gate is always strict with missing
+times ignored.
+
+`--min-release-age <seconds>` overrides the detected value — pass a larger one to be stricter than
+the repo's own policy, or `0` to resolve plain `latest` again (which is what bumper did before, and
+will fail the install if the package manager's own gate is still in force). An explicit value is
+strict. npm has no equivalent setting, so npm repos are never gated. Without a cooldown, resolution
+makes no extra registry calls.
+
+`bumper detect` reports the gate it found, in both the human and the `--json` output:
+
+```sh
+bumper detect --json | jq .releaseAge
+# { "seconds": 86400, "excludes": [], "strict": false, "ignoreMissingTime": true, "source": "pnpm 11 default" }
+```
 
 ## Modules
 
@@ -259,18 +310,19 @@ the PR), as shown above.
 
 All inputs are optional.
 
-| Input       | Default                      | Description                                                                                                  |
-| ----------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `base`      | repository default branch    | Base branch for the PR.                                                                                      |
-| `branch`    | `chore/bumper-update`        | Branch name used for the update commit and PR.                                                               |
-| `pr-title`  | `chore: update dependencies` | Title of the created or updated PR.                                                                          |
-| `pr-labels` | _(none)_                     | Comma-separated labels to apply to the PR (labels must already exist in the repo).                           |
-| `only`      | _(all modules)_              | Run only the listed module ids (comma-separated, e.g. `node,pnpm`).                                          |
-| `skip`      | _(none)_                     | Skip the listed module ids (comma-separated, e.g. `docker-node`).                                            |
-| `exclude`   | _(none)_                     | Space-separated repo-relative paths to exclude (e.g. `examples fixtures`).                                   |
-| `format`    | `false`                      | Run the repo's formatter after the update (equivalent to `--format` / `-f`).                                 |
-| `approve`   | `false`                      | Approve install scripts after the update, pnpm/npm only (equivalent to `--approve` / `-a`).                  |
-| `token`     | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows). |
+| Input             | Default                      | Description                                                                                                             |
+| ----------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `base`            | repository default branch    | Base branch for the PR.                                                                                                 |
+| `branch`          | `chore/bumper-update`        | Branch name used for the update commit and PR.                                                                          |
+| `pr-title`        | `chore: update dependencies` | Title of the created or updated PR.                                                                                     |
+| `pr-labels`       | _(none)_                     | Comma-separated labels to apply to the PR (labels must already exist in the repo).                                      |
+| `only`            | _(all modules)_              | Run only the listed module ids (comma-separated, e.g. `node,pnpm`).                                                     |
+| `skip`            | _(none)_                     | Skip the listed module ids (comma-separated, e.g. `docker-node`).                                                       |
+| `exclude`         | _(none)_                     | Space-separated repo-relative paths to exclude (e.g. `examples fixtures`).                                              |
+| `min-release-age` | _(package manager's own)_    | Only resolve versions published at least N seconds ago (see [Minimum release age](#minimum-release-age)); `0` disables. |
+| `format`          | `false`                      | Run the repo's formatter after the update (equivalent to `--format` / `-f`).                                            |
+| `approve`         | `false`                      | Approve install scripts after the update, pnpm/npm only (equivalent to `--approve` / `-a`).                             |
+| `token`           | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows).            |
 
 Module ids are the values from the `id` column in the [Modules](#modules) table.
 

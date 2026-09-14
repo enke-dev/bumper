@@ -32,10 +32,24 @@ const PROPAGATION_LAG_MARKERS = [
  * alternative — failing the bump and rerunning `bumper update` from scratch — costs minutes. */
 const PROPAGATION_RETRY_DELAY_MS = 15_000;
 
+/**
+ * Wording every package manager uses when its *minimum release age* gate refuses a version that
+ * was published too recently (bun: `was published within minimum release age of N seconds`;
+ * pnpm: `... is not old enough`/`minimumReleaseAge`). Not a propagation lag: waiting 15s changes
+ * nothing, the cooldown is hours or days.
+ */
+const RELEASE_AGE_MARKERS = ['minimum release age', 'minimumReleaseAge', 'minimum-release-age'];
+
 /** Whether a failed install output carries a propagation-lag marker. Exported for tests. */
 export function isPropagationLag(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return PROPAGATION_LAG_MARKERS.some(marker => message.includes(marker));
+}
+
+/** Whether a failed install was refused by the package manager's release-age cooldown. */
+export function isReleaseAgeBlock(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return RELEASE_AGE_MARKERS.some(marker => message.includes(marker));
 }
 
 /**
@@ -53,6 +67,14 @@ export async function installWithRetry(
     await execOk(cmd, { cwd });
   } catch (error) {
     if (!isPropagationLag(error)) {
+      if (isReleaseAgeBlock(error)) {
+        // bumper normally resolves inside the gate (see ReleaseAgePolicy); landing here means the
+        // cooldown wasn't detected — say so, instead of leaving a bare package-manager error.
+        stepNote(
+          'the package manager refused a version under its minimum-release-age cooldown; ' +
+            'set it explicitly with `--min-release-age <seconds>`'
+        );
+      }
       throw error;
     }
     stepNote(

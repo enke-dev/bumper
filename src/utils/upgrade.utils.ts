@@ -5,8 +5,9 @@ import { isLess, isValid, satisfies } from 'verkit';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { allDependencies, pathExists, readPackageJson, writePackageJson } from './fs.utils.js';
+import type { ReleaseAgeGate } from './npm-registry.utils.js';
 import {
-  latestVersion,
+  latestEligibleVersion,
   maxSatisfyingRanges,
   peerDependenciesOf,
   viewTool,
@@ -45,11 +46,18 @@ export interface RegistryLookups {
   ) => Promise<Record<string, string>>;
 }
 
-const defaultLookups: RegistryLookups = {
-  latestVersion,
-  maxSatisfyingRanges,
-  peerDependencies: peerDependenciesOf,
-};
+/**
+ * The real, network-backed lookups, bound to the repo's minimum-release-age gate so every
+ * resolved version is one the subsequent install will actually accept.
+ */
+export function registryLookups(gate: ReleaseAgeGate): RegistryLookups {
+  return {
+    latestVersion: (pkg, tool, cwd) => latestEligibleVersion(pkg, tool, cwd, gate),
+    maxSatisfyingRanges: (pkg, ranges, tool, cwd) =>
+      maxSatisfyingRanges(pkg, ranges, tool, cwd, gate),
+    peerDependencies: peerDependenciesOf,
+  };
+}
 
 async function collectPackages(ctx: ModuleContext): Promise<Map<string, PackageJson>> {
   const entries = await Promise.all(
@@ -311,7 +319,7 @@ async function bumpPackageManagerField(
 /** Rewrite every bumpable dependency spec across the workspace to latest. */
 export async function upgradeAllWorkspaces(
   ctx: ModuleContext,
-  lookups: RegistryLookups = defaultLookups
+  lookups: RegistryLookups = registryLookups({ policy: ctx.releaseAge })
 ): Promise<void> {
   const managed = ctx.managedDependencies ?? new Set<string>();
   const pkgs = await collectPackages(ctx);

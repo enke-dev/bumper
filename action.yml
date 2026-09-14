@@ -40,6 +40,11 @@ inputs:
   exclude:
     description: Space-separated repo-relative paths to exclude (e.g. "examples fixtures")
     default: ''
+  min-release-age:
+    description: >-
+      Only resolve versions published at least N seconds ago (equivalent to --min-release-age).
+      Defaults to the cooldown the repo's package manager enforces itself; "0" disables it.
+    default: ''
   format:
     description: Run the repo's formatter after the update (equivalent to --format / -f)
     default: 'true'
@@ -190,6 +195,9 @@ runs:
           for p in ${{ inputs.exclude }}; do
             args="$args --exclude $p"
           done
+        fi
+        if [ -n "${{ inputs.min-release-age }}" ]; then
+          args="$args --min-release-age ${{ inputs.min-release-age }}"
         fi
         if [ "${{ inputs.format }}" = "true" ]; then
           args="$args --format"

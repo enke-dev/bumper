@@ -11,6 +11,7 @@ export const cliOptions = {
   exclude: { type: 'string', multiple: true, short: 'e' },
   'ignore-config': { type: 'boolean' },
   'skip-update-check': { type: 'boolean' },
+  'min-release-age': { type: 'string' },
   commit: { type: 'boolean', short: 'c' },
   format: { type: 'boolean', short: 'f' },
   approve: { type: 'boolean', short: 'a' },

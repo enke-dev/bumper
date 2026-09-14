@@ -24,6 +24,7 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
           isMonorepo: ctx.isMonorepo,
           workspaces: ctx.workspaces,
           versionManager: ctx.versionManager,
+          releaseAge: ctx.releaseAge,
           config: ctx.config,
           configCreated,
           modules,
@@ -44,6 +45,12 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
   process.stdout.write(`  package manager   ${val(ctx.packageManager)}\n`);
   process.stdout.write(`  is monorepo       ${val(ctx.isMonorepo)} (${pkgCount} ${pkgLabel})\n`);
   process.stdout.write(`  version manager   ${val(ctx.versionManager)}\n`);
+  if (ctx.releaseAge.seconds > 0) {
+    const mode = ctx.releaseAge.strict ? 'strict' : 'non-strict';
+    process.stdout.write(
+      `  release age       ${val(`${ctx.releaseAge.seconds}s`)} ${DIM}(${ctx.releaseAge.source}, ${mode})${RESET}\n`
+    );
+  }
   if (ctx.config.exclude.length > 0) {
     const rows = ctx.config.exclude.map(path => {
       const fromConfig = !ignoreConfig && configExclude.includes(path);
