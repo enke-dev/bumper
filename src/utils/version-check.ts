@@ -1,4 +1,4 @@
-import { isGreater, isValid } from 'verkit';
+import { isGreaterThan, isValid } from 'verkit';
 
 import { PackageManager } from '../context/context.types.js';
 import type { InstallChannel } from './channel.js';
@@ -30,7 +30,7 @@ export function checkForSelfUpdate(
   run: typeof exec = exec
 ): Promise<string | null> {
   return latestVersion(SELF, viewTool(pm), cwd, run).then(latest =>
-    latest && isValid(latest) && isValid(current) && isGreater(latest, current) ? latest : null
+    latest && isValid(latest) && isValid(current) && isGreaterThan(latest, current) ? latest : null
   );
 }
 

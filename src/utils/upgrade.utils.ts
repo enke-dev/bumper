@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { isLess, isValid, satisfies } from 'verkit';
+import { isLessThan, isValid, satisfies } from 'verkit';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { allDependencies, pathExists, readPackageJson, writePackageJson } from './fs.utils.js';
@@ -457,7 +457,7 @@ async function rewriteSpecs(
       //    pin still satisfying them — typically a prerelease the stable-only cap resolution
       //    skipped — must be kept, not downgraded to the newest stable.
       const current = spec.replace(/^[\^~]/, '');
-      if (isValid(current) && isLess(version, current)) {
+      if (isValid(current) && isLessThan(version, current)) {
         const currentViolatesCaps =
           capped_ && !(capRanges.get(name) ?? []).every(range => satisfies(current, range));
         if (!currentViolatesCaps) {
@@ -480,7 +480,7 @@ async function rewriteSpecs(
 /** Remember the version `name` landed on; when manifests disagree the lowest (most constrained) wins. */
 function recordApplied(applied: Map<string, string>, name: string, version: string): void {
   const previous = applied.get(name);
-  if (previous === undefined || isLess(version, previous)) {
+  if (previous === undefined || isLessThan(version, previous)) {
     applied.set(name, version);
   }
 }

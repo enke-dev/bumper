@@ -1,4 +1,4 @@
-import { isGreater, isValid } from 'verkit';
+import { isGreaterThan, isValid } from 'verkit';
 
 import pkg from '../../../package.json';
 import { installChannel } from '../../utils/channel.js';
@@ -32,7 +32,7 @@ async function run(): Promise<void> {
     process.stdout.write(`${YELLOW}couldn't resolve the latest version (offline?)${RESET}\n`);
     return;
   }
-  if (!isValid(current) || !isGreater(latest, current)) {
+  if (!isValid(current) || !isGreaterThan(latest, current)) {
     process.stdout.write(`${GREEN}bumper ${current} is already up to date${RESET}\n`);
     return;
   }

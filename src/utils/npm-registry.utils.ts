@@ -1,4 +1,4 @@
-import { compareReversed, isLessOrEqual, isStable, satisfies } from 'verkit';
+import { compareReversed, isLessThanOrEqual, isStable, satisfies } from 'verkit';
 
 import { PackageManager } from '../context/context.types.js';
 import { exec, execOk } from './exec.utils.js';
@@ -139,7 +139,7 @@ function pickEligible(
     return candidate;
   }
   const older = Object.keys(times).filter(
-    version => isStable(version) && isLessOrEqual(version, candidate) && accept(version)
+    version => isStable(version) && isLessThanOrEqual(version, candidate) && accept(version)
   );
   const fallback = eligibleVersions(older, pkg, times, cutoff, policy).sort(compareReversed)[0];
   if (fallback !== undefined) {
