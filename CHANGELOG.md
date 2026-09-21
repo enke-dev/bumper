@@ -1,5 +1,7 @@
 # @enke.dev/bumper
 
+## [0.13.5](https://github.com/enke-dev/bumper/compare/0.13.4...0.13.5) (2026-09-21)
+
 ## [0.13.4](https://github.com/enke-dev/bumper/compare/0.13.3...0.13.4) (2026-09-14)
 
 ### Bug Fixes
