@@ -54,6 +54,13 @@ export async function latestVersion(
 export interface ReleaseAgeGate {
   policy: ReleaseAgePolicy;
   now?: number;
+  /** Packages the gate doesn't apply to this run (`--allow-young`). */
+  allowYoung?: readonly string[];
+}
+
+/** The gate's cutoff for one package: null when no gate applies, or the package may be young. */
+function cutoffFor(gate: ReleaseAgeGate, pkg: string): number | null {
+  return gate.allowYoung?.includes(pkg) ? null : releaseAgeCutoff(gate.policy, gate.now);
 }
 
 /** The open gate: used whenever a caller resolves without a policy. */
@@ -160,7 +167,7 @@ async function clampToEligible(
   run: typeof exec,
   accept: (version: string) => boolean = () => true
 ): Promise<string | null> {
-  const cutoff = releaseAgeCutoff(gate.policy, gate.now);
+  const cutoff = cutoffFor(gate, pkg);
   if (cutoff === null) {
     return candidate;
   }
@@ -209,7 +216,7 @@ export async function latestEligibleVersion(
   gate: ReleaseAgeGate,
   run: typeof exec = exec
 ): Promise<string | null> {
-  const cutoff = releaseAgeCutoff(gate.policy, gate.now);
+  const cutoff = cutoffFor(gate, pkg);
   if (cutoff === null) {
     return latestVersion(pkg, tool, cwd, run);
   }
@@ -324,7 +331,7 @@ export async function maxSatisfyingRanges(
     const matching = versions
       .filter(v => isStable(v))
       .filter(v => ranges.every(range => satisfies(v, range)));
-    const cutoff = releaseAgeCutoff(gate.policy, gate.now);
+    const cutoff = cutoffFor(gate, pkg);
     // the cooldown applies here too: a peer cap that resolves to a just-published version is
     // refused by the same install gate as an unconstrained bump.
     const eligible =

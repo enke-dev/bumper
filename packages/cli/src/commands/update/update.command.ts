@@ -72,6 +72,7 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
     exclude,
     ignoreConfig,
     minReleaseAge,
+    allowYoung: values['allow-young'],
   });
   if (configCreated) {
     process.stdout.write(`${DIM}Discovered new repo, wrote entry to ${configPath()}${RESET}\n`);
@@ -141,6 +142,8 @@ export const updateCommand: Command = {
       '--skip-update-check  Skip the newer-bumper check for this run',
       '--min-release-age n  Only resolve versions published at least n seconds ago',
       "                     (default: the package manager's own cooldown; 0 disables)",
+      '--allow-young pkg    Let pkg resolve past the cooldown (repeat for several); pnpm gets a',
+      '                     version-pinned minimumReleaseAgeExclude rule, bun installs ungated',
     ],
   }),
 };

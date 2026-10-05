@@ -38,6 +38,7 @@ async function detect(dir: string): Promise<{ ctx: ModuleContext; used: Set<stri
     versionManager: VersionManager.None,
     config: defaultRepoConfig(),
     releaseAge: NO_RELEASE_AGE,
+    allowYoung: [],
     dryRun: false,
   };
   const modules = await detectModules(ctx);

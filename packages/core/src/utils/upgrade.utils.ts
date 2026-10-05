@@ -319,7 +319,10 @@ async function bumpPackageManagerField(
 /** Rewrite every bumpable dependency spec across the workspace to latest. */
 export async function upgradeAllWorkspaces(
   ctx: ModuleContext,
-  lookups: RegistryLookups = registryLookups({ policy: ctx.releaseAge })
+  lookups: RegistryLookups = registryLookups({
+    policy: ctx.releaseAge,
+    allowYoung: ctx.allowYoung,
+  })
 ): Promise<void> {
   const managed = ctx.managedDependencies ?? new Set<string>();
   const pkgs = await collectPackages(ctx);

@@ -16,6 +16,12 @@ export interface BuildContextOptions {
   /** Force the minimum-release-age cooldown (seconds) instead of detecting the package
    * manager's; `0` resolves without any cooldown. */
   minReleaseAge?: number | undefined;
+  /**
+   * Packages allowed to resolve to a version younger than the cooldown (from `--allow-young`):
+   * the ones another repo of the same workspace just released. The package managers' install
+   * gates are relaxed for exactly these (see `allow-young.utils.ts`).
+   */
+  allowYoung?: string[] | undefined;
 }
 
 /** Run all detectors + resolve config into a single {@link ModuleContext}. */
@@ -47,6 +53,7 @@ export async function buildContext(
     versionManager,
     config,
     releaseAge,
+    allowYoung: [...new Set(options.allowYoung ?? [])],
     dryRun: options.dryRun ?? false,
   };
   return { ctx, configCreated: created, configExclude: stored.exclude };

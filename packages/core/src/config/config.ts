@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+import { REPO_CONFIG_FIELDS } from './config.schema.js';
 import type { BumperConfig, RepoConfig } from './config.types.js';
 
 const CONFIG_PATH = join(homedir(), '.bumperrc');
@@ -11,17 +12,17 @@ export function configPath(): string {
   return CONFIG_PATH;
 }
 
-/** Default entry for a freshly discovered repo: fully auto-detected. */
+/** Default entry for a freshly discovered repo: fully auto-detected, every field at its default. */
 export function defaultRepoConfig(): RepoConfig {
-  return { exclude: [], modules: {} };
+  return normalizeRepoConfig({});
 }
 
-/** Fill in any missing fields on a stored entry. */
-function normalize(entry: Partial<RepoConfig>): RepoConfig {
-  return {
-    exclude: entry.exclude ?? [],
-    modules: entry.modules ?? {},
-  };
+/** Fill in any missing fields on a stored entry from the schema defaults; optional fields stay absent. */
+export function normalizeRepoConfig(entry: Partial<RepoConfig>): RepoConfig {
+  return REPO_CONFIG_FIELDS.reduce<Record<string, unknown>>((acc, field) => {
+    const value = entry[field.key] ?? field.default;
+    return value === undefined ? acc : { ...acc, [field.key]: structuredClone(value) };
+  }, {}) as unknown as RepoConfig;
 }
 
 /** Load `~/.bumperrc`, tolerating an absent or malformed file. */
@@ -55,7 +56,7 @@ export async function resolveForPath(
   const config = await loadConfig();
   const existing = config.repos[repoPath];
   if (existing) {
-    return { config: normalize(existing), created: false };
+    return { config: normalizeRepoConfig(existing), created: false };
   }
 
   const fresh = defaultRepoConfig();

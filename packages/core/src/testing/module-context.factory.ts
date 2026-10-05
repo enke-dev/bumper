@@ -25,6 +25,7 @@ export function contextFor(cwd: string, dryRun = false, exclude: string[] = []):
     bunLatest: { ...BUN_LATEST },
     config: { ...defaultRepoConfig(), exclude },
     releaseAge: NO_RELEASE_AGE,
+    allowYoung: [],
     dryRun,
   };
 }
