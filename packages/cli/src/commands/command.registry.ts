@@ -2,6 +2,7 @@ import type { Command } from './command.types.js';
 import { configCommand } from './config/config.command.js';
 import { detectCommand } from './detect/detect.command.js';
 import { helpCommand } from './help/help.command.js';
+import { manageCommand } from './manage/manage.command.js';
 import { updateCommand } from './update/update.command.js';
 import { upgradeCommand } from './upgrade/upgrade.command.js';
 import { versionCommand } from './version/version.command.js';
@@ -10,6 +11,7 @@ import { versionCommand } from './version/version.command.js';
 export const commands: Command[] = [
   detectCommand,
   updateCommand,
+  manageCommand,
   configCommand,
   upgradeCommand,
   versionCommand,

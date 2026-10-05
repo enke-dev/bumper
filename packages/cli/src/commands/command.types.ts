@@ -13,6 +13,8 @@ export const cliOptions = {
   'skip-update-check': { type: 'boolean' },
   'min-release-age': { type: 'string' },
   'allow-young': { type: 'string', multiple: true },
+  port: { type: 'string' },
+  'no-open': { type: 'boolean' },
   commit: { type: 'boolean', short: 'c' },
   format: { type: 'boolean', short: 'f' },
   approve: { type: 'boolean', short: 'a' },

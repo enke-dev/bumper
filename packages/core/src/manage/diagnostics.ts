@@ -113,6 +113,15 @@ export const registryAuth: DiagnosticCollector = async ({ repo, config, run }) =
     : [];
 };
 
+/** Collectors that need no git or registry call: cheap enough to re-run on every config edit. */
+export const FAST_COLLECTORS: readonly DiagnosticCollector[] = [
+  unsupportedRepo,
+  noChecksConfigured,
+  graphCycle,
+  ambiguousProducer,
+  branchMismatch,
+];
+
 export const DEFAULT_COLLECTORS: readonly DiagnosticCollector[] = [
   unsupportedRepo,
   noChecksConfigured,

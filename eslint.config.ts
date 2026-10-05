@@ -4,6 +4,11 @@ import { defineConfig } from 'eslint/config';
 export default defineConfig([
   ...nodeLibrary,
   {
+    // the GUI is imported as text from the ui package's build output, absent in a fresh checkout
+    files: ['**/*.ts'],
+    rules: { 'import/no-unresolved': ['error', { ignore: ['\\.html$'] }] },
+  },
+  {
     ignores: [
       '**/CHANGELOG.md',
       '**/dist/',

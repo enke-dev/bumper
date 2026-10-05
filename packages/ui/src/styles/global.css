@@ -1,0 +1,21 @@
+/* Page-level styles, excluded from vite-plugin-lit-css: stays a plain stylesheet. */
+@import '@awesome.me/webawesome/dist/styles/themes/default.css';
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--wa-font-family-body);
+  color: var(--wa-color-text-normal);
+  background: var(--wa-color-surface-default);
+}
+
+bumper-app {
+  flex: 1;
+  min-height: 0;
+}
