@@ -62,6 +62,19 @@ export async function currentBranch(dir: string, run: typeof exec = exec): Promi
   return exitCode === 0 && branch !== '' && branch !== 'HEAD' ? branch : null;
 }
 
+/** Local branch names (`git branch --format`), empty when git can't answer. */
+export async function localBranches(dir: string, run: typeof exec = exec): Promise<string[]> {
+  const { exitCode, stdout } = await run(['git', 'branch', '--format=%(refname:short)'], {
+    cwd: dir,
+  });
+  return exitCode === 0
+    ? stdout
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+    : [];
+}
+
 /** Describe one repo: manifests, package manager, published names, dependency names. */
 export async function inspectRepo(
   root: string,
@@ -69,7 +82,8 @@ export async function inspectRepo(
   run: typeof exec = exec
 ): Promise<RepoInfo> {
   const id = relative(root, dir).split(sep).join('/') || '.';
-  const base = { id, path: dir, branch: await currentBranch(dir, run) };
+  const [branch, branches] = await Promise.all([currentBranch(dir, run), localBranches(dir, run)]);
+  const base = { id, path: dir, branch, branches };
   const pkg = await readPackageJson(dir);
   if (pkg === null) {
     return {

@@ -5,12 +5,13 @@ import {
   saveConfig,
 } from '../config/config.js';
 import type { BumperConfig, RepoConfig } from '../config/config.types.js';
+import { moduleCatalog } from '../modules/module.registry.js';
 import { mapWithConcurrency } from '../utils/concurrency.utils.js';
 import type { exec as execFn } from '../utils/exec.utils.js';
 import { exec } from '../utils/exec.utils.js';
 import type { Diagnostic, DiagnosticCollector } from './diagnostics.js';
 import { collectDiagnostics, DEFAULT_COLLECTORS, FAST_COLLECTORS } from './diagnostics.js';
-import type { LogStream, RepoStatus, RunEvent } from './events.js';
+import type { RepoStatus, RunEvent } from './events.js';
 import type { RepoGraph } from './graph.js';
 import { buildGraph, stageOf } from './graph.js';
 import type { RepoRunOptions } from './runner.js';
@@ -18,47 +19,10 @@ import { RepoRun } from './runner.js';
 import { scanWorkspace } from './scan.js';
 import type { Runnable } from './scheduler.js';
 import { Scheduler } from './scheduler.js';
+import type { LogLine, RunRequest, SessionEvent, WorkspaceView } from './view.types.js';
 import type { RepoInfo, WorkspaceScan } from './workspace.types.js';
 
-/** A repo as the GUI sees it: scan data, graph position, config, diagnostics and run state. */
-export interface RepoView extends RepoInfo {
-  stage: number;
-  upstream: string[];
-  downstream: string[];
-  config: RepoConfig;
-  /** Whether `~/.bumperrc` has an entry (otherwise `config` is bumper's defaults). */
-  configured: boolean;
-  diagnostics: Diagnostic[];
-  status?: RepoStatus;
-  detail?: string;
-}
-
-export interface WorkspaceView {
-  root: string;
-  scannedAt: number;
-  stages: string[][];
-  cycles: string[][];
-  ambiguous: { name: string; repos: string[] }[];
-  repos: RepoView[];
-  running: boolean;
-}
-
-export interface LogLine {
-  stream: LogStream;
-  line: string;
-  at: number;
-}
-
-export type SessionEvent =
-  | RunEvent
-  | { type: 'workspace'; workspace: WorkspaceView }
-  | { type: 'run'; running: boolean; at: number };
-
-export interface RunRequest {
-  selection: string[];
-  /** Per-run "Ignore minimum release age". */
-  ignoreReleaseAge?: boolean;
-}
+export type { LogLine, RepoView, RunRequest, SessionEvent, WorkspaceView } from './view.types.js';
 
 /** Everything the session reaches outside its own state; tests inject fakes. */
 export interface SessionDeps {
@@ -163,6 +127,7 @@ export class ManageSession {
         cycles: [],
         ambiguous: [],
         repos: [],
+        modules: moduleCatalog(),
         running: false,
       };
     }
@@ -172,6 +137,7 @@ export class ManageSession {
       stages: graph.stages,
       cycles: graph.cycles,
       ambiguous: graph.ambiguous,
+      modules: moduleCatalog(),
       running: this.running,
       repos: scan.repos.map(repo => ({
         ...repo,

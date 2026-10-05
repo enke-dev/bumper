@@ -30,7 +30,9 @@ async function gitRepo(
 const run = async (cmd: string[]): Promise<ExecResult> =>
   cmd[1] === 'rev-parse'
     ? { exitCode: 0, stdout: 'main\n', stderr: '' }
-    : { exitCode: 1, stdout: '', stderr: '' };
+    : cmd[1] === 'branch'
+      ? { exitCode: 0, stdout: 'main\nchore/deps\n', stderr: '' }
+      : { exitCode: 1, stdout: '', stderr: '' };
 
 beforeEach(async () => {
   root = await makeTempDir('scan');
@@ -80,6 +82,7 @@ describe('manage scan', () => {
     assert.deepEqual(mono?.published, [{ name: '@o/lib', registry: 'https://npm.pkg.github.com' }]);
     assert.deepEqual(mono?.dependencies.sort(), ['@o/lib', 'eslint', 'lit']);
     assert.equal(mono?.branch, 'main');
+    assert.deepEqual(mono?.branches, ['main', 'chore/deps']);
 
     const plain = repos.find(r => r.id === 'o/plain');
     assert.equal(plain?.packageManager, null);

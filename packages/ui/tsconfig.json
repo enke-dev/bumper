@@ -6,7 +6,7 @@
     "moduleResolution": "bundler",
     "target": "ESNext",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "exactOptionalPropertyTypes": false,

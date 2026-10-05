@@ -28,7 +28,7 @@
     "test:bun": "bun test --reporter=junit --reporter-outfile=reports/junit.bun.xml",
     "test:node": "node --import tsx --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/junit.node.xml \"packages/*/src/**/*.spec.ts\"",
     "dev": "bun run --bun packages/cli/src/cli.ts",
-    "build": "bun run --filter @enke.dev/bumper-ui build && bun run --filter @enke.dev/bumper build",
+    "build": "bun run --filter @enke.dev/bumper build",
     "build:binaries": "sh scripts/build-binaries.sh",
     "dev:ui": "bun run --filter @enke.dev/bumper-ui dev",
     "dev:manage": "bun run --bun packages/cli/src/cli.ts manage --port 3131 --no-open"

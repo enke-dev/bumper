@@ -19,6 +19,7 @@ function repo(id: string, published: string[], dependencies: string[]): RepoInfo
     published: published.map(name => ({ name })),
     dependencies,
     branch: 'main',
+    branches: ['main'],
   };
 }
 

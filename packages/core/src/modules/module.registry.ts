@@ -34,6 +34,11 @@ const MODULES: readonly Module[] = [
   githubActionsFeature,
 ];
 
+/** Every module's id, title and family — the static catalog the manage GUI renders toggles from. */
+export function moduleCatalog(): { id: string; title: string; kind: string }[] {
+  return MODULES.map(module => ({ id: module.id, title: module.title, kind: module.kind }));
+}
+
 export interface ModuleStatus {
   id: string;
   title: string;

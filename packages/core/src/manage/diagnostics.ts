@@ -1,17 +1,11 @@
 import type { RepoConfig } from '../config/config.types.js';
 import type { exec } from '../utils/exec.utils.js';
 import { isAuthFailure, viewTool } from '../utils/npm-registry.utils.js';
+import type { Diagnostic } from './diagnostics.types.js';
 import type { RepoGraph } from './graph.js';
 import type { RepoInfo } from './workspace.types.js';
 
-export type Severity = 'info' | 'warning' | 'error';
-
-export interface Diagnostic {
-  /** Stable machine id (`dirty-tree`, `graph-cycle`, …) the UI keys icons/filters on. */
-  code: string;
-  severity: Severity;
-  message: string;
-}
+export type { Diagnostic, Severity } from './diagnostics.types.js';
 
 export interface DiagnosticContext {
   repo: RepoInfo;

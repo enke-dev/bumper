@@ -21,10 +21,17 @@ const replaceAsync = async (
   pattern: RegExp,
   replacer: (match: string, group: string) => Promise<string>
 ): Promise<string> => {
-  const parts = await Promise.all(
-    [...text.matchAll(pattern)].map(match => replacer(match[0], match[1] ?? ''))
+  const matches = [...text.matchAll(pattern)];
+  const replacements = await Promise.all(matches.map(match => replacer(match[0], match[1] ?? '')));
+  // stitch: text before each match, then its replacement; split() would leak the capture groups
+  const { out, cursor } = matches.reduce(
+    (acc, match, i) => ({
+      out: `${acc.out}${text.slice(acc.cursor, match.index)}${replacements[i] ?? ''}`,
+      cursor: (match.index ?? 0) + match[0].length,
+    }),
+    { out: '', cursor: 0 }
   );
-  return text.split(pattern).reduce((acc, chunk, i) => `${acc}${chunk}${parts[i] ?? ''}`, '');
+  return `${out}${text.slice(cursor)}`;
 };
 
 const withScripts = await replaceAsync(

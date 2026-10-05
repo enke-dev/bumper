@@ -32,6 +32,7 @@ const repo = (extra: Partial<RepoInfo> = {}): RepoInfo => ({
   published: [{ name: 'repo' }],
   dependencies: [],
   branch: 'main',
+  branches: ['main'],
   ...extra,
 });
 

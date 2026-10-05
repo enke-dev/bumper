@@ -26,6 +26,8 @@ export interface RepoInfo {
   dependencies: string[];
   /** Branch the work tree is on; null when detached or not resolvable. */
   branch: string | null;
+  /** Local branches, for the push-branch picker. */
+  branches: string[];
 }
 
 export interface WorkspaceScan {

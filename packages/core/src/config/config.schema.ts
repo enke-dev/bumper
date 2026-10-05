@@ -29,14 +29,6 @@ export const REPO_CONFIG_FIELDS: readonly ConfigField[] = [
     placeholder: 'path...',
   },
   {
-    key: 'modules',
-    kind: 'boolean-map',
-    title: 'Module overrides',
-    description: 'Force a module on or off instead of auto-detecting it.',
-    default: {},
-    placeholder: 'modules.<id> true|false',
-  },
-  {
     key: 'branch',
     kind: 'string',
     title: 'Push branch',
@@ -61,6 +53,14 @@ export const REPO_CONFIG_FIELDS: readonly ConfigField[] = [
     description:
       'After pushing, wait for a new version on the registry before dependents start. Skipped for private packages.',
     default: true,
+  },
+  {
+    key: 'modules',
+    kind: 'boolean-map',
+    title: 'Module overrides',
+    description: 'Force a module on or off instead of auto-detecting it.',
+    default: {},
+    placeholder: 'modules.<id> true|false',
   },
 ];
 
