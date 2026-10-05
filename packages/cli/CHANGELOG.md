@@ -1,5 +1,14 @@
 # @enke.dev/bumper
 
+# [0.14.0](https://github.com/enke-dev/bumper/compare/0.13.6...0.14.0) (2026-10-05)
+
+### Features
+
+* add --allow-young and a shared config schema ([1dfcdcd](https://github.com/enke-dev/bumper/commit/1dfcdcd89384f012cc7f8e37e3bea3aece9bc7cc))
+* **cli:** add bmpr manage with a Bun-only local GUI server ([84dbf02](https://github.com/enke-dev/bumper/commit/84dbf0293381c301361de16ab0c55aee53f81a6c))
+* **core:** add manage workspace scan, graph, runner and scheduler ([db4abcd](https://github.com/enke-dev/bumper/commit/db4abcdb86f1fee7b190a3b1a55a8d56ffa4f917))
+* **ui:** add the manage GUI (Lit + Web Awesome) ([666b79a](https://github.com/enke-dev/bumper/commit/666b79a2cec3b9ca38f5806cbd7ad12a41527aa5))
+
 ## [0.13.6](https://github.com/enke-dev/bumper/compare/0.13.5...0.13.6) (2026-10-05)
 
 ## [0.13.5](https://github.com/enke-dev/bumper/compare/0.13.4...0.13.5) (2026-09-21)
