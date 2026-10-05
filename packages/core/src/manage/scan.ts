@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, realpath, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 
 import { PackageManager } from '../context/context.types.js';
@@ -20,20 +20,74 @@ const SKIP = new Set(['node_modules', 'dist', 'build', 'target', 'vendor']);
  * worktrees and submodules count). The walk stops at a repo and skips hidden dirs. Order is
  * stable (sorted by path) so ids and stages don't shuffle between scans.
  */
-export async function findRepos(root: string, depth = MAX_DEPTH): Promise<string[]> {
+export async function findRepos(
+  root: string,
+  depth = MAX_DEPTH,
+  seen = new Set<string>()
+): Promise<string[]> {
+  // symlinked dirs are followed; the real path dedupes a repo reachable twice and breaks loops
+  const real = await realpath(root).catch(() => null);
+  if (real === null || seen.has(real)) {
+    return [];
+  }
+  seen.add(real);
   if (await pathExists(join(root, '.git'))) {
     return [root];
   }
   if (depth === 0) {
     return [];
   }
-  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
-  const dirs = entries
-    .filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !SKIP.has(entry.name))
-    .map(entry => join(root, entry.name))
+  const names = (await readdir(root).catch(() => [])).filter(
+    name => !name.startsWith('.') && !SKIP.has(name)
+  );
+  const dirs = (
+    await Promise.all(
+      names.map(async name => {
+        const path = join(root, name);
+        const stats = await stat(path).catch(() => null);
+        return stats?.isDirectory() ? path : null;
+      })
+    )
+  )
+    .filter((path): path is string => path !== null)
     .sort();
-  const nested = await Promise.all(dirs.map(dir => findRepos(dir, depth - 1)));
+  const nested = await Promise.all(dirs.map(dir => findRepos(dir, depth - 1, seen)));
   return nested.flat();
+}
+
+/** `owner/name` of a GitHub repository reference — a URL in any spelling, the `github:owner/name`
+ * shorthand or a bare `owner/name` — lower-cased, or null for anything else. */
+export function githubSlug(url: string | undefined): string | null {
+  const match =
+    url?.match(/github\.com[/:]([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$/i) ??
+    url?.match(/^github:([^/#]+)\/([^/#]+)$/i) ??
+    url?.match(/^([\w.-]+)\/([\w.-]+)$/);
+  return match ? `${match[1]}/${match[2]}`.toLowerCase() : null;
+}
+
+/**
+ * A fork: a manifest says the project lives at one GitHub repo, `origin` points at another. The
+ * root manifest counts first, then the workspace members (a forked monorepo often declares
+ * `repository` only there). Decided locally, no API call; false whenever either side is unknown
+ * or not on GitHub.
+ */
+export async function isFork(
+  dir: string,
+  manifests: readonly PackageJson[],
+  run: typeof exec = exec
+): Promise<boolean> {
+  const declared =
+    manifests
+      .map(pkg =>
+        githubSlug(typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url)
+      )
+      .find((slug): slug is string => slug !== null) ?? null;
+  if (declared === null) {
+    return false;
+  }
+  const { exitCode, stdout } = await run(['git', 'remote', 'get-url', 'origin'], { cwd: dir });
+  const origin = exitCode === 0 ? githubSlug(stdout.trim()) : null;
+  return origin !== null && origin !== declared;
 }
 
 function publishedOf(manifests: PackageJson[]): PublishedPackage[] {
@@ -83,7 +137,7 @@ export async function inspectRepo(
 ): Promise<RepoInfo> {
   const id = relative(root, dir).split(sep).join('/') || '.';
   const [branch, branches] = await Promise.all([currentBranch(dir, run), localBranches(dir, run)]);
-  const base = { id, path: dir, branch, branches };
+  const base = { id, path: dir, branch, branches, fork: false };
   const pkg = await readPackageJson(dir);
   if (pkg === null) {
     return {
@@ -101,10 +155,12 @@ export async function inspectRepo(
   const manifests = (await Promise.all(workspaces.map(member => readPackageJson(member)))).filter(
     (manifest): manifest is PackageJson => manifest !== null
   );
+  const fork = await isFork(dir, manifests, run);
   const info: RepoInfo = {
     ...base,
     ...(pkg.name !== undefined ? { name: pkg.name } : {}),
     private: pkg.private === true,
+    fork,
     packageManager: unsupported === null ? packageManager : null,
     published: publishedOf(manifests),
     dependencies: [

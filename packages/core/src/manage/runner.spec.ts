@@ -33,6 +33,7 @@ const repo = (extra: Partial<RepoInfo> = {}): RepoInfo => ({
   dependencies: [],
   branch: 'main',
   branches: ['main'],
+  fork: false,
   ...extra,
 });
 

@@ -16,6 +16,8 @@ export interface RepoView extends RepoInfo {
   /** Whether `~/.bumperrc` has an entry (otherwise `config` is bumper's defaults). */
   configured: boolean;
   diagnostics: Diagnostic[];
+  /** Whether the slow (git/registry) diagnostics have run for this repo since the last scan. */
+  diagnosed: boolean;
   status?: RepoStatus;
   detail?: string;
 }
@@ -46,6 +48,7 @@ export interface LogLine {
 export type SessionEvent =
   | RunEvent
   | { type: 'workspace'; workspace: WorkspaceView }
+  | { type: 'diagnostics'; repo: string; diagnostics: Diagnostic[]; diagnosed: boolean; at: number }
   | { type: 'run'; running: boolean; at: number };
 
 export interface RunRequest {

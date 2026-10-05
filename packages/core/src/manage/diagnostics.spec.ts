@@ -23,6 +23,7 @@ function repo(
     dependencies,
     branch: 'main',
     branches: ['main'],
+    fork: false,
     ...extra,
   };
 }
@@ -102,6 +103,17 @@ describe('manage diagnostics', () => {
       run: fakeRun({}),
     });
     assert.deepEqual(z.map(d => d.code).sort(), ['ambiguous-producer', 'unsupported']);
+    const forked = repo('f', ['f'], [], { fork: true });
+    const fork = await collectDiagnostics({
+      repo: forked,
+      graph: buildGraph([forked]),
+      config: config(),
+      run: fakeRun({}),
+    });
+    assert.deepEqual(
+      fork.map(d => d.code),
+      ['fork']
+    );
   });
 
   test('registry auth is only checked when the wait applies', async () => {

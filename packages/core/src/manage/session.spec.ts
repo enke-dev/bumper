@@ -20,6 +20,7 @@ function repo(id: string, published: string[], dependencies: string[]): RepoInfo
     dependencies,
     branch: 'main',
     branches: ['main'],
+    fork: false,
   };
 }
 
@@ -149,6 +150,17 @@ describe('manage session', () => {
     session.retry('lint');
     assert.ok(runs.has('lint'));
     assert.equal(session.running, true);
+  });
+
+  test('diagnose runs the full collector set for one repo and broadcasts it', async () => {
+    const { session, events } = harness();
+    await session.scan();
+    assert.equal(session.view().repos[0]?.diagnosed, false);
+    const result = await session.diagnose('lint');
+    assert.deepEqual(result, []);
+    assert.equal(session.view().repos.find(r => r.id === 'lint')?.diagnosed, true);
+    assert.ok(events.some(e => e.type === 'diagnostics' && e.repo === 'lint' && e.diagnosed));
+    await assert.rejects(() => session.diagnose('ghost'), /unknown repo/);
   });
 
   test('start validates the selection', async () => {

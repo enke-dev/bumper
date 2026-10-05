@@ -28,6 +28,11 @@ export interface RepoInfo {
   branch: string | null;
   /** Local branches, for the push-branch picker. */
   branches: string[];
+  /**
+   * The manifest's `repository` points at another GitHub owner/name than `origin` does: a fork. Its
+   * published names produce no graph edges (the real package comes from the original project).
+   */
+  fork: boolean;
 }
 
 export interface WorkspaceScan {

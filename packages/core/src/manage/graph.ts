@@ -59,13 +59,14 @@ function cycles(ids: string[], upstream: Map<string, string[]>): string[][] {
 
 /**
  * Derive the repo dependency graph: an edge from a repo to every repo publishing one of its
- * dependencies. Private manifests never produce; a name published by several repos is reported as
+ * dependencies. Private manifests and forks never produce; a name published by several repos is reported as
  * ambiguous and produces no edge. Stages are Kahn layers; whatever can't be layered (cycles) is
  * appended as the final stage and listed in `cycles`.
  */
 export function buildGraph(repos: readonly RepoInfo[]): RepoGraph {
   const ids = repos.map(repo => repo.id);
   const claims = repos
+    .filter(repo => !repo.fork)
     .flatMap(repo => repo.published.map(pkg => [pkg.name, repo.id] as const))
     .reduce<Map<string, string[]>>(
       (acc, [name, id]) => acc.set(name, [...new Set([...(acc.get(name) ?? []), id])]),

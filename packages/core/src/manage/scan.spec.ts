@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
 import { PackageManager } from '../context/context.types.js';
 import { makeTempDir } from '../testing/with-temp-dir.harness.js';
 import type { ExecResult } from '../utils/exec.utils.js';
-import { findRepos, scanWorkspace } from './scan.js';
+import { findRepos, githubSlug, scanWorkspace } from './scan.js';
 
 let root: string;
 
@@ -28,11 +28,13 @@ async function gitRepo(
 }
 
 const run = async (cmd: string[]): Promise<ExecResult> =>
-  cmd[1] === 'rev-parse'
-    ? { exitCode: 0, stdout: 'main\n', stderr: '' }
-    : cmd[1] === 'branch'
-      ? { exitCode: 0, stdout: 'main\nchore/deps\n', stderr: '' }
-      : { exitCode: 1, stdout: '', stderr: '' };
+  cmd[1] === 'remote'
+    ? { exitCode: 0, stdout: 'git@github.com:me/plain.git\n', stderr: '' }
+    : cmd[1] === 'rev-parse'
+      ? { exitCode: 0, stdout: 'main\n', stderr: '' }
+      : cmd[1] === 'branch'
+        ? { exitCode: 0, stdout: 'main\nchore/deps\n', stderr: '' }
+        : { exitCode: 1, stdout: '', stderr: '' };
 
 beforeEach(async () => {
   root = await makeTempDir('scan');
@@ -92,6 +94,29 @@ describe('manage scan', () => {
     const empty = repos.find(r => r.id === 'o/empty');
     assert.equal(empty?.unsupported, 'no package.json');
     assert.equal(empty?.packageManager, null);
+  });
+
+  test('follows symlinked directories once and survives loops', async () => {
+    await gitRepo('real/a', { name: 'a' });
+    await symlink(join(root, 'real'), join(root, 'linked'));
+    await symlink(root, join(root, 'real/loop'));
+    const found = await findRepos(root);
+    // reached via `linked/a` or `real/a`, whichever sorts first — but exactly once
+    assert.equal(found.length, 1);
+    assert.equal(await realpath(found[0] as string), await realpath(join(root, 'real/a')));
+  });
+
+  test('a manifest pointing at another GitHub owner than origin marks a fork', async () => {
+    await gitRepo('o/plain', { name: 'plain', repository: 'github:upstream/plain' });
+    await gitRepo('o/own', {
+      name: 'own',
+      repository: { url: 'git+https://github.com/me/plain.git' },
+    });
+    const { repos } = await scanWorkspace(root, run);
+    assert.equal(repos.find(r => r.id === 'o/plain')?.fork, true);
+    assert.equal(repos.find(r => r.id === 'o/own')?.fork, false);
+    assert.equal(githubSlug('https://github.com/A/B#readme'), 'a/b');
+    assert.equal(githubSlug('https://gitlab.com/a/b'), null);
   });
 
   test('the root itself may be a repo', async () => {

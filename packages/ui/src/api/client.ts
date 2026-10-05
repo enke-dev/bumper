@@ -31,6 +31,7 @@ const encode = (id: string): string => encodeURIComponent(id);
 export const api = {
   workspace: () => call<WorkspaceView>('GET', '/api/workspace'),
   rescan: () => call<WorkspaceView>('POST', '/api/workspace/rescan'),
+  diagnose: (id: string) => call<unknown>('POST', `/api/workspace/${encode(id)}/diagnose`),
   config: () => call<BumperConfig>('GET', '/api/config'),
   saveConfig: (config: BumperConfig) => call<WorkspaceView>('PUT', '/api/config', config),
   saveRepoConfig: (id: string, config: RepoConfig) =>

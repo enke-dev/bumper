@@ -18,6 +18,7 @@ function repo(id: string, published: string[], dependencies: string[]): RepoInfo
     dependencies,
     branch: 'main',
     branches: ['main'],
+    fork: false,
   };
 }
 

@@ -4,6 +4,7 @@ export interface PackageJson {
   version?: string;
   packageManager?: string;
   private?: boolean;
+  repository?: string | { type?: string; url?: string; directory?: string };
   publishConfig?: { registry?: string; access?: string };
   engines?: Record<string, string>;
   scripts?: Record<string, string>;

@@ -43,6 +43,10 @@ export function startServer({ session, html, token, port, hostname = '127.0.0.1'
     if (req.method === 'POST' && head === 'workspace' && id === 'rescan') {
       return json(await session.scan());
     }
+    if (req.method === 'POST' && head === 'workspace' && path.endsWith('/diagnose')) {
+      const repoId = decodeURIComponent(path.split('/').slice(2, -1).join('/'));
+      return json(await session.diagnose(repoId));
+    }
     if (head === 'config' && id === undefined) {
       if (req.method === 'GET') {
         return json(session.config());

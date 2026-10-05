@@ -31,7 +31,9 @@ export interface SessionDeps {
   loadConfig: () => Promise<BumperConfig>;
   saveConfig: (config: BumperConfig) => Promise<void>;
   createRun: (options: RepoRunOptions) => Runnable;
+  /** Every collector: run for one repo by {@link ManageSession.diagnose}. */
   collectors: readonly DiagnosticCollector[];
+  /** The cheap subset run for every repo on scan and on config edits. */
   fastCollectors: readonly DiagnosticCollector[];
   now: () => number;
   /** Log lines kept per repo (oldest dropped). */
@@ -67,6 +69,7 @@ export class ManageSession {
   #graph: RepoGraph | null = null;
   #config: BumperConfig = { repos: {} };
   #diagnostics = new Map<string, Diagnostic[]>();
+  readonly #diagnosed = new Set<string>();
   #scannedAt = 0;
   #scheduler: Scheduler | null = null;
 
@@ -112,7 +115,8 @@ export class ManageSession {
     this.#config = config;
     this.#graph = buildGraph(scan.repos);
     this.#scannedAt = this.#deps.now();
-    await this.#refreshDiagnostics(this.#deps.collectors);
+    this.#diagnosed.clear();
+    await this.#refreshDiagnostics(this.#deps.fastCollectors);
     return this.#publishWorkspace();
   }
 
@@ -147,6 +151,7 @@ export class ManageSession {
         config: this.configFor(repo),
         configured: repo.path in this.#config.repos,
         diagnostics: this.#diagnostics.get(repo.id) ?? [],
+        diagnosed: this.#diagnosed.has(repo.id),
         ...(this.#state.get(repo.id) ?? {}),
       })),
     };
@@ -183,6 +188,32 @@ export class ManageSession {
   configFor(repo: RepoInfo): RepoConfig {
     const stored = this.#config.repos[repo.path];
     return stored ? normalizeRepoConfig(stored) : defaultRepoConfig();
+  }
+
+  /**
+   * Run every collector (incl. the slow git/registry ones) for one repo now and broadcast the
+   * result. The GUI calls this when a repo is focused, so a scan of many repos stays fast.
+   */
+  async diagnose(id: string): Promise<Diagnostic[]> {
+    const repo = this.#repo(id);
+    const graph = this.#graph;
+    if (graph === null) {
+      throw new Error('scan the workspace first');
+    }
+    const diagnostics = await collectDiagnostics(
+      { repo, graph, config: this.configFor(repo), run: this.#deps.run },
+      this.#deps.collectors
+    );
+    this.#diagnostics.set(id, diagnostics);
+    this.#diagnosed.add(id);
+    this.#emit({
+      type: 'diagnostics',
+      repo: id,
+      diagnostics,
+      diagnosed: true,
+      at: this.#deps.now(),
+    });
+    return diagnostics;
   }
 
   logs(id: string): LogLine[] {
@@ -289,9 +320,10 @@ export class ManageSession {
           ),
         ] as const
     );
-    // a fast refresh replaces only the fast collectors' output, keeping the slow results
+    // a fast refresh replaces only the fast collectors' output, keeping any slow results
     const fastCodes = new Set([
       'unsupported',
+      'fork',
       'no-checks',
       'graph-cycle',
       'ambiguous-producer',
@@ -300,9 +332,7 @@ export class ManageSession {
     this.#diagnostics = new Map(
       entries.map(([id, fresh]) => [
         id,
-        collectors === this.#deps.fastCollectors
-          ? [...(this.#diagnostics.get(id) ?? []).filter(d => !fastCodes.has(d.code)), ...fresh]
-          : fresh,
+        [...(this.#diagnostics.get(id) ?? []).filter(d => !fastCodes.has(d.code)), ...fresh],
       ])
     );
   }

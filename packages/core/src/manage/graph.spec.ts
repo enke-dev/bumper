@@ -20,6 +20,7 @@ function repo(
     dependencies,
     branch: 'main',
     branches: ['main'],
+    fork: false,
     ...extra,
   };
 }
@@ -62,6 +63,12 @@ describe('manage graph', () => {
     ]);
     assert.deepEqual(graph.stages, [['base'], ['x', 'y', 'z']]);
     assert.deepEqual(graph.cycles, [['x', 'y']]);
+  });
+
+  test('a fork never produces, even when it publishes a consumed name', () => {
+    const graph = buildGraph([repo('fork', ['lit'], [], { fork: true }), repo('app', [], ['lit'])]);
+    assert.deepEqual(graph.upstream.get('app'), []);
+    assert.equal(graph.producers.has('lit'), false);
   });
 
   test('a repo depending on its own package is not its own upstream', () => {

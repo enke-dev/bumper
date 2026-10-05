@@ -23,6 +23,8 @@ export interface StoreState {
   ignoreReleaseAge: boolean;
   /** Repo whose settings drawer is open. */
   editing: string | null;
+  /** Repos whose slow diagnostics are being collected right now. */
+  diagnosing: ReadonlySet<string>;
   error: string | null;
   busy: boolean;
 }
@@ -44,6 +46,7 @@ export class ManageStore {
     logs: [],
     ignoreReleaseAge: false,
     editing: null,
+    diagnosing: new Set(),
     error: null,
     busy: false,
   };
@@ -129,12 +132,29 @@ export class ManageStore {
   async focus(id: string | null): Promise<void> {
     this.#patch({ focused: id, logs: [] });
     if (id !== null) {
+      // the slow diagnostics run lazily: first focus triggers them, the result arrives as an event
+      if (this.repo(id)?.diagnosed === false) {
+        void this.diagnose(id);
+      }
       await this.#guard(async () => {
         const logs = await api.logs(id);
         if (this.#state.focused === id) {
           this.#patch({ logs });
         }
       });
+    }
+  }
+
+  async diagnose(id: string): Promise<void> {
+    this.#patch({ diagnosing: new Set([...this.#state.diagnosing, id]) });
+    try {
+      await api.diagnose(id);
+    } catch (error) {
+      this.#patch({ error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      const diagnosing = new Set(this.#state.diagnosing);
+      diagnosing.delete(id);
+      this.#patch({ diagnosing });
     }
   }
 
@@ -212,6 +232,23 @@ export class ManageStore {
       case 'run':
         this.#patch({ running: event.running });
         return;
+      case 'diagnostics': {
+        const workspace = this.#state.workspace;
+        if (workspace === null) {
+          return;
+        }
+        this.#patch({
+          workspace: {
+            ...workspace,
+            repos: workspace.repos.map(repo =>
+              repo.id === event.repo
+                ? { ...repo, diagnostics: event.diagnostics, diagnosed: event.diagnosed }
+                : repo
+            ),
+          },
+        });
+        return;
+      }
       case 'status': {
         const workspace = this.#state.workspace;
         if (workspace === null) {

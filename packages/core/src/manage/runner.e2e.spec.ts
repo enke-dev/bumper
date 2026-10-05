@@ -69,6 +69,7 @@ const repo = (): RepoInfo => ({
   dependencies: ['@x/lint'],
   branch: 'main',
   branches: ['main'],
+  fork: false,
 });
 
 describe('manage runner (e2e, real git)', () => {

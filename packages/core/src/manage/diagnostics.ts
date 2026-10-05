@@ -20,6 +20,17 @@ export type DiagnosticCollector = (ctx: DiagnosticContext) => Promise<Diagnostic
 export const unsupportedRepo: DiagnosticCollector = ({ repo }) =>
   repo.unsupported ? [{ code: 'unsupported', severity: 'error', message: repo.unsupported }] : [];
 
+export const forkRepo: DiagnosticCollector = ({ repo }) =>
+  repo.fork && repo.published.length > 0
+    ? [
+        {
+          code: 'fork',
+          severity: 'info',
+          message: 'fork: its published packages produce no dependency edges',
+        },
+      ]
+    : [];
+
 export const noChecksConfigured: DiagnosticCollector = ({ repo, config }) =>
   repo.packageManager !== null && config.checks.length === 0
     ? [
@@ -110,14 +121,23 @@ export const registryAuth: DiagnosticCollector = async ({ repo, config, run }) =
 /** Collectors that need no git or registry call: cheap enough to re-run on every config edit. */
 export const FAST_COLLECTORS: readonly DiagnosticCollector[] = [
   unsupportedRepo,
+  forkRepo,
   noChecksConfigured,
   graphCycle,
   ambiguousProducer,
   branchMismatch,
 ];
 
+/** Collectors that spawn git or a registry `view`: run lazily, per repo, on demand. */
+export const SLOW_COLLECTORS: readonly DiagnosticCollector[] = [
+  dirtyTree,
+  behindRemote,
+  registryAuth,
+];
+
 export const DEFAULT_COLLECTORS: readonly DiagnosticCollector[] = [
   unsupportedRepo,
+  forkRepo,
   noChecksConfigured,
   graphCycle,
   ambiguousProducer,
