@@ -119,6 +119,7 @@ bumper detect                 # show context + applicable modules for the cwd
 bumper detect /path --json    # machine-readable detection
 bumper update                 # run every applicable module, in order
 bumper update /path/to/repo   # target another repo (defaults to cwd)
+bumper manage [path]          # local GUI for cascading updates across many repos (Bun only)
 bumper upgrade                # update the bumper binary itself (standalone install only)
 ```
 
@@ -148,6 +149,7 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | `--exclude`, `-e <path>` |    yes     | Skip a repo-relative path this run only, without editing config (see [Excludes](#excludes)). |
 | `--ignore-config`        |     no     | Ignore `~/.bumperrc` for this run — auto-detect everything, read + write nothing.            |
 | `--min-release-age <s>`  |     no     | Only resolve versions published at least `<s>` seconds ago; `0` disables the cooldown.       |
+| `--allow-young <pkg>`    |    yes     | Let one package resolve past the cooldown; see [Minimum release age](#minimum-release-age).  |
 | `--json`                 |     no     | `detect` only — emit machine-readable detection output.                                      |
 
 `--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `bun-runtime`,
@@ -238,6 +240,56 @@ makes no extra registry calls.
 bumper detect --json | jq .releaseAge
 # { "seconds": 86400, "excludes": [], "strict": false, "ignoreMissingTime": true, "source": "pnpm 11 default" }
 ```
+
+#### Consuming your own fresh releases (`--allow-young`)
+
+The cooldown also bites when a repo should pick up a version _you_ just published from another
+repo. `--allow-young <pkg>` (repeatable) lets exactly that package resolve past the gate, and keeps
+the subsequent install working: for **pnpm** bumper writes a version-pinned rule
+(`'@scope/pkg@1.2.3'`, merged into an existing union) into `minimumReleaseAgeExclude` in
+`pnpm-workspace.yaml` — pnpm re-checks the lockfile against the cooldown on every install, so the rule
+has to be committed alongside — and prunes pinned versions that have since cleared the cooldown. For
+**bun**, whose excludes are plain names, the install runs with `--minimum-release-age 0` once;
+`--frozen-lockfile` keeps the versions afterwards. `bumper manage` passes the flag automatically.
+
+## Manage
+
+`bumper manage [path]` scans every git repository under a folder (default `~/Projects`, nested
+`owner/repo` layouts included), serves a local GUI and runs cascading updates: each repo gets
+`bumper update -afc`, then its configured checks, then a push to its configured branch, and — for
+repos that publish a package — a wait until the registry lists the new version, so the dependents
+that follow actually pick it up.
+
+```sh
+bumper manage                 # scan ~/Projects, open the GUI in the browser
+bumper manage ~/work --port 3131 --no-open
+```
+
+- **Stages.** Repos are grouped by dependency stage, derived from the package names other repos in
+  the folder publish (private manifests never produce). Cycles and names published by several repos
+  are shown as diagnostics instead of edges.
+- **Selection.** Each checkbox selects only its repo; nothing cascades on its own. An unselected repo
+  whose selected upstream changes is flagged _upstream changes_; the arrow button selects a repo
+  together with its dependents.
+- **Run.** Repos start as soon as their selected upstreams are done, in parallel where possible. A
+  failed repo blocks its dependents, which offer _Retry_ and _Run anyway_ (consume whatever is
+  published); a repo waiting for its release offers _Skip waiting_. The run belongs to the server
+  process — reloading the browser doesn't stop it.
+- **Minimum release age.** Dependents receive the upstream packages as `--allow-young` (see
+  [Minimum release age](#minimum-release-age)), so a freshly released version is consumed without
+  lifting the cooldown for anything else. _Ignore minimum release age_ extends that to every
+  upstream producer, selected or not.
+- **Settings.** The gear opens the repo's `~/.bumperrc` entry: excludes, push branch (an existing
+  one or a custom name created from the current branch), checks (script names run through the
+  package manager, anything else through the shell), wait-for-release, and module overrides. Repos
+  without an entry run with bumper's defaults.
+- **Diagnostics.** Unsupported repos (no manifest, yarn), missing checks, dirty work tree, behind
+  the remote, missing registry credentials, graph cycles and ambiguous producers.
+
+`manage` needs the Bun runtime: the standalone binary has it built in, an npm install runs it via
+`bunx --bun @enke.dev/bumper manage`. Every other command works on Node as well. The server binds
+to `127.0.0.1` with a random port and a per-process token in the URL, so nothing else on the
+machine (or a page in another tab) can drive it.
 
 ## Modules
 
@@ -399,6 +451,9 @@ entry, so the next run is already scoped:
     "/absolute/path/to/repository": {
       "exclude": ["packages/vendored-pkg"], // repo-relative paths skipped everywhere (see below)
       "modules": { "docker-node": false }, // explicit per-module on/off overrides, keyed by module id
+      "branch": "chore/deps", // manage: branch to commit to and push (default: the current one)
+      "checks": ["lint", "test"], // manage: run after the update, before the push
+      "waitForRelease": true, // manage: wait for the registry release before dependents start
     },
   },
 }
@@ -413,10 +468,14 @@ bumper config get                              # current repo (path defaults to 
 bumper config get /path/to/repo                # another repo
 bumper config set exclude packages/a packages/b  # current repo
 bumper config set /path/to/repo modules.docker-node false
+bumper config set branch chore/deps               # manage: push branch ("-" removes it)
+bumper config set checks lint test                # manage: checks, in order
+bumper config set waitForRelease false
 ```
 
 `get` and `set` default the path to the current repo — omit it to configure where you're standing.
-For `set` a leading config key (`exclude`, `modules.<id>`) is what signals the path was omitted.
+For `set` a leading config key (`exclude`, `modules.<id>`, `branch`, `checks`, `waitForRelease`) is
+what signals the path was omitted.
 
 `bumper detect` marks anything the config drives — a forced module shows `(config: on|off)`, a
 stored `exclude` shows `(from config)` — with a footer pointing at the `config set` to change it and
