@@ -1,13 +1,9 @@
 {
-  "name": "@enke.dev/bumper",
-  "version": "0.13.5",
+  "name": "bumper",
+  "private": true,
   "license": "MIT",
   "packageManager": "bun@1.4.2",
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org",
-    "access": "public"
-  },
-  "description": "Central, feature-based repo updater: bumps Node/deps/actions across node, pnpm, npm and bun repos.",
+  "description": "Monorepo for @enke.dev/bumper (packages/cli) and its library (packages/core).",
   "author": {
     "name": "David Enke",
     "email": "david@enke.dev"
@@ -17,19 +13,10 @@
     "url": "git+https://github.com/enke-dev/bumper.git"
   },
   "type": "module",
-  "bin": {
-    "bmpr": "./dist/cli.mjs",
-    "bumper": "./dist/cli.mjs"
-  },
-  "files": [
-    "dist/cli.mjs",
-    "assets/icon/icon.png"
+  "workspaces": [
+    "packages/*"
   ],
-  "engines": {
-    "node": ">=22"
-  },
   "scripts": {
-    "prepare": "bun run build",
     "check": "tsgo --noEmit",
     "lint": "run-p lint:*",
     "lint:eslint": "bun --bun eslint --config eslint.config.ts",
@@ -39,9 +26,10 @@
     "format:prettier": "bun --bun prettier --config prettier.config.ts --write .",
     "test": "run-p -c test:*",
     "test:bun": "bun test --reporter=junit --reporter-outfile=reports/junit.bun.xml",
-    "test:node": "node --import tsx --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/junit.node.xml \"src/**/*.spec.ts\"",
-    "dev": "bun run --bun src/cli.ts",
-    "build": "bun build ./src/cli.ts --target=node --outfile dist/cli.mjs"
+    "test:node": "node --import tsx --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/junit.node.xml \"packages/*/src/**/*.spec.ts\"",
+    "dev": "bun run --bun packages/cli/src/cli.ts",
+    "build": "bun run --filter @enke.dev/bumper build",
+    "build:binaries": "sh scripts/build-binaries.sh"
   },
   "devDependencies": {
     "@enke.dev/lint": "0.13.13",
@@ -55,10 +43,5 @@
     "prettier": "3.9.8",
     "tsx": "4.23.15",
     "typescript": "6.0.3"
-  },
-  "dependencies": {
-    "@swimlane/docker-reference": "2.0.1",
-    "semver-utils": "1.1.4",
-    "verkit": "0.5.0"
   }
 }

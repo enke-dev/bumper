@@ -1,5 +1,5 @@
-assets
-CHANGELOG.md
-examples/**/*.yml
-examples/**/*.yaml
-examples/**/*.json
+packages/cli/assets
+packages/cli/CHANGELOG.md
+packages/core/examples/**/*.yml
+packages/core/examples/**/*.yaml
+packages/core/examples/**/*.json

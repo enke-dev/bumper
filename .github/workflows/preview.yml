@@ -49,6 +49,7 @@ jobs:
       # is globally monotonic, so each build is uniquely identifiable.
       - name: Set preview version
         id: version
+        working-directory: packages/cli
         run: |
           base="$(node -p "require('./package.json').version")"
           preview="${base}-pr-${{ github.event.pull_request.number }}.${{ github.run_number }}"
@@ -69,7 +70,7 @@ jobs:
         run: |
           tag="pr-${{ github.event.pull_request.number }}"
           gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$tag" dist/bin/bmpr-* \
+          gh release create "$tag" packages/cli/dist/bin/bmpr-* \
             --prerelease \
             --target "${{ github.event.pull_request.head.sha }}" \
             --title "Preview — PR #${{ github.event.pull_request.number }}" \

@@ -94,7 +94,7 @@ Then invoke `bumper` (or `bmpr`) directly.
 Requires [Bun](https://bun.sh) to build.
 
 ```sh
-bun install     # installs deps + builds ./dist/cli.mjs (prepare hook)
+bun install     # installs deps + builds ./packages/cli/dist/cli.mjs (prepare hook)
 bun run dev …   # run the CLI straight from source, no build needed
 ```
 
@@ -102,11 +102,11 @@ To get a global `bumper` on your `PATH` from the working tree (e.g. to dogfood i
 repos), build and link once:
 
 ```sh
-bun run build   # refresh ./dist/cli.mjs
-bun link        # symlinks it into ~/.bun/bin (on PATH for a standard Bun install)
+bun run build            # refresh ./packages/cli/dist/cli.mjs
+cd packages/cli && bun link  # symlinks it into ~/.bun/bin (on PATH for a standard Bun install)
 ```
 
-The link tracks `dist/cli.mjs` live — re-run `bun run build` to update what `bumper` executes;
+The link tracks `packages/cli/dist/cli.mjs` live — re-run `bun run build` to update what `bumper` executes;
 no need to link again. `bun link` writes the platform-appropriate shim, so this works on Windows too.
 
 ## Usage

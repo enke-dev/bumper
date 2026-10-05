@@ -1,14 +1,14 @@
-import { isGreaterThan, isValid } from 'verkit';
-
-import pkg from '../../../package.json';
-import { installChannel } from '../../utils/channel.js';
-import { BOLD, DIM, GREEN, RESET, YELLOW } from '../../utils/output.utils.js';
+import { installChannel } from '@enke.dev/bumper-core/utils/channel.js';
+import { BOLD, DIM, GREEN, RESET, YELLOW } from '@enke.dev/bumper-core/utils/output.utils.js';
 import {
   assetName,
   downloadAsset,
   latestReleaseVersion,
   replaceExecutable,
-} from '../../utils/self-upgrade.utils.js';
+} from '@enke.dev/bumper-core/utils/self-upgrade.utils.js';
+import { isGreaterThan, isValid } from 'verkit';
+
+import pkg from '../../../package.json';
 import type { Command } from '../command.types.js';
 
 const INSTALL_SH = 'https://raw.githubusercontent.com/enke-dev/bumper/main/install.sh';

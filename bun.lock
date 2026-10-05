@@ -3,12 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@enke.dev/bumper",
-      "dependencies": {
-        "@swimlane/docker-reference": "2.0.1",
-        "semver-utils": "1.1.4",
-        "verkit": "0.5.0",
-      },
+      "name": "bumper",
       "devDependencies": {
         "@enke.dev/lint": "0.13.13",
         "@tsconfig/strictest": "2.0.8",
@@ -21,6 +16,31 @@
         "prettier": "3.9.8",
         "tsx": "4.23.15",
         "typescript": "6.0.3",
+      },
+    },
+    "packages/cli": {
+      "name": "@enke.dev/bumper",
+      "version": "0.13.5",
+      "bin": {
+        "bmpr": "./dist/cli.mjs",
+        "bumper": "./dist/cli.mjs",
+      },
+      "dependencies": {
+        "@swimlane/docker-reference": "2.0.1",
+        "semver-utils": "1.1.4",
+        "verkit": "0.5.0",
+      },
+      "devDependencies": {
+        "@enke.dev/bumper-core": "workspace:*",
+      },
+    },
+    "packages/core": {
+      "name": "@enke.dev/bumper-core",
+      "version": "0.0.0",
+      "dependencies": {
+        "@swimlane/docker-reference": "2.0.1",
+        "semver-utils": "1.1.4",
+        "verkit": "0.5.0",
       },
     },
   },
@@ -80,6 +100,10 @@
     "@emnapi/runtime": ["@emnapi/runtime@1.10.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA=="],
 
     "@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.2.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w=="],
+
+    "@enke.dev/bumper": ["@enke.dev/bumper@workspace:packages/cli"],
+
+    "@enke.dev/bumper-core": ["@enke.dev/bumper-core@workspace:packages/core"],
 
     "@enke.dev/lint": ["@enke.dev/lint@0.13.13", "", { "dependencies": { "@eslint/compat": "2.1.1", "@eslint/js": "10.0.1", "@eslint/json": "2.1.0", "@html-eslint/eslint-plugin": "0.66.0", "@html-eslint/parser": "0.66.0", "eslint-config-prettier": "10.1.8", "eslint-import-resolver-typescript": "4.4.5", "eslint-plugin-html": "8.2.0", "eslint-plugin-import": "2.32.0", "eslint-plugin-import-extensions": "0.1.5", "eslint-plugin-lit": "2.3.1", "eslint-plugin-lit-a11y": "5.1.1", "eslint-plugin-package-json": "1.8.1", "eslint-plugin-prettier": "5.5.6", "eslint-plugin-simple-import-sort": "14.0.0", "eslint-plugin-unused-imports": "4.4.1", "eslint-plugin-wc": "3.1.0" }, "optionalDependencies": { "jiti": "^2.7.0", "stylelint": "^17.15.0", "stylelint-config-rational-order": "^0.1.2", "stylelint-config-standard-scss": "^17.0.0", "stylelint-order": "^8.1.1", "typescript-eslint": "^8.70.0" }, "peerDependencies": { "@awmottaz/prettier-plugin-void-html": "^2.3.0", "eslint": "^10.10.0", "prettier": "^3.9.6", "typescript": "6.0.3" }, "optionalPeers": ["typescript"] }, "sha512-I1p1x+yZoc+CpvhFkk6l1r2IzZgNH2jhMOoVjh2zScLWc7HjfuSiO/U+5nzi4z9EZkwDgQYbA+NNOANwmwfljg=="],
 

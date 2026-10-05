@@ -47,10 +47,12 @@ jobs:
 
       # npmjs auth for the `@enke.dev/bumper` publish (public scoped package).
       # The @enke.dev/lint devDep is public on npmjs too — installs need no auth.
+      # Written to ~/.npmrc: release-it runs in packages/cli, and npm only reads the project
+      # .npmrc of its own cwd, so a root .npmrc would be ignored.
       - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
+        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > "$HOME/.npmrc"
 
-      # `bun install` runs the `prepare` script → builds dist/cli.mjs. npm re-runs
+      # `bun install` runs the `prepare` script → builds packages/cli/dist/cli.mjs. npm re-runs
       # `prepare` at publish/pack time too, so the tarball always contains the build.
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -66,7 +68,10 @@ jobs:
       # version bump, so they bake in the released version (not the pre-bump one).
       # No-op when there are no releasable commits. The release commit it pushes uses
       # GITHUB_TOKEN, so it won't re-trigger this workflow (loop-prevention helps here).
+      # Runs in packages/cli: release-it reads name/version from the package.json in its cwd and
+      # publishes that directory, so the published package is the CLI, not the workspace root.
       - name: Release
+        working-directory: packages/cli
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bunx -p release-it -p @release-it/conventional-changelog release-it --ci
@@ -74,7 +79,7 @@ jobs:
       - name: Resolve released version
         id: version
         run: |
-          version="$(node -p "require('./package.json').version")"
+          version="$(node -p "require('./packages/cli/package.json').version")"
           echo "tag=v${version}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "Released ${version} :rocket:" >> "$GITHUB_STEP_SUMMARY"

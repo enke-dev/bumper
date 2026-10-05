@@ -1,7 +1,8 @@
 import { resolve } from 'node:path';
 
-import { loadConfig, resolveForPath, setRepoConfig } from '../../config/config.js';
-import type { RepoConfig } from '../../config/config.types.js';
+import { loadConfig, resolveForPath, setRepoConfig } from '@enke.dev/bumper-core/config/config.js';
+import type { RepoConfig } from '@enke.dev/bumper-core/config/config.types.js';
+
 import type { Command, CommandContext } from '../command.types.js';
 
 /**

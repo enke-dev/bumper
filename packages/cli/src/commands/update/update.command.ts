@@ -1,10 +1,9 @@
 import { resolve } from 'node:path';
 
-import pkg from '../../../package.json';
-import { configPath, loadConfig } from '../../config/config.js';
-import { buildContext } from '../../context/context.js';
-import type { PackageManager } from '../../context/context.types.js';
-import { runUpdate } from '../../modules/module.registry.js';
+import { configPath, loadConfig } from '@enke.dev/bumper-core/config/config.js';
+import { buildContext } from '@enke.dev/bumper-core/context/context.js';
+import type { PackageManager } from '@enke.dev/bumper-core/context/context.types.js';
+import { runUpdate } from '@enke.dev/bumper-core/modules/module.registry.js';
 import {
   collectChangedFiles,
   commitAll,
@@ -12,11 +11,13 @@ import {
   isGitRepo,
   renderCommitBody,
   summarizeChanges,
-} from '../../utils/commit.utils.js';
-import { approveScripts } from '../../utils/deps.utils.js';
-import { runFormat } from '../../utils/format.utils.js';
-import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from '../../utils/output.utils.js';
-import { checkForSelfUpdate, updateHint } from '../../utils/version-check.js';
+} from '@enke.dev/bumper-core/utils/commit.utils.js';
+import { approveScripts } from '@enke.dev/bumper-core/utils/deps.utils.js';
+import { runFormat } from '@enke.dev/bumper-core/utils/format.utils.js';
+import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from '@enke.dev/bumper-core/utils/output.utils.js';
+import { checkForSelfUpdate, updateHint } from '@enke.dev/bumper-core/utils/version-check.js';
+
+import pkg from '../../../package.json';
 import type { Command, CommandContext } from '../command.types.js';
 
 const COMMIT_SUBJECT = 'chore: update dependencies';

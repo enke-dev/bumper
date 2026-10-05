@@ -1,9 +1,10 @@
 import { resolve } from 'node:path';
 
-import { configPath } from '../../config/config.js';
-import { buildContext } from '../../context/context.js';
-import { detectModules } from '../../modules/module.registry.js';
-import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from '../../utils/output.utils.js';
+import { configPath } from '@enke.dev/bumper-core/config/config.js';
+import { buildContext } from '@enke.dev/bumper-core/context/context.js';
+import { detectModules } from '@enke.dev/bumper-core/modules/module.registry.js';
+import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from '@enke.dev/bumper-core/utils/output.utils.js';
+
 import type { Command, CommandContext } from '../command.types.js';
 
 async function run({ values, positionals }: CommandContext): Promise<void> {

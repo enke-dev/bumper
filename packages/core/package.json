@@ -1,0 +1,15 @@
+{
+  "name": "@enke.dev/bumper-core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "bumper's library: detection, modules, config and registry access. Bundled into the CLI, not published.",
+  "type": "module",
+  "exports": {
+    "./*.js": "./src/*.ts"
+  },
+  "dependencies": {
+    "@swimlane/docker-reference": "2.0.1",
+    "semver-utils": "1.1.4",
+    "verkit": "0.5.0"
+  }
+}

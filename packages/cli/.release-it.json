@@ -1,6 +1,6 @@
 {
   "hooks": {
-    "after:bump": "sh scripts/build-binaries.sh"
+    "after:bump": "sh ../../scripts/build-binaries.sh"
   },
   "npm": {
     "skipChecks": true,

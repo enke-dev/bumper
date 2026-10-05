@@ -1,2 +1,5 @@
 [install]
 exact = true
+# workspaces default to the isolated linker in bun 1.4; hoist like before so root tooling
+# (prettier plugins pulled in by @enke.dev/lint) resolves transitive deps from the repo root
+linker = "hoisted"

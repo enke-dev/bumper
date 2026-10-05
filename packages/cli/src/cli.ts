@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 
+import { DIM, RESET, wasReported } from '@enke.dev/bumper-core/utils/output.utils.js';
+
 import pkg from '../package.json';
 import { findCommand } from './commands/command.registry.js';
 import { cliOptions } from './commands/command.types.js';
 import { commandHelp } from './commands/help/help.command.js';
 import { versionCommand } from './commands/version/version.command.js';
-import { DIM, RESET, wasReported } from './utils/output.utils.js';
 
 // Node flags `fs.glob` as experimental and prints a warning on every use. We depend
 // on it deliberately (the one glob API portable across Node + Bun), so silence just

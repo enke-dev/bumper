@@ -1,4 +1,5 @@
-import { BOLD, CYAN, GREEN, RESET } from '../../utils/output.utils.js';
+import { BOLD, CYAN, GREEN, RESET } from '@enke.dev/bumper-core/utils/output.utils.js';
+
 import { commands } from '../command.registry.js';
 import type { Command, CommandContext } from '../command.types.js';
 

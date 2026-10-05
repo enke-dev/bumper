@@ -16,3 +16,7 @@ reports/*
 !.vscode/settings.json
 .idea
 *.sw?
+
+# copied from the repo root by the CLI's prepack hook
+packages/cli/README.md
+packages/cli/LICENSE

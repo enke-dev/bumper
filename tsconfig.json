@@ -9,6 +9,6 @@
     "noEmit": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts", "eslint.config.ts", "prettier.config.ts"],
-  "exclude": ["dist", "node_modules"]
+  "include": ["packages/*/src/**/*.ts", "eslint.config.ts", "prettier.config.ts"],
+  "exclude": ["**/dist", "**/node_modules"]
 }

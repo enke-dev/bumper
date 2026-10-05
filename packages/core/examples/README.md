@@ -1,8 +1,8 @@
 # examples
 
 Sample repositories used as fixtures by the detection + feature tests
-(`src/context/detection.spec.ts` and the colocated module specs,
-`src/modules/**/*.spec.ts`). Each one is a
+(`packages/core/src/context/detection.spec.ts` and the colocated module specs,
+`packages/core/src/modules/**/*.spec.ts`). Each one is a
 minimal, self-contained repo that exercises one detection/runtime combination.
 They double as living documentation of what `bumper detect` recognises.
 
@@ -16,8 +16,8 @@ They double as living documentation of what `bumper detect` recognises.
 Try it against any of them:
 
 ```sh
-bun run --bun src/cli.ts detect examples/node-npm
-bun run --bun src/cli.ts detect examples/bun --json
+bun run dev detect packages/core/examples/node-npm
+bun run dev detect packages/core/examples/bun --json
 ```
 
 The lockfiles are intentionally stubbed — detection only checks for their presence,
