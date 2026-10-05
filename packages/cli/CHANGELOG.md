@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+# [0.15.0](https://github.com/enke-dev/bumper/compare/0.14.0...0.15.0) (2026-10-05)
+
+### Features
+
+* **manage:** lazy diagnostics, fork detection, symlink-aware scan ([ea06bd3](https://github.com/enke-dev/bumper/commit/ea06bd3225f21aec9ecad17383685fc6bcb357fd))
+
 # [0.14.0](https://github.com/enke-dev/bumper/compare/0.13.6...0.14.0) (2026-10-05)
 
 ### Features
