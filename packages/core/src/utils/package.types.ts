@@ -3,6 +3,8 @@ export interface PackageJson {
   name?: string;
   version?: string;
   packageManager?: string;
+  private?: boolean;
+  publishConfig?: { registry?: string; access?: string };
   engines?: Record<string, string>;
   scripts?: Record<string, string>;
   workspaces?: string[] | { packages?: string[] };

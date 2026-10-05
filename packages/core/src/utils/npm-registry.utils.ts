@@ -349,3 +349,50 @@ export async function maxSatisfyingRanges(
     return null;
   }
 }
+
+/**
+ * Every published version of a package, ascending as the registry lists them, via
+ * `<tool> view <pkg> versions --json` — run in the repo so its `.npmrc` applies, with
+ * `--registry` added when the package declares `publishConfig.registry`. Null when unresolvable
+ * (offline, 401, unpublished). Used by the manage release wait and its registry-auth diagnostic.
+ */
+export async function publishedVersions(
+  pkg: string,
+  tool: string,
+  cwd: string,
+  registry?: string,
+  run: typeof exec = exec
+): Promise<string[] | null> {
+  try {
+    const args = [
+      tool,
+      'view',
+      pkg,
+      'versions',
+      '--json',
+      ...(registry ? ['--registry', registry] : []),
+    ];
+    const { exitCode, stdout } = await run(args, { cwd });
+    const trimmed = stdout.trim();
+    if (exitCode !== 0 || !trimmed) {
+      return null;
+    }
+    const parsed: unknown = JSON.parse(trimmed);
+    // a single published version prints a bare string, not an array
+    return Array.isArray(parsed)
+      ? (parsed as string[])
+      : typeof parsed === 'string'
+        ? [parsed]
+        : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a failed `view` was refused for missing/invalid credentials: npm answers `E401`, pnpm
+ * `ERR_PNPM_FETCH_401` (both also print the HTTP status). Exported for the manage diagnostics.
+ */
+export function isAuthFailure(output: string): boolean {
+  return /E401|ERR_PNPM_FETCH_401|401 Unauthorized/.test(output);
+}
