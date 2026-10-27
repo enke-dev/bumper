@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+# [0.16.0](https://github.com/enke-dev/bumper/compare/0.15.1...0.16.0) (2026-10-27)
+
+### Features
+
+* **ui:** add theme toggle, repo filter and stage hints ([cc5e436](https://github.com/enke-dev/bumper/commit/cc5e436510759ce02b4667802993007d4780254f))
+
 ## [0.15.1](https://github.com/enke-dev/bumper/compare/0.15.0...0.15.1) (2026-10-27)
 
 ### Bug Fixes
