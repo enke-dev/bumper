@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+## [0.15.1](https://github.com/enke-dev/bumper/compare/0.15.0...0.15.1) (2026-10-27)
+
+### Bug Fixes
+
+* add `workflows: write` permission to update-dependencies job ([#18](https://github.com/enke-dev/bumper/issues/18)) ([23e47d3](https://github.com/enke-dev/bumper/commit/23e47d3534377327da02fc60e8352d00de3b008e))
+
 # [0.15.0](https://github.com/enke-dev/bumper/compare/0.14.0...0.15.0) (2026-10-05)
 
 ### Features
