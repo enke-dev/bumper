@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: write # push the update branch
       pull-requests: write # open the PR
+      workflows: write # push changes to workflow files
     outputs:
       updated: ${{ steps.bump.outputs.updated }}
       branch: ${{ steps.bump.outputs.branch }}
