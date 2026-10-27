@@ -51,9 +51,9 @@ jobs:
         id: version
         working-directory: packages/cli
         run: |
-          base="$(node -p "require('./package.json').version")"
+          base="$(jq -r '.version' package.json)"
           preview="${base}-pr-${{ github.event.pull_request.number }}.${{ github.run_number }}"
-          PREVIEW_VERSION="$preview" node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.PREVIEW_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          jq --arg v "$preview" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
           echo "version=${preview}" >> "$GITHUB_OUTPUT"
 
       # compile AFTER the version stamp so the binaries bake in the preview version
