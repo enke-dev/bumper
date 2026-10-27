@@ -53,7 +53,7 @@ jobs:
         run: |
           base="$(node -p "require('./package.json').version")"
           preview="${base}-pr-${{ github.event.pull_request.number }}.${{ github.run_number }}"
-          npm version "$preview" --no-git-tag-version
+          PREVIEW_VERSION="$preview" node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.PREVIEW_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
           echo "version=${preview}" >> "$GITHUB_OUTPUT"
 
       # compile AFTER the version stamp so the binaries bake in the preview version
