@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+# [0.17.0](https://github.com/enke-dev/bumper/compare/0.16.1...0.17.0) (2026-10-27)
+
+### Features
+
+* **docker:** hold an image with a `# bumper: skip` comment ([ad05f55](https://github.com/enke-dev/bumper/commit/ad05f559484c127f43825c6ba78a6a87019e6588))
+
 ## [0.16.1](https://github.com/enke-dev/bumper/compare/0.16.0...0.16.1) (2026-10-27)
 
 # [0.16.0](https://github.com/enke-dev/bumper/compare/0.15.1...0.16.0) (2026-10-27)
