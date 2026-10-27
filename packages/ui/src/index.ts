@@ -17,3 +17,7 @@ import '@awesome.me/webawesome/dist/components/tooltip/tooltip.js';
 import '@awesome.me/webawesome/dist/components/tree/tree.js';
 import '@awesome.me/webawesome/dist/components/tree-item/tree-item.js';
 import './components/app/app.component.js';
+
+import { initTheme } from './utils/theme.utils.js';
+
+initTheme();

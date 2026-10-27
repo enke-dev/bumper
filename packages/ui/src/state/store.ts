@@ -19,6 +19,8 @@ export interface StoreState {
   selection: ReadonlySet<string>;
   /** Repo whose log is shown. */
   focused: string | null;
+  /** Free-text filter over repo ids, names and published package names. */
+  filter: string;
   logs: LogLine[];
   ignoreReleaseAge: boolean;
   /** Repo whose settings drawer is open. */
@@ -43,6 +45,7 @@ export class ManageStore {
     running: false,
     selection: new Set(),
     focused: null,
+    filter: '',
     logs: [],
     ignoreReleaseAge: false,
     editing: null,
@@ -119,6 +122,10 @@ export class ManageStore {
       .filter(entry => this.repo(entry)?.packageManager !== null)
       .forEach(entry => selection.add(entry));
     this.#patch({ selection });
+  }
+
+  setFilter(filter: string): void {
+    this.#patch({ filter });
   }
 
   clearSelection(): void {

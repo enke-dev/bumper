@@ -54,7 +54,17 @@ export class BumperLogView extends BumperElement.withUtilities().withStyles(styl
     const { focused, logs, busy, diagnosing } = this.store.state;
     const repo = this.store.repo(focused);
     if (repo === undefined) {
-      return html`<div class="empty">select a repository to see its log</div>`;
+      return html`
+        <div class="empty">
+          <p>Select a repository to see its log.</p>
+          <p class="hint">
+            <strong>Stages</strong> order the repos by their dependencies on each other. Stage 0
+            uses no other repo from this folder; a repo in stage N uses packages published by repos
+            in earlier stages. An update runs stage by stage, so each repo picks up the versions its
+            upstream repos just released.
+          </p>
+        </div>
+      `;
     }
     const status = repo.status;
     return html`

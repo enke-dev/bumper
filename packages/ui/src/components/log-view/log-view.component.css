@@ -18,6 +18,12 @@ header .id {
 }
 
 header .detail,
+.hint {
+  max-width: 38rem;
+  margin: 0 auto;
+  font-size: var(--wa-font-size-s);
+}
+
 .empty {
   color: var(--wa-color-text-quiet);
 }

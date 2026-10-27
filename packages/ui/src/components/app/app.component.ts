@@ -5,16 +5,21 @@ import '../repo-settings/repo-settings.component.js';
 import { provide } from '@lit/context';
 import type { TemplateResult } from 'lit';
 import { html } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 import { when } from 'lit/directives/when.js';
 
 import { ManageStore, storeContext, StoreController } from '../../state/store.js';
 import { BumperElement } from '../../utils/base.utils.js';
+import type { ThemeMode } from '../../utils/theme.utils.js';
+import { cycleTheme, storedTheme } from '../../utils/theme.utils.js';
 import styles from './app.component.css';
 
 /** Application shell: run bar, repo list and log panel side by side, settings drawer. */
 @customElement('bumper-app')
 export class BumperApp extends BumperElement.withUtilities().withStyles(styles) {
+  @state()
+  private theme: ThemeMode = storedTheme();
+
   @provide({ context: storeContext })
   readonly store = new ManageStore();
 
@@ -45,6 +50,14 @@ export class BumperApp extends BumperElement.withUtilities().withStyles(styles) 
           ${connected ? 'connected' : 'offline'}
         </wa-badge>
         <span class="spacer"></span>
+        <wa-button
+          size="s"
+          appearance="plain"
+          title="Colour theme: auto follows the system"
+          @click=${() => (this.theme = cycleTheme(this.theme))}
+        >
+          Theme: ${this.theme}
+        </wa-button>
         <wa-button
           size="s"
           appearance="plain"

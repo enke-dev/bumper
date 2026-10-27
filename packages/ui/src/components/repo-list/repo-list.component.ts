@@ -139,22 +139,62 @@ export class BumperRepoList extends BumperElement.withUtilities().withStyles(sty
       return html`<div class="empty">no git repositories under ${workspace.root}</div>`;
     }
     const byId = new Map(workspace.repos.map(repo => [repo.id, repo]));
+    const { filter } = this.store.state;
+    const query = filter.trim().toLowerCase();
+    const matches = (repo: RepoView | undefined): repo is RepoView =>
+      repo !== undefined &&
+      (query === '' ||
+        [repo.id, repo.name ?? '', ...repo.published.map(pkg => pkg.name)].some(term =>
+          term.toLowerCase().includes(query)
+        ));
+    const stages = workspace.stages
+      .map((stage, index) => ({ index, repos: stage.map(id => byId.get(id)).filter(matches) }))
+      .filter(stage => stage.repos.length > 0);
     return html`
-      <wa-tree selection="single" @wa-selection-change=${this.#onSelection}>
-        ${map(
-          workspace.stages,
-          (stage, index) => html`
-            <wa-tree-item expanded>
-              <span class="stage">Stage ${index}</span>
-              <wa-badge variant="neutral" appearance="outlined" pill>${stage.length}</wa-badge>
-              ${map(stage, id => {
-                const repo = byId.get(id);
-                return repo ? this.#renderRepo(repo) : nothing;
-              })}
-            </wa-tree-item>
-          `
-        )}
-      </wa-tree>
+      <div class="filter">
+        <wa-input
+          size="s"
+          placeholder="Filter repos or packages"
+          with-clear
+          .value=${filter}
+          @input=${(event: Event) => this.store.setFilter((event.target as HTMLInputElement).value)}
+          @wa-clear=${() => this.store.setFilter('')}
+        >
+          <wa-icon slot="start" library="system" name="magnifying-glass"></wa-icon>
+        </wa-input>
+      </div>
+      ${
+        stages.length === 0
+          ? html`<div class="empty">nothing matches “${filter}”</div>`
+          : html`
+              <wa-tree selection="single" @wa-selection-change=${this.#onSelection}>
+                ${map(
+                  stages,
+                  ({ index, repos }) => html`
+                    <wa-tree-item expanded>
+                      <span
+                        class="stage"
+                        title=${
+                          index === 0
+                            ? 'Depends on no other repo in this folder'
+                            : `Depends on repos from earlier stages; runs after stage ${index - 1}`
+                        }
+                      >
+                        Stage ${index}
+                      </span>
+                      <span class="hint">
+                        ${index === 0 ? 'no upstream repos' : 'needs earlier stages'}
+                      </span>
+                      <wa-badge variant="neutral" appearance="outlined" pill
+                        >${repos.length}</wa-badge
+                      >
+                      ${map(repos, repo => this.#renderRepo(repo))}
+                    </wa-tree-item>
+                  `
+                )}
+              </wa-tree>
+            `
+      }
     `;
   }
 }
