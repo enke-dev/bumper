@@ -2,7 +2,13 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { isDockerFileName, parseImageRef, parseImageRefs, registryHost } from './docker.utils.js';
+import {
+  isDockerFileName,
+  parseImageRef,
+  parseImageRefs,
+  parseSkippedImageRefs,
+  registryHost,
+} from './docker.utils.js';
 
 describe('registryHost', () => {
   test('maps Docker Hub to its canonical endpoint, everything else is identity', () => {
@@ -59,6 +65,40 @@ describe('parseImageRefs', () => {
       '    # image: redis:99',
     ].join('\n');
     assert.deepEqual(parseImageRefs(text), ['postgres:16']);
+  });
+});
+
+describe('parseSkippedImageRefs', () => {
+  test('holds the refs right below a skip comment, with or without a reason', () => {
+    const text = [
+      'services:',
+      '  a:',
+      '    # bumper: skip',
+      '    image: directus/directus:11.17.4',
+      '  b:',
+      '    # bumper: skip - pinned to prod',
+      '    image: "redis:7.2"',
+      '  c:',
+      '    image: postgres:16',
+      '# Bumper: Skip',
+      'FROM node:22',
+    ].join('\n');
+    assert.deepEqual(
+      [...parseSkippedImageRefs(text)],
+      ['directus/directus:11.17.4', 'redis:7.2', 'node:22']
+    );
+  });
+
+  test('holds nothing a blank line or another comment separates from the skip comment', () => {
+    const text = [
+      '# bumper: skip',
+      '',
+      'FROM postgres:16',
+      '# bumper: skip',
+      '# why',
+      'FROM redis:7.2',
+    ];
+    assert.deepEqual([...parseSkippedImageRefs(text.join('\n'))], []);
   });
 });
 

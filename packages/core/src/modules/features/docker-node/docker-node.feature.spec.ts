@@ -47,6 +47,25 @@ describe('docker-node feature', () => {
     });
   });
 
+  test('holds a line below a `# bumper: skip` comment', async () => {
+    await withTempDir('docker-node', async dir => {
+      const body = [
+        'FROM node:20 AS app',
+        '# bumper: skip - legacy worker',
+        'FROM node:20 AS worker',
+        '# bumper: skip',
+        'ARG NODE_VERSION=20',
+        '',
+      ].join('\n');
+      await writeFile(join(dir, 'Dockerfile'), body);
+      await dockerNodeFeature.update(contextFor(dir));
+      const out = await readFile(join(dir, 'Dockerfile'), 'utf8');
+      assert.ok(out.includes(`FROM node:${NODE_LTS.version} AS app`), 'unheld image aligned');
+      assert.ok(out.includes('FROM node:20 AS worker'), 'held image untouched');
+      assert.ok(out.includes('ARG NODE_VERSION=20'), 'held arg untouched');
+    });
+  });
+
   test('owns the node image so the generic docker feature never bumps it', async () => {
     assert.deepEqual(await dockerNodeFeature.managedImages?.(contextFor('/tmp')), ['node']);
   });

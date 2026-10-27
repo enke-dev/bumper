@@ -46,6 +46,25 @@ describe('docker-bun feature', () => {
     });
   });
 
+  test('holds a line below a `# bumper: skip` comment', async () => {
+    await withTempDir('docker-bun', async dir => {
+      const body = [
+        'services:',
+        '  app:',
+        '    image: oven/bun:1.1',
+        '  legacy:',
+        '    # bumper: skip',
+        '    image: oven/bun:1.1',
+        '',
+      ].join('\n');
+      await writeFile(join(dir, 'compose.yaml'), body);
+      await dockerBunFeature.update(contextFor(dir));
+      const out = await readFile(join(dir, 'compose.yaml'), 'utf8');
+      assert.ok(out.includes(`image: oven/bun:${BUN_LATEST.version}`), 'unheld image aligned');
+      assert.ok(out.includes('# bumper: skip\n    image: oven/bun:1.1'), 'held image untouched');
+    });
+  });
+
   test('owns the oven/bun image so the generic docker feature never bumps it', async () => {
     assert.deepEqual(await dockerBunFeature.managedImages?.(contextFor('/tmp')), ['oven/bun']);
   });

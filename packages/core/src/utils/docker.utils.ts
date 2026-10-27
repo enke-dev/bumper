@@ -2,6 +2,7 @@ import { parseFamiliarName } from '@swimlane/docker-reference';
 
 import type { ModuleContext } from '../context/context.types.js';
 import { collectFiles } from './fs.utils.js';
+import { isHeldLine } from './skip-comment.utils.js';
 
 /** Dockerfiles + compose manifests, matched anywhere in the tree. */
 export const DOCKER_GLOB =
@@ -46,6 +47,15 @@ export function parseImageRefs(text: string): string[] {
   ].filter((ref): ref is string => ref !== undefined);
   // `FROM scratch` is the empty base image — nothing to bump.
   return refs.filter(ref => ref !== 'scratch');
+}
+
+/** The refs held by a `# bumper: skip` comment on the line directly above their FROM/image line
+ * (see {@link isHeldLine}). */
+export function parseSkippedImageRefs(text: string): Set<string> {
+  const lines = text.split(/\r?\n/);
+  return new Set(
+    lines.filter((_, index) => isHeldLine(lines, index)).flatMap(line => parseImageRefs(line))
+  );
 }
 
 /** An image reference decomposed + normalized to docker's canonical form. */

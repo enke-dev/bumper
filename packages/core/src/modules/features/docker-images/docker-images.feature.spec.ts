@@ -173,6 +173,26 @@ describe('docker-images feature', () => {
     });
   });
 
+  test('holds a ref below a `# bumper: skip` comment, everywhere in the file', async () => {
+    const body = [
+      'services:',
+      '  db:',
+      '    # bumper: skip - pinned to prod',
+      '    image: postgres:16',
+      '  db-copy:',
+      '    image: postgres:16',
+      '  cache:',
+      '    image: redis:7.2',
+      '',
+    ].join('\n');
+    await withFiles({ 'compose.yaml': body }, async (dir, ctx) => {
+      await updateDockerImages(ctx, fetchTags);
+      const out = await readFile(join(dir, 'compose.yaml'), 'utf8');
+      assert.ok(!out.includes('postgres:18'), 'held ref not bumped, nor its repetition');
+      assert.ok(out.includes('image: redis:8.0'), 'unheld ref bumped');
+    });
+  });
+
   test('rewrites every occurrence of a repeated ref', async () => {
     const body = 'FROM postgres:16 AS base\nFROM postgres:16 AS worker\n';
     await withDockerfile(body, async (dir, ctx) => {

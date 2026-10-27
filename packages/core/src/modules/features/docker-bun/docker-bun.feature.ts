@@ -3,6 +3,7 @@ import { relative } from 'node:path';
 
 import { findDockerFiles } from '../../../utils/docker.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
+import { replaceUnheldLines } from '../../../utils/skip-comment.utils.js';
 import type { Module, ModuleContext } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 import { ensureBunLatest } from '../../runtimes/bun/bun-release.utils.js';
@@ -54,9 +55,9 @@ export const dockerBunFeature: Module = {
           return;
         }
         const original = await readFile(file, 'utf8');
-        const updated = original
-          .replace(IMAGE_RE, `oven/bun:${version}`)
-          .replace(ARG_RE, `BUN_VERSION=${version}`);
+        const updated = replaceUnheldLines(original, line =>
+          line.replace(IMAGE_RE, `oven/bun:${version}`).replace(ARG_RE, `BUN_VERSION=${version}`)
+        );
         if (updated !== original) {
           await writeFile(file, updated);
         }

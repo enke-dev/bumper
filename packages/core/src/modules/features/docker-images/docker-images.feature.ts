@@ -6,6 +6,7 @@ import {
   findDockerFiles,
   parseImageRef,
   parseImageRefs,
+  parseSkippedImageRefs,
   registryHost,
 } from '../../../utils/docker.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
@@ -90,7 +91,8 @@ function applyBumps(text: string, bumps: readonly Bump[]): string {
  * Bump base images referenced in Docker/compose files to their newest tag on the same variant +
  * precision (see {@link pickNewestTag}). Images owned by another module (see
  * {@link Module.managedImages}, e.g. `node` held at LTS by docker-node) are skipped via the
- * ownership carve-out. Best-effort per image: a registry failure leaves that ref untouched.
+ * ownership carve-out, refs below a `# bumper: skip` comment (see {@link parseSkippedImageRefs})
+ * are held as they are. Best-effort per image: a registry failure leaves that ref untouched.
  */
 export async function updateDockerImages(
   ctx: ModuleContext,
@@ -103,7 +105,9 @@ export async function updateDockerImages(
     files.map(async file => {
       const original = await readFile(file, 'utf8');
       const { candidates } = partitionByOwnership(parseImageRefs(original), owned);
-      const unique = [...new Set(candidates)];
+      // a held ref stays everywhere in the file, as bumps rewrite every occurrence of a ref
+      const skipped = parseSkippedImageRefs(original);
+      const unique = [...new Set(candidates)].filter(ref => !skipped.has(ref));
       const bumps = (
         await Promise.all(unique.map(ref => resolveBump(ref, fetchTags, resolveDigest)))
       ).filter((bump): bump is Bump => bump !== null);

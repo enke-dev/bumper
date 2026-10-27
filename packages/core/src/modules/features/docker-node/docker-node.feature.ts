@@ -3,6 +3,7 @@ import { relative } from 'node:path';
 
 import { findDockerFiles } from '../../../utils/docker.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
+import { replaceUnheldLines } from '../../../utils/skip-comment.utils.js';
 import type { Module } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 import { ensureNodeLts } from '../../runtimes/node/node-lts.utils.js';
@@ -34,9 +35,11 @@ export const dockerNodeFeature: Module = {
           return;
         }
         const original = await readFile(file, 'utf8');
-        const updated = original
-          .replace(/node:[0-9]+(\.[0-9]+)*/g, `node:${version}`)
-          .replace(/NODE_VERSION=[0-9]+(\.[0-9]+)*/g, `NODE_VERSION=${version}`);
+        const updated = replaceUnheldLines(original, line =>
+          line
+            .replace(/node:[0-9]+(\.[0-9]+)*/g, `node:${version}`)
+            .replace(/NODE_VERSION=[0-9]+(\.[0-9]+)*/g, `NODE_VERSION=${version}`)
+        );
         if (updated !== original) {
           await writeFile(file, updated);
         }
