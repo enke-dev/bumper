@@ -5,6 +5,7 @@ import { dockerImagesFeature } from './features/docker-images/docker-images.feat
 import { dockerNodeFeature } from './features/docker-node/docker-node.feature.js';
 import { githubActionsFeature } from './features/github-actions/github-actions.feature.js';
 import { githubVersionFilesFeature } from './features/github-version-files/github-version-files.feature.js';
+import { tsconfigNodeFeature } from './features/tsconfig-node/tsconfig-node.feature.js';
 import { typesBunFeature } from './features/types-bun/types-bun.feature.js';
 import { typesNodeFeature } from './features/types-node/types-node.feature.js';
 import type { Module } from './module.types.js';
@@ -16,15 +17,16 @@ import { nodeRuntime } from './runtimes/node/node.runtime.js';
 
 /**
  * Ordered module registry. Runtimes first so version pins are in place; then
- * dependency-pinning features (types-node, types-bun) so their edits land in package.json
- * *before* the package manager installs — otherwise the lockfile would be left out of sync with
- * a freshly bumped `@types/node`. Package managers then bump + install everything, and the
+ * dependency-pinning features (types-node, tsconfig-node, types-bun) so their edits land in
+ * package.json *before* the package manager installs — otherwise the lockfile would be left out
+ * of sync with a freshly bumped `@types/node`. Package managers then bump + install everything, and the
  * remaining file-rewriting features run last.
  */
 const MODULES: readonly Module[] = [
   nodeRuntime,
   bunRuntime,
   typesNodeFeature,
+  tsconfigNodeFeature,
   typesBunFeature,
   bunPackageManager,
   npmPackageManager,
