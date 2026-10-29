@@ -1,6 +1,6 @@
 {
   "name": "@enke.dev/bumper",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org",

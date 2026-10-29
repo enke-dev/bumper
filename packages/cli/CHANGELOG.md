@@ -1,5 +1,19 @@
 # @enke.dev/bumper
 
+# [0.18.0](https://github.com/enke-dev/bumper/compare/0.17.0...0.18.0) (2026-10-29)
+
+### Bug Fixes
+
+* **docker-node:** leave images merely ending in -node alone ([f81c1f3](https://github.com/enke-dev/bumper/commit/f81c1f305626ea9160aa828e405bf63d1e9f9da9))
+* find files in dot dirs, asking git for the file list ([9d99521](https://github.com/enke-dev/bumper/commit/9d99521c36f5c531af69eb1f97533f1f8ab7f645))
+
+### Features
+
+* **devcontainer-node:** align node in devcontainer configs ([f67829a](https://github.com/enke-dev/bumper/commit/f67829af9002533171ce409acc21c5090834ef49))
+* **github:** read node/bun/pnpm versions from their pins in workflows ([5ccaee6](https://github.com/enke-dev/bumper/commit/5ccaee672a8ae115d4d3ba6294d769f931d56c14))
+* **runtimes:** align devEngines and tool manager configs ([3ef8d3a](https://github.com/enke-dev/bumper/commit/3ef8d3aa807301719cf90d8e8c36db0dc75e9a50))
+* **tsconfig-node:** move @tsconfig/node<major> to the node lts major ([3bdde5e](https://github.com/enke-dev/bumper/commit/3bdde5eb4428e0e9989b21f791b5ce140eaac59b))
+
 # [0.17.0](https://github.com/enke-dev/bumper/compare/0.16.1...0.17.0) (2026-10-27)
 
 ### Features
