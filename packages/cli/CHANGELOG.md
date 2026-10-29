@@ -1,5 +1,13 @@
 # @enke.dev/bumper
 
+## [0.18.1](https://github.com/enke-dev/bumper/compare/0.18.0...0.18.1) (2026-10-29)
+
+### Bug Fixes
+
+* **bun:** install within the --min-release-age override ([f9b217b](https://github.com/enke-dev/bumper/commit/f9b217be779cc91f8a19c8701c6f48142122d08c))
+* **deps:** name the peer that holds a dependency below latest ([8322221](https://github.com/enke-dev/bumper/commit/83222215b1fc7902de737cbbde09ec94216a3323))
+* keep stable pins off prereleases tagged latest ([b9dfefd](https://github.com/enke-dev/bumper/commit/b9dfefdac92bae7d715714e23e2db8b6d65bb77d))
+
 # [0.18.0](https://github.com/enke-dev/bumper/compare/0.17.0...0.18.0) (2026-10-29)
 
 ### Bug Fixes
