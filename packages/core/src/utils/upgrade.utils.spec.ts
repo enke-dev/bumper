@@ -203,6 +203,46 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.dependencies?.['lit'], '^3.2.0');
   });
 
+  test('names the peer that holds a package below latest', async () => {
+    // Regression (estino/pitstop): ui.components@0.65.0 peered lit-utils `^0.6.2`, which kept
+    // lit-utils on 0.6.3 while 0.7.0 was out - silently, so it read like an ignored release age
+    latest = {
+      '@enke.dev/lit-utils': '0.7.0',
+      '@optiscaners/ui.components': '0.65.0',
+      lit: '3.2.0',
+    };
+    versions = { '@enke.dev/lit-utils': ['0.6.2', '0.6.3', '0.7.0'], lit: ['3.0.0', '3.2.0'] };
+    peers = { '@optiscaners/ui.components': { '@enke.dev/lit-utils': '^0.6.2', lit: '^3.0.0' } };
+    await writePkg({
+      name: 'root',
+      dependencies: {
+        '@enke.dev/lit-utils': '0.6.2',
+        '@optiscaners/ui.components': '^0.64.0',
+        lit: '^3.0.0',
+      },
+    });
+
+    const out = captureStdout();
+    try {
+      await upgradeAllWorkspaces(ctx(), lookups);
+    } finally {
+      out.restore();
+    }
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.dependencies?.['@enke.dev/lit-utils'], '0.6.3');
+    assert.equal(pkg?.dependencies?.['lit'], '^3.2.0');
+    assert.ok(
+      out
+        .output()
+        .includes(
+          '@enke.dev/lit-utils held at 0.6.3, latest 0.7.0 is excluded by ^0.6.2 (@optiscaners/ui.components@0.65.0)'
+        )
+    );
+    // a cap latest satisfies is no cause: lit is capped by `^3.0.0`, but lands on latest
+    assert.ok(!out.output().includes('lit held'));
+  });
+
   test('caps on a hyphen-range peer', async () => {
     // Regression (kvlm/projector): @awmottaz/prettier-plugin-void-html peers
     // `prettier: 3.0.0 - 3.8.x`. The hyphen range carries no `<`/`>`/`||` comparator, so it was

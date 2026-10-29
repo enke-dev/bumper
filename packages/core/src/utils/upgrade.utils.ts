@@ -12,7 +12,7 @@ import {
   peerDependenciesOf,
   viewTool,
 } from './npm-registry.utils.js';
-import { planLine } from './output.utils.js';
+import { planLine, stepNote } from './output.utils.js';
 import type { PackageJson } from './package.types.js';
 import { isPinnable, isVersionRange, operatorOf } from './spec.utils.js';
 
@@ -44,6 +44,13 @@ export interface RegistryLookups {
     tool: string,
     cwd: string
   ) => Promise<Record<string, string>>;
+}
+
+/** A range capping a package's bump, and who declared it: a dependency (`name@version`, from its
+ * peers) or the manifest itself (its own range for the package). */
+interface CapRange {
+  range: string;
+  by: string;
 }
 
 /**
@@ -246,8 +253,8 @@ async function collectPeerCaps(
   exempt: ReadonlySet<string>,
   tool: string,
   lookups: RegistryLookups
-): Promise<Map<string, string[]>> {
-  const collected = new Map<string, Set<string>>();
+): Promise<Map<string, CapRange[]>> {
+  const collected = new Map<string, CapRange[]>();
   await Promise.all(
     depNames.map(async dep => {
       const version = await targetVersion(cwd, dep, latest);
@@ -259,11 +266,12 @@ async function collectPeerCaps(
         if (exempt.has(peer) || (!isPinnable(range) && !isVersionRange(range))) {
           return;
         }
-        (collected.get(peer) ?? collected.set(peer, new Set()).get(peer))?.add(range);
+        const caps = collected.get(peer) ?? collected.set(peer, []).get(peer) ?? [];
+        caps.push({ range, by: `${dep}@${version}` });
       });
     })
   );
-  return new Map([...collected].map(([peer, ranges]) => [peer, [...ranges]]));
+  return collected;
 }
 
 /**
@@ -354,15 +362,31 @@ export async function upgradeAllWorkspaces(
   // The version each package landed on in any bucket, capped where a peer applied; the override
   // trees are realigned to these afterwards, so a pin follows its dependency rather than `latest`.
   const applied = new Map<string, string>();
+  const heldBack = new Map<string, HeldBack>();
   const specsChanged = new Map<string, boolean>();
   await Promise.all(
     [...pkgs].map(async ([dir, pkg]) => {
       specsChanged.set(
         dir,
-        await rewriteSpecs(pkg, managed, latest, peerCaps, tool, ctx.cwd, lookups, applied)
+        await rewriteSpecs(
+          pkg,
+          managed,
+          latest,
+          peerCaps,
+          tool,
+          ctx.cwd,
+          lookups,
+          applied,
+          heldBack
+        )
       );
     })
   );
+  // a cap silently keeping a package off `latest` looks like a bumper bug, so name its cause
+  heldBack.forEach(({ version, latest: newest, caps }, name) => {
+    const causes = caps.map(({ range, by }) => `${range} (${by})`).join(', ');
+    stepNote(`${name} held at ${version}, latest ${newest} is excluded by ${causes}`);
+  });
   // Override trees live in the root manifest only, whichever field spelling is used.
   const resolved = new Map<string, string | null>([...latest, ...applied]);
   const overridesChanged =
@@ -413,23 +437,29 @@ async function rewriteSpecs(
   pkg: PackageJson,
   managed: ReadonlySet<string>,
   latest: Map<string, string | null>,
-  peerCaps: ReadonlyMap<string, string[]>,
+  peerCaps: ReadonlyMap<string, CapRange[]>,
   tool: string,
   cwd: string,
   lookups: RegistryLookups,
-  applied: Map<string, string>
+  applied: Map<string, string>,
+  heldBack: Map<string, HeldBack>
 ): Promise<boolean> {
   const present = allDependencies(pkg);
   // Collect every capping range per package as a list — never joined into one string (see
   // collectPeerCaps): the manifest's own self-declared range plus each dependency's peer range.
-  const capRanges = new Map<string, string[]>();
-  cappedRanges(pkg, managed).forEach((range, name) => capRanges.set(name, [range]));
-  peerCaps.forEach((ranges, name) => {
+  const capSources = new Map<string, CapRange[]>();
+  cappedRanges(pkg, managed).forEach((range, name) =>
+    capSources.set(name, [{ range, by: pkg.name ?? 'manifest' }])
+  );
+  peerCaps.forEach((caps, name) => {
     if (!(name in present)) {
       return;
     }
-    capRanges.set(name, [...new Set([...(capRanges.get(name) ?? []), ...ranges])]);
+    capSources.set(name, [...(capSources.get(name) ?? []), ...caps]);
   });
+  const capRanges = new Map(
+    [...capSources].map(([name, caps]) => [name, [...new Set(caps.map(({ range }) => range))]])
+  );
   const capped = new Map(
     await Promise.all(
       [...capRanges].map(
@@ -465,10 +495,12 @@ async function rewriteSpecs(
           capped_ && !(capRanges.get(name) ?? []).every(range => satisfies(current, range));
         if (!currentViolatesCaps) {
           recordApplied(applied, name, current);
+          recordHeldBack(heldBack, name, current, latest.get(name), capSources.get(name));
           return acc;
         }
       }
       recordApplied(applied, name, version);
+      recordHeldBack(heldBack, name, version, latest.get(name), capSources.get(name));
       const next = `${operatorOf(spec)}${version}`;
       if (next === spec) {
         return acc;
@@ -478,6 +510,36 @@ async function rewriteSpecs(
     }, false);
     return bucketChanged || entryChanged;
   }, false);
+}
+
+/** A package a cap kept below `latest`, with the caps `latest` fails. */
+interface HeldBack {
+  version: string;
+  latest: string;
+  caps: CapRange[];
+}
+
+/** Remember a capped package landing below `latest`, keeping only the caps that exclude it: those
+ * are the cause, the others would have allowed `latest`. The lowest version wins, like
+ * {@link recordApplied}. */
+function recordHeldBack(
+  heldBack: Map<string, HeldBack>,
+  name: string,
+  version: string,
+  newest: string | null | undefined,
+  caps: CapRange[] | undefined
+): void {
+  if (!caps || !newest || !isValid(newest) || !isLessThan(version, newest)) {
+    return;
+  }
+  const previous = heldBack.get(name);
+  if (previous && !isLessThan(version, previous.version)) {
+    return;
+  }
+  const excluding = caps.filter(({ range }) => !satisfies(newest, range));
+  if (excluding.length > 0) {
+    heldBack.set(name, { version, latest: newest, caps: excluding });
+  }
 }
 
 /** Remember the version `name` landed on; when manifests disagree the lowest (most constrained) wins. */

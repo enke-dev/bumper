@@ -39,6 +39,10 @@ needed, the declaration lives in the dependency itself. Because the peers are re
 version, a peer newly introduced (or changed) by that bump is honored in the **same run** — no
 second pass needed to converge.
 
+A package held below `latest` this way is reported with the cause, e.g. `@enke.dev/lit-utils held
+at 0.6.3, latest 0.7.0 is excluded by ^0.6.2 (@optiscaners/ui.components@0.65.0)`: such a hold
+releases once the capping dependency widens its peer range, `--min-release-age` has no say in it.
+
 > **Note** — most network runs through subprocesses (`curl` for the Node dist index, `pnpm`/`npm
 view` for versions, `actions-up` via `bunx`), so private-registry auth is handled by the tools
 > that own it — the repo's own `.npmrc` just works. The `docker-images` feature is the exception: it
