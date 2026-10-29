@@ -43,6 +43,27 @@ describe('bun runtime', () => {
     });
   });
 
+  test('aligns devEngines naming bun and an existing .tool-versions', async () => {
+    await withFixture('bun', async dir => {
+      const pkg = await readPackageJson(dir);
+      const devEngines = {
+        runtime: { name: 'bun', version: '^1.1.0' },
+        packageManager: { name: 'bun', version: '1.1.0' },
+      };
+      await writeFile(join(dir, 'package.json'), JSON.stringify({ ...pkg, devEngines }));
+      await writeFile(join(dir, '.tool-versions'), 'bun 1.1.0\nnodejs 22.1.0\n');
+      await bunRuntime.update(contextFor(dir));
+      assert.deepEqual((await readPackageJson(dir))?.['devEngines'], {
+        runtime: { name: 'bun', version: `^${BUN_LATEST.version}` },
+        packageManager: { name: 'bun', version: BUN_LATEST.version },
+      });
+      assert.equal(
+        await readFile(join(dir, '.tool-versions'), 'utf8'),
+        `bun ${BUN_LATEST.version}\nnodejs 22.1.0\n`
+      );
+    });
+  });
+
   test('dry-run leaves .bun-version and engines.bun untouched', async () => {
     await withFixture('bun', async dir => {
       const before = await readPackageJson(dir);

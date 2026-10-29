@@ -9,7 +9,12 @@ import {
   writePackageJson,
 } from '../../../utils/fs.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
-import { realignVersionSpec } from '../../../utils/spec.utils.js';
+import type { Pin } from '../../../utils/version-pins.utils.js';
+import {
+  realignDevEngines,
+  realignEngines,
+  realignToolConfigs,
+} from '../../../utils/version-pins.utils.js';
 import type { Module, ModuleContext } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 import { ensureBunLatest } from './bun-release.utils.js';
@@ -35,18 +40,21 @@ async function writeVersionFile(dir: string, version: string, ensure: boolean): 
 }
 
 /**
- * Realign an existing `engines.bun` floor to the pinned Bun, preserving the operator + precision
- * the manifest declared (see `realignVersionSpec`). Never injects an `engines` field.
+ * Realign an existing `engines.bun` floor and the `devEngines` runtime + packageManager entries
+ * naming bun (one binary, one release) to the pinned Bun, preserving operator + precision (see
+ * `realignVersionSpec`). Never injects a field.
  */
-async function alignEnginesBun(dir: string, version: string, major: number): Promise<void> {
+async function alignManifestBun(dir: string, pin: Pin): Promise<void> {
   const pkg = await readPackageJson(dir);
-  const current = pkg?.engines?.['bun'];
-  if (!pkg || !pkg.engines || !current) {
+  if (!pkg) {
     return;
   }
-  const next = realignVersionSpec(current, version, major);
-  if (next && next !== current) {
-    pkg.engines['bun'] = next;
+  // both, not short-circuited
+  const changed = [
+    realignEngines(pkg, 'bun', pin),
+    realignDevEngines(pkg, 'bun', pin, ['runtime', 'packageManager']),
+  ];
+  if (changed.some(Boolean)) {
     await writePackageJson(dir, pkg);
   }
 }
@@ -62,7 +70,8 @@ export const bunRuntime: Module = {
     const bun = await ensureBunLatest(ctx);
     if (ctx.dryRun) {
       planLine(`write ${bun.version} to .bun-version (root + any member pinning one)`);
-      planLine(`align engines.bun to ${bun.version} where declared`);
+      planLine(`align engines.bun / devEngines to ${bun.version} where declared`);
+      planLine(`align bun in any existing .tool-versions / mise.toml to ${bun.version}`);
       return;
     }
     // The binary itself is upgraded by the bun package-manager module (`bun upgrade`); this
@@ -71,7 +80,8 @@ export const bunRuntime: Module = {
       ctx.workspaces.map(async dir => {
         const isRoot = dir === ctx.cwd;
         await writeVersionFile(dir, bun.version, isRoot);
-        await alignEnginesBun(dir, bun.version, bun.major);
+        await alignManifestBun(dir, bun);
+        await realignToolConfigs(dir, ['bun'], bun);
       })
     );
   },

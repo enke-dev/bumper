@@ -10,7 +10,12 @@ import {
   writePackageJson,
 } from '../../../utils/fs.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
-import { realignVersionSpec } from '../../../utils/spec.utils.js';
+import type { Pin } from '../../../utils/version-pins.utils.js';
+import {
+  realignDevEngines,
+  realignEngines,
+  realignToolConfigs,
+} from '../../../utils/version-pins.utils.js';
 import type { Module, ModuleContext } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 import { ensureNodeLts } from './node-lts.utils.js';
@@ -40,21 +45,22 @@ async function writeVersionFile(
   }
 }
 
+/** Node's names in `.tool-versions` (asdf's plugin) and mise configs. */
+const NODE_TOOLS = ['nodejs', 'node'];
+
 /**
- * Realign an existing `engines.node` floor to the pinned Node, preserving the operator + precision
- * the manifest declared (see `repinNodeSpec`). No-op when the manifest declares no `engines.node`,
- * or when its spec is a shape we don't rewrite (a compound range is left as authored) — never
- * injects an `engines` field where there was none.
+ * Realign an existing `engines.node` floor and `devEngines.runtime` entry to the pinned Node,
+ * preserving the operator + precision the manifest declared (see `realignVersionSpec`). Shapes we
+ * don't rewrite (a compound range) are left as authored, and no field is ever injected.
  */
-async function alignEnginesNode(dir: string, version: string, major: number): Promise<void> {
+async function alignManifestNode(dir: string, pin: Pin): Promise<void> {
   const pkg = await readPackageJson(dir);
-  const current = pkg?.engines?.['node'];
-  if (!pkg || !pkg.engines || !current) {
+  if (!pkg) {
     return;
   }
-  const next = realignVersionSpec(current, version, major);
-  if (next && next !== current) {
-    pkg.engines['node'] = next;
+  // both, not short-circuited
+  const changed = [realignEngines(pkg, 'node', pin), realignDevEngines(pkg, 'node', pin)];
+  if (changed.some(Boolean)) {
     await writePackageJson(dir, pkg);
   }
 }
@@ -90,18 +96,20 @@ export const nodeRuntime: Module = {
     if (ctx.dryRun) {
       planLine(`install Node ${lts.version} via ${ctx.versionManager}`);
       planLine(`write v${lts.version} to .node-version + any existing .nvmrc (root + members)`);
-      planLine(`align engines.node to ${lts.version} where declared`);
+      planLine(`align engines.node / devEngines.runtime to ${lts.version} where declared`);
+      planLine(`align node in any existing .tool-versions / mise.toml to ${lts.version}`);
       return;
     }
     await installNode(ctx, lts.version);
     await Promise.all(
       ctx.workspaces.map(async dir => {
         // Root always gets the canonical `.node-version`; members only if they already pin one
-        // (mirrors update.sh). `.nvmrc` and `engines.node` are aligned only where they exist.
+        // (mirrors update.sh). `.nvmrc`, tool configs and manifest fields only where they exist.
         const isRoot = dir === ctx.cwd;
         await writeVersionFile(dir, '.node-version', lts.version, isRoot);
         await writeVersionFile(dir, '.nvmrc', lts.version, false);
-        await alignEnginesNode(dir, lts.version, lts.major);
+        await alignManifestNode(dir, lts);
+        await realignToolConfigs(dir, NODE_TOOLS, lts);
       })
     );
   },

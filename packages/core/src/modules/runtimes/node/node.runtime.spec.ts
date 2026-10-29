@@ -42,6 +42,31 @@ describe('node runtime feature', () => {
     });
   });
 
+  test('aligns devEngines.runtime and existing tool manager configs', async () => {
+    await withFixture('node-npm', async dir => {
+      const pkg = await readPackageJson(dir);
+      await writeFile(
+        join(dir, 'package.json'),
+        JSON.stringify({ ...pkg, devEngines: { runtime: { name: 'node', version: '>=20' } } })
+      );
+      await writeFile(join(dir, '.tool-versions'), 'nodejs 20.11.0\n');
+      await writeFile(join(dir, 'mise.toml'), '[tools]\nnode = "20"\n');
+      await nodeRuntime.update(contextFor(dir));
+      const after = await readPackageJson(dir);
+      assert.deepEqual(after?.['devEngines'], {
+        runtime: { name: 'node', version: `>=${NODE_LTS.major}` },
+      });
+      assert.equal(
+        await readFile(join(dir, '.tool-versions'), 'utf8'),
+        `nodejs ${NODE_LTS.version}\n`
+      );
+      assert.equal(
+        await readFile(join(dir, 'mise.toml'), 'utf8'),
+        `[tools]\nnode = "${NODE_LTS.major}"\n`
+      );
+    });
+  });
+
   test('dry-run leaves .node-version, .nvmrc and engines.node untouched', async () => {
     await withFixture('node-npm', async dir => {
       await writeFile(join(dir, '.nvmrc'), 'v18.0.0\n');
