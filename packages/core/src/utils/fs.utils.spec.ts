@@ -5,9 +5,12 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
 import { makeTempDir } from '../testing/with-temp-dir.harness.js';
+import { execOk } from './exec.utils.js';
 import {
   allDependencies,
   anyExists,
+  collectFiles,
+  expandBraces,
   globFiles,
   pathExists,
   readPackageJson,
@@ -73,6 +76,58 @@ describe('globFiles', () => {
 
   test('returns an empty array when nothing matches', async () => {
     assert.deepEqual(await globFiles(dir, '*.nope'), []);
+  });
+});
+
+describe('expandBraces', () => {
+  test('expands every brace group, keeping a pattern without one', () => {
+    assert.deepEqual(expandBraces('**/{a,b}.{json,yml}'), [
+      '**/a.json',
+      '**/a.yml',
+      '**/b.json',
+      '**/b.yml',
+    ]);
+    assert.deepEqual(expandBraces('**/tsconfig*.json'), ['**/tsconfig*.json']);
+  });
+});
+
+describe('collectFiles', () => {
+  async function tree() {
+    const files = [
+      'tsconfig.json',
+      '.storybook/tsconfig.json',
+      'packages/ui/.storybook/tsconfig.build.json',
+      '.svelte-kit/tsconfig.json',
+      'node_modules/x/tsconfig.json',
+      'examples/tsconfig.json',
+    ];
+    await Promise.all(
+      files.map(async file => {
+        await mkdir(join(dir, file, '..'), { recursive: true });
+        await writeFile(join(dir, file), '{}\n');
+      })
+    );
+  }
+  const relative = (paths: string[]) => paths.map(path => path.slice(dir.length + 1)).sort();
+
+  test('in a git work tree, finds files in dot dirs at any depth and skips ignored ones', async () => {
+    await tree();
+    await writeFile(join(dir, '.gitignore'), '.svelte-kit\n');
+    await execOk(['git', 'init', '-q'], { cwd: dir });
+    assert.deepEqual(relative(await collectFiles(dir, '**/tsconfig*.json', ['examples'])), [
+      '.storybook/tsconfig.json',
+      'packages/ui/.storybook/tsconfig.build.json',
+      'tsconfig.json',
+    ]);
+  });
+
+  test('outside a git work tree, globs the dot dirs at the root too', async () => {
+    await tree();
+    assert.deepEqual(relative(await collectFiles(dir, '**/tsconfig*.json', ['examples'])), [
+      '.storybook/tsconfig.json',
+      '.svelte-kit/tsconfig.json',
+      'tsconfig.json',
+    ]);
   });
 });
 

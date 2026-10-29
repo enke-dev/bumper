@@ -1,6 +1,7 @@
-import { access, glob, readFile, stat, writeFile } from 'node:fs/promises';
+import { access, glob, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, relative as relativePath, resolve, sep } from 'node:path';
 
+import { exec } from './exec.utils.js';
 import type { PackageJson } from './package.types.js';
 
 /** Whether a path exists (file or dir). */
@@ -19,6 +20,14 @@ export async function anyExists(dir: string, names: string[]): Promise<boolean> 
   return present.some(Boolean);
 }
 
+/** The regular files among `paths`; directories and vanished paths drop out. */
+async function onlyFiles(paths: readonly string[]): Promise<string[]> {
+  const files = await Promise.all(
+    paths.map(async path => ((await stat(path).catch(() => null))?.isFile() ? path : null))
+  );
+  return files.filter((path): path is string => path !== null);
+}
+
 /**
  * Expand `pattern` under `cwd`, returning absolute paths to regular files only.
  * Uses the node `fs.glob` API (implemented by both Node ≥22 and Bun), so results
@@ -27,11 +36,50 @@ export async function anyExists(dir: string, names: string[]): Promise<boolean> 
  */
 export async function globFiles(cwd: string, pattern: string): Promise<string[]> {
   const relative = await Array.fromAsync(glob(pattern, { cwd }));
-  const absolute = relative.map(entry => join(cwd, entry));
-  const files = await Promise.all(
-    absolute.map(async path => ((await stat(path)).isFile() ? path : null))
+  return onlyFiles(relative.map(entry => join(cwd, entry)));
+}
+
+/** `a/{b,c}/d` → `a/b/d`, `a/c/d`, as git pathspecs know no braces. */
+export function expandBraces(pattern: string): string[] {
+  const match = /\{([^{}]*)\}/.exec(pattern);
+  if (!match) {
+    return [pattern];
+  }
+  const [group, alternatives = ''] = match;
+  return alternatives.split(',').flatMap(alt => expandBraces(pattern.replace(group, alt)));
+}
+
+/**
+ * Files matching `pattern` under `cwd` as git sees them — tracked plus untracked, minus ignored —
+ * or null outside a git work tree. Unlike `fs.glob`, git matches inside dot dirs (`.devcontainer`,
+ * `.storybook`) the same on every runtime, and skips the generated files a repo ignores.
+ */
+async function gitFiles(cwd: string, pattern: string): Promise<string[] | null> {
+  const pathspecs = expandBraces(pattern).map(expanded => `:(glob)${expanded}`);
+  const { exitCode, stdout } = await exec(
+    ['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...pathspecs],
+    { cwd }
   );
-  return files.filter((path): path is string => path !== null);
+  if (exitCode !== 0) {
+    return null;
+  }
+  // a conflicted file is listed once per stage
+  const relative = [...new Set(stdout.split('\0').filter(Boolean))];
+  return onlyFiles(relative.map(entry => join(cwd, entry)));
+}
+
+/** `fs.glob`, plus the dot dirs directly under `cwd` for a `**` pattern, which it never descends
+ * (outside a git work tree only, see {@link gitFiles}). */
+async function globWithDotDirs(cwd: string, pattern: string): Promise<string[]> {
+  const dotDirs = pattern.startsWith('**/')
+    ? (await readdir(cwd, { withFileTypes: true }).catch(() => []))
+        .filter(entry => entry.isDirectory() && entry.name.startsWith('.') && entry.name !== '.git')
+        .map(entry => `${entry.name}/`)
+    : [];
+  const found = await Promise.all(
+    ['', ...dotDirs].map(prefix => globFiles(cwd, `${prefix}${pattern}`))
+  );
+  return found.flat();
 }
 
 /**
@@ -48,13 +96,16 @@ export function isExcluded(cwd: string, path: string, exclude: string[]): boolea
  * Discover files under `cwd` matching `pattern`, honoring the repo's `exclude`
  * list and always skipping `node_modules`. Every file-based feature should route
  * its discovery through here so `exclude` is respected uniformly, not per-module.
+ * Asks git first (see {@link gitFiles}), globbing only outside a work tree.
  */
 export async function collectFiles(
   cwd: string,
   pattern: string,
   exclude: string[] = []
 ): Promise<string[]> {
-  const matches = await globFiles(cwd, pattern);
+  const matches = [
+    ...new Set((await gitFiles(cwd, pattern)) ?? (await globWithDotDirs(cwd, pattern))),
+  ];
   return matches.filter(
     match => !match.split(sep).includes('node_modules') && !isExcluded(cwd, match, exclude)
   );

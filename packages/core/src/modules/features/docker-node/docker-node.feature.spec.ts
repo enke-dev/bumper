@@ -79,6 +79,27 @@ describe('docker-node feature', () => {
     });
   });
 
+  test('finds Docker files in .devcontainer, which globs skip as a dot dir', async () => {
+    await withTempDir('docker-node', async dir => {
+      await mkdir(join(dir, '.devcontainer', 'web'), { recursive: true });
+      const files = [
+        join(dir, '.devcontainer', 'Dockerfile'),
+        join(dir, '.devcontainer', 'web', 'Dockerfile'),
+      ];
+      await Promise.all(files.map(file => writeFile(file, 'FROM node:20\n')));
+      await dockerNodeFeature.update(contextFor(dir));
+      const texts = await Promise.all(files.map(file => readFile(file, 'utf8')));
+      assert.deepEqual(
+        texts,
+        files.map(() => `FROM node:${NODE_LTS.version}\n`)
+      );
+
+      await writeFile(files[0] ?? '', 'FROM node:20\n');
+      await dockerNodeFeature.update(contextFor(dir, false, ['.devcontainer']));
+      assert.equal(await readFile(files[0] ?? '', 'utf8'), 'FROM node:20\n', 'exclude honored');
+    });
+  });
+
   test('owns the node image so the generic docker feature never bumps it', async () => {
     assert.deepEqual(await dockerNodeFeature.managedImages?.(contextFor('/tmp')), ['node']);
   });
