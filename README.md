@@ -154,7 +154,7 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 
 `--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `bun-runtime`,
 `types-node`, `types-bun`, `bun`, `npm`, `pnpm`, `docker-node`, `docker-bun`, `docker-images`,
-`github-actions`).
+`github-actions`, `github-version-files`).
 
 ```sh
 bumper update --dry-run                               # preview, no writes
@@ -299,19 +299,20 @@ three families (mirrored by the `modules/` folder layout): **runtimes**, **packa
 — runtimes first (pin versions), then dependency-pinning features, then package managers install,
 then the remaining file-rewriting features:
 
-| id               | kind            | detects                                               | does                                                                                                                                                              |
-| ---------------- | --------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node`           | runtime         | node runtime / `.node-version`                        | install latest LTS via fnm/asdf, write `.node-version` + any `.nvmrc`, align `engines.node`                                                                       |
-| `bun-runtime`    | runtime         | bun runtime / `.bun-version`                          | resolve latest Bun release, write `.bun-version` (root + members that pin one), align `engines.bun`                                                               |
-| `types-node`     | feature         | `@types/node` in any package                          | pin spec to exact latest in the Node LTS major line                                                                                                               |
-| `types-bun`      | feature         | `@types/bun` in any package                           | pin spec to the newest `@types/bun` not exceeding the pinned Bun release (the exact match when published)                                                         |
-| `bun`            | package-manager | bun packageManager / lockfile                         | self-upgrade, bump specs + `bun@x` packageManager field to the pinned release, reinstall                                                                          |
-| `npm`            | package-manager | npm packageManager / lockfile                         | bump specs to latest, clean reinstall, `approve-scripts --all`                                                                                                    |
-| `pnpm`           | package-manager | pnpm packageManager / lockfile                        | self-update, bump specs to latest, clean reinstall, `approve-builds --all`                                                                                        |
-| `docker-node`    | feature         | `Dockerfile*` / `compose*.yaml`                       | align `node:<ver>` / `NODE_VERSION=` to LTS                                                                                                                       |
-| `docker-bun`     | feature         | `oven/bun:` / `BUN_VERSION=` in a Docker/Compose file | align `oven/bun:<ver>` / `BUN_VERSION=` to the pinned Bun release                                                                                                 |
-| `docker-images`  | feature         | `Dockerfile*` / `compose*.yaml`                       | bump other base-image tags to newest (same variant + precision), repinning any digest, via the OCI registry API (Docker Hub, GHCR, …); `# bumper: skip` holds one |
-| `github-actions` | feature         | `.github/workflows/*.y{a,}ml`                         | pin actions via `actions-up`                                                                                                                                      |
+| id                     | kind            | detects                                                                                                           | does                                                                                                                                                                                                                                   |
+| ---------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node`                 | runtime         | node runtime / `.node-version`                                                                                    | install latest LTS via fnm/asdf, write `.node-version` + any `.nvmrc`, align `engines.node`                                                                                                                                            |
+| `bun-runtime`          | runtime         | bun runtime / `.bun-version`                                                                                      | resolve latest Bun release, write `.bun-version` (root + members that pin one), align `engines.bun`                                                                                                                                    |
+| `types-node`           | feature         | `@types/node` in any package                                                                                      | pin spec to exact latest in the Node LTS major line                                                                                                                                                                                    |
+| `types-bun`            | feature         | `@types/bun` in any package                                                                                       | pin spec to the newest `@types/bun` not exceeding the pinned Bun release (the exact match when published)                                                                                                                              |
+| `bun`                  | package-manager | bun packageManager / lockfile                                                                                     | self-upgrade, bump specs + `bun@x` packageManager field to the pinned release, reinstall                                                                                                                                               |
+| `npm`                  | package-manager | npm packageManager / lockfile                                                                                     | bump specs to latest, clean reinstall, `approve-scripts --all`                                                                                                                                                                         |
+| `pnpm`                 | package-manager | pnpm packageManager / lockfile                                                                                    | self-update, bump specs to latest, clean reinstall, `approve-builds --all`                                                                                                                                                             |
+| `docker-node`          | feature         | `Dockerfile*` / `compose*.yaml`                                                                                   | align `node:<ver>` / `NODE_VERSION=` to LTS                                                                                                                                                                                            |
+| `github-version-files` | feature         | `actions/setup-node` / `oven-sh/setup-bun` / `pnpm/action-setup` with a hand-written version, and the pin to read | point setup-node/setup-bun at `.node-version` / `.bun-version` (`*-version-file`), drop pnpm's `version` so it reads `packageManager`; expressions, lists, `canary`, steps ahead of `actions/checkout` and `# bumper: skip` lines stay |
+| `docker-bun`           | feature         | `oven/bun:` / `BUN_VERSION=` in a Docker/Compose file                                                             | align `oven/bun:<ver>` / `BUN_VERSION=` to the pinned Bun release                                                                                                                                                                      |
+| `docker-images`        | feature         | `Dockerfile*` / `compose*.yaml`                                                                                   | bump other base-image tags to newest (same variant + precision), repinning any digest, via the OCI registry API (Docker Hub, GHCR, …); `# bumper: skip` holds one                                                                      |
+| `github-actions`       | feature         | `.github/workflows/*.y{a,}ml`                                                                                     | pin actions via `actions-up`                                                                                                                                                                                                           |
 
 Adding a concern = adding one module (`*.runtime.ts` / `*.package-manager.ts` / `*.feature.ts`)
 implementing the `Module` interface and registering it. `bumper detect` exposes per-module
@@ -505,11 +506,10 @@ bumper update --exclude examples                   # skip just this run
 > Modules that read a single fixed file at the repo root (`github-actions`, the package managers)
 > are unaffected — `exclude` targets subpaths, and the root is never excluded.
 
-### Holding an image
+### Holding a single line
 
-`exclude` skips whole files. To hold a single image the `docker-images` feature would bump, put a
-`# bumper: skip` comment on the line directly above its `FROM` or `image:` line — a reason may
-follow, the comment is matched case-insensitively:
+`exclude` skips whole files. To hold a single image or version pin, put a `# bumper: skip` comment
+on the line directly above it — a reason may follow, the comment is matched case-insensitively:
 
 ```yaml
 services:
@@ -534,5 +534,15 @@ FROM node:24 AS app
 FROM node:20 AS worker
 ```
 
-GitHub Actions are pinned by `actions-up`, which brings its own ignore comments
+In workflows, `github-version-files` leaves a `node-version:` / `bun-version:` / pnpm `version:`
+line below a skip comment as written, e.g. a job testing the oldest supported Node:
+
+```yaml
+- uses: actions/setup-node@v6
+  with:
+    # bumper: skip - oldest supported node
+    node-version: 20
+```
+
+The actions themselves are pinned by `actions-up`, which brings its own ignore comments
 (`# actions-up-ignore` on a `uses:` line, `# actions-up-ignore-next-line` above it, …).

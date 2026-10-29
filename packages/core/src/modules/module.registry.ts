@@ -4,6 +4,7 @@ import { dockerBunFeature } from './features/docker-bun/docker-bun.feature.js';
 import { dockerImagesFeature } from './features/docker-images/docker-images.feature.js';
 import { dockerNodeFeature } from './features/docker-node/docker-node.feature.js';
 import { githubActionsFeature } from './features/github-actions/github-actions.feature.js';
+import { githubVersionFilesFeature } from './features/github-version-files/github-version-files.feature.js';
 import { typesBunFeature } from './features/types-bun/types-bun.feature.js';
 import { typesNodeFeature } from './features/types-node/types-node.feature.js';
 import type { Module } from './module.types.js';
@@ -29,6 +30,7 @@ const MODULES: readonly Module[] = [
   npmPackageManager,
   pnpmPackageManager,
   dockerNodeFeature,
+  githubVersionFilesFeature,
   dockerBunFeature,
   dockerImagesFeature,
   githubActionsFeature,
