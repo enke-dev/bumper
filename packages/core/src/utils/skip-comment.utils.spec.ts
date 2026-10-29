@@ -19,6 +19,10 @@ describe('isHeldLine', () => {
     assert.equal(isHeldLine(lines, 5), false);
   });
 
+  test('takes a JSONC line comment too', () => {
+    assert.equal(isHeldLine(['  // bumper: skip', 'a'], 1), true);
+  });
+
   test('ignores a comment that merely mentions skipping', () => {
     assert.equal(isHeldLine(['# bumper: skipped by hand', 'a'], 1), false);
   });

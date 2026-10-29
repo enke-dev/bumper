@@ -24,7 +24,7 @@ export type TagFetcher = (ref: ImageRef) => Promise<string[]>;
 /** Resolve the content digest a tag currently points at — used to repin a digest-pinned ref. */
 export type DigestResolver = (ref: ImageRef, tag: string) => Promise<string | null>;
 
-const defaultTagFetcher: TagFetcher = ref =>
+export const defaultTagFetcher: TagFetcher = ref =>
   fetchOciTags(registryHost(ref.domain), ref.repository, fetch, readDockerConfigAuth);
 
 const defaultDigestResolver: DigestResolver = (ref, tag) =>

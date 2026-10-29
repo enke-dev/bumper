@@ -23,7 +23,7 @@ const TOML_HEADER = /^\s*\[\s*([^\]]+?)\s*\]/;
 const PLAIN_VERSION = /^\d+(?:\.\d+){0,2}$/;
 
 /** A bare version realigned to the pin, keeping its precision, or null for anything else. */
-const realignPlain = (version: string, pin: Pin) =>
+export const realignPlainVersion = (version: string, pin: Pin) =>
   PLAIN_VERSION.test(version) ? realignVersionSpec(version, pin.version, pin.major) : null;
 
 /**
@@ -40,7 +40,7 @@ export function realignToolVersions(text: string, tools: readonly string[], pin:
         return line;
       }
       const [, indent, tool, gap, version, rest] = match;
-      const next = realignPlain(version ?? '', pin);
+      const next = realignPlainVersion(version ?? '', pin);
       return next ? `${indent}${tool}${gap}${next}${rest}` : line;
     })
     .join('\n');
@@ -69,7 +69,7 @@ export function realignMiseTools(text: string, tools: readonly string[], pin: Pi
         return line;
       }
       const [, indent, quote, tool, assign, valueQuote, version, rest] = match;
-      const next = realignPlain(version ?? '', pin);
+      const next = realignPlainVersion(version ?? '', pin);
       return next
         ? `${indent}${quote}${tool}${quote}${assign}${valueQuote}${next}${valueQuote}${rest}`
         : line;
