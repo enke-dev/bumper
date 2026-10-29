@@ -84,6 +84,26 @@ describe('latestVersion', () => {
     });
     assert.equal(version, null);
   });
+
+  test('takes the highest stable version when latest is a prerelease', async () => {
+    const version = await latestVersion(
+      'prisma',
+      'npm',
+      '/repo',
+      registry('8.0.0-rc.28', { '7.9.0': '', '7.10.1': '', '8.0.0-rc.28': '' })
+    );
+    assert.equal(version, '7.10.1');
+  });
+
+  test('keeps a prerelease latest when nothing stable was published', async () => {
+    const version = await latestVersion(
+      'next-only',
+      'npm',
+      '/repo',
+      registry('1.0.0-beta.2', { '1.0.0-beta.1': '', '1.0.0-beta.2': '' })
+    );
+    assert.equal(version, '1.0.0-beta.2');
+  });
 });
 
 describe('latestVersionInRange', () => {
@@ -329,6 +349,32 @@ describe('latestEligibleVersion', () => {
     });
     assert.equal(version, '1.1.0');
     assert.equal(calls.length, 1);
+  });
+
+  test('takes the highest stable version when latest is a prerelease', async () => {
+    const version = await latestEligibleVersion(
+      'lit',
+      'npm',
+      '/repo',
+      gate(HOUR / 1000),
+      registry('2.0.0-rc.1', { ...TIMES, '2.0.0-rc.1': new Date(NOW - 20 * HOUR).toISOString() })
+    );
+    assert.equal(version, '1.2.0');
+  });
+
+  test('takes the highest stable version for a prerelease latest without publish times', async () => {
+    const versions = ['7.9.0', '7.10.1', '8.0.0-rc.28'];
+    const version = await latestEligibleVersion(
+      'prisma',
+      'npm',
+      '/repo',
+      gate(HOUR / 1000),
+      async cmd =>
+        cmd.includes('versions')
+          ? ok(JSON.stringify(versions))
+          : ok(JSON.stringify({ version: '8.0.0-rc.28' }))
+    );
+    assert.equal(version, '7.10.1');
   });
 
   test('returns latest when it already cleared the cooldown', async () => {

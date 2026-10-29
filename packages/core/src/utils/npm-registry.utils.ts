@@ -27,6 +27,8 @@ export function viewTool(pm: PackageManager): string {
  * Latest published version of a package via `<tool> view <pkg> version`, run in
  * the repo so its `.npmrc` (scoped registries, auth) applies. Null if
  * unresolvable (network, private without access, 404).
+ *
+ * A prerelease under `latest` yields the highest stable version instead, see {@link stableLatest}.
  */
 export async function latestVersion(
   pkg: string,
@@ -40,10 +42,25 @@ export async function latestVersion(
       return null;
     }
     const version = stdout.trim().split('\n').pop()?.trim();
-    return version && /^\d/.test(version) ? version : null;
+    if (!version || !/^\d/.test(version)) {
+      return null;
+    }
+    return isStable(version)
+      ? version
+      : stableLatest(version, (await publishedVersions(pkg, tool, cwd, undefined, run)) ?? []);
   } catch {
     return null;
   }
+}
+
+/**
+ * The highest stable version when the `latest` dist-tag points to a prerelease, as maintainers
+ * sometimes tag one by mistake (prisma tagged `8.0.0-rc.28`): every stable pin would slide into
+ * it. A pinned prerelease above that stays put, as pins are never walked back. `latest` itself
+ * when nothing stable was published.
+ */
+function stableLatest(latest: string, versions: readonly string[]): string {
+  return versions.filter(version => isStable(version)).sort(compareReversed)[0] ?? latest;
 }
 
 /**
@@ -221,7 +238,27 @@ export async function latestEligibleVersion(
     return latestVersion(pkg, tool, cwd, run);
   }
   const { version, times } = await latestWithTimes(pkg, tool, cwd, run);
-  return version === null ? null : pickEligible(pkg, version, times, cutoff, gate.policy);
+  if (version === null) {
+    return null;
+  }
+  const candidate = isStable(version)
+    ? version
+    : stableLatest(version, await knownVersions(pkg, tool, cwd, times, run));
+  return pickEligible(pkg, candidate, times, cutoff, gate.policy);
+}
+
+/** The versions the `time` map lists, or, for a registry dropping that map, the published ones. */
+async function knownVersions(
+  pkg: string,
+  tool: string,
+  cwd: string,
+  times: Record<string, number>,
+  run: typeof exec
+): Promise<string[]> {
+  const timed = Object.keys(times);
+  return timed.length > 0
+    ? timed
+    : ((await publishedVersions(pkg, tool, cwd, undefined, run)) ?? []);
 }
 
 /**
@@ -354,7 +391,8 @@ export async function maxSatisfyingRanges(
  * Every published version of a package, ascending as the registry lists them, via
  * `<tool> view <pkg> versions --json` — run in the repo so its `.npmrc` applies, with
  * `--registry` added when the package declares `publishConfig.registry`. Null when unresolvable
- * (offline, 401, unpublished). Used by the manage release wait and its registry-auth diagnostic.
+ * (offline, 401, unpublished). Used by the manage release wait and its registry-auth diagnostic,
+ * and to find the highest stable version when `latest` is a prerelease.
  */
 export async function publishedVersions(
   pkg: string,
