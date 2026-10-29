@@ -41,6 +41,9 @@ export interface ReleaseAgePolicy {
   source: string;
 }
 
+/** {@link ReleaseAgePolicy.source} of a cooldown given on the command line. */
+const OVERRIDE_SOURCE = '--min-release-age';
+
 /** No gate in force. */
 export const NO_RELEASE_AGE: ReleaseAgePolicy = {
   seconds: 0,
@@ -281,7 +284,7 @@ export async function detectReleaseAge(
 ): Promise<ReleaseAgePolicy> {
   if (override !== undefined) {
     // an explicit cooldown is an explicit policy: strict, like pnpm treats a configured one
-    return { ...NO_RELEASE_AGE, seconds: Math.max(0, override), source: '--min-release-age' };
+    return { ...NO_RELEASE_AGE, seconds: Math.max(0, override), source: OVERRIDE_SOURCE };
   }
   switch (pm) {
     case PackageManager.Bun:
@@ -316,6 +319,15 @@ export function isExemptFromReleaseAge(
     }
     return range === null || (isValid(version) && satisfies(version, range));
   });
+}
+
+/**
+ * bun install arguments carrying a `--min-release-age` override to the install: bumper resolved
+ * within that cooldown, so the install has to accept it too, instead of refusing with the repo's
+ * own `bunfig.toml` one. Empty when the cooldown is the repo's own.
+ */
+export function bunReleaseAgeArgs(policy: ReleaseAgePolicy): string[] {
+  return policy.source === OVERRIDE_SOURCE ? ['--minimum-release-age', String(policy.seconds)] : [];
 }
 
 /** Newest publish timestamp (epoch ms) a version may carry and still be installable, or null

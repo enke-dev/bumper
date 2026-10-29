@@ -8,6 +8,7 @@ import { PackageManager } from '../context/context.types.js';
 import type { ExecResult } from './exec.utils.js';
 import type { ReleaseAgePolicy } from './release-age.utils.js';
 import {
+  bunReleaseAgeArgs,
   detectReleaseAge,
   isExemptFromReleaseAge,
   NO_RELEASE_AGE,
@@ -155,6 +156,18 @@ describe('isExemptFromReleaseAge', () => {
     const scoped = policy('nx@21.6.5');
     assert.equal(isExemptFromReleaseAge(scoped, 'nx', '21.6.5'), true);
     assert.equal(isExemptFromReleaseAge(scoped, 'nx', '21.6.6'), false);
+  });
+});
+
+describe('bunReleaseAgeArgs', () => {
+  test('carries an override to the install, so it accepts what bumper resolved', async () => {
+    const policy = await detectReleaseAge('/repo', PackageManager.Bun, 0);
+    assert.deepEqual(bunReleaseAgeArgs(policy), ['--minimum-release-age', '0']);
+  });
+
+  test("leaves the repo's own cooldown to bun", () => {
+    const policy = { ...NO_RELEASE_AGE, seconds: 86400, source: 'bunfig.toml' };
+    assert.deepEqual(bunReleaseAgeArgs(policy), []);
   });
 });
 

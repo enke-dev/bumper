@@ -233,9 +233,9 @@ equivalent knobs and simply errors on a blocked version, so its gate is always s
 times ignored.
 
 `--min-release-age <seconds>` overrides the detected value — pass a larger one to be stricter than
-the repo's own policy, or `0` to resolve plain `latest` again (which is what bumper did before, and
-will fail the install if the package manager's own gate is still in force). An explicit value is
-strict. npm has no equivalent setting, so npm repos are never gated. Without a cooldown, resolution
+the repo's own policy, or `0` to resolve plain `latest` again. bun's install is run with the same
+value (`--minimum-release-age`), so it accepts what bumper resolved; pnpm's install keeps its own
+gate, which fails on a version younger than that. An explicit value is strict. npm has no equivalent setting, so npm repos are never gated. Without a cooldown, resolution
 makes no extra registry calls.
 
 `bumper detect` reports the gate it found, in both the human and the `--json` output:
