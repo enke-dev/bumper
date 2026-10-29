@@ -37,7 +37,8 @@ export const dockerNodeFeature: Module = {
         const original = await readFile(file, 'utf8');
         const updated = replaceUnheldLines(original, line =>
           line
-            .replace(/node:[0-9]+(\.[0-9]+)*/g, `node:${version}`)
+            // not `typescript-node:1-22` and the like, whose tag is no node version
+            .replace(/(?<![\w.-])node:[0-9]+(\.[0-9]+)*/g, `node:${version}`)
             .replace(/NODE_VERSION=[0-9]+(\.[0-9]+)*/g, `NODE_VERSION=${version}`)
         );
         if (updated !== original) {

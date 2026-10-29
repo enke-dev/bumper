@@ -66,6 +66,19 @@ describe('docker-node feature', () => {
     });
   });
 
+  test('leaves images merely ending in -node alone', async () => {
+    await withTempDir('docker-node', async dir => {
+      const body =
+        'FROM mcr.microsoft.com/devcontainers/typescript-node:1-22\nFROM cimg/node:20.1\n';
+      await writeFile(join(dir, 'Dockerfile'), body);
+      await dockerNodeFeature.update(contextFor(dir));
+      assert.equal(
+        await readFile(join(dir, 'Dockerfile'), 'utf8'),
+        `FROM mcr.microsoft.com/devcontainers/typescript-node:1-22\nFROM cimg/node:${NODE_LTS.version}\n`
+      );
+    });
+  });
+
   test('owns the node image so the generic docker feature never bumps it', async () => {
     assert.deepEqual(await dockerNodeFeature.managedImages?.(contextFor('/tmp')), ['node']);
   });
