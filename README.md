@@ -382,6 +382,7 @@ All inputs are optional.
 | `format`          | `true`                       | Run the repo's formatter after the update (equivalent to `--format` / `-f`).                                            |
 | `approve`         | `true`                       | Approve install scripts after the update, pnpm/npm only (equivalent to `--approve` / `-a`).                             |
 | `token`           | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows).            |
+| `setup`           | _(none)_                     | Shell command run before bumper, e.g. `bun run setup` for a workspace a skipped `preinstall` script would generate.     |
 
 Module ids are the values from the `id` column in the [Modules](#modules) table.
 
@@ -391,7 +392,8 @@ Module ids are the values from the `id` column in the [Modules](#modules) table.
 > formatter respects the skip: its edits to workflow files are reverted, not committed.
 
 > **Note** — the action runs the bumper release its own ref carries: pin the action (to a tag or
-> commit) and the CLI stays on that release; `@main` follows the latest one.
+> commit) and the CLI stays on that release; `@main` follows the latest one. Installs run without
+> lifecycle scripts, so a workspace a `preinstall` script generates needs the `setup` input.
 
 ### Outputs
 

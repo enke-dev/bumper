@@ -56,6 +56,12 @@ inputs:
       Token used to push the branch and open the PR (defaults to the job's GITHUB_TOKEN). With the
       default token, the modules editing .github/workflows/* are skipped: it can't push them.
     default: ${{ github.token }}
+  setup:
+    description: >-
+      Shell command run in the repo before bumper (e.g. "bun run setup"), for what an install
+      without lifecycle scripts misses, like a workspace a preinstall script generates. Its
+      output should be gitignored, or it lands in the update commit.
+    default: ''
   registry-token:
     description: >-
       Auth token for a private npm registry (e.g. GitHub Packages). When set, an .npmrc
@@ -177,6 +183,11 @@ runs:
       id: pre
       shell: bash
       run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+    - name: Run setup
+      if: inputs.setup != ''
+      shell: bash
+      run: ${{ inputs.setup }}
 
     - name: Build bumper flags
       id: flags
