@@ -1,5 +1,12 @@
 # @enke.dev/bumper
 
+## [0.18.2](https://github.com/enke-dev/bumper/compare/0.18.1...0.18.2) (2026-11-02)
+
+### Bug Fixes
+
+* **action:** add a setup input run before bumper ([d5f6cf4](https://github.com/enke-dev/bumper/commit/d5f6cf42fd2054c94c237d89ddfabf961347a3dd))
+* **action:** run the CLI release of the action's ref ([a21c5cd](https://github.com/enke-dev/bumper/commit/a21c5cd34c67e14b5b48b8be914fc94aaded7da3))
+
 ## [0.18.1](https://github.com/enke-dev/bumper/compare/0.18.0...0.18.1) (2026-10-29)
 
 ### Bug Fixes
