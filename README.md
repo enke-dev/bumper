@@ -379,15 +379,19 @@ All inputs are optional.
 | `skip`            | _(none)_                     | Skip the listed module ids (comma-separated, e.g. `docker-node`).                                                       |
 | `exclude`         | _(none)_                     | Space-separated repo-relative paths to exclude (e.g. `examples fixtures`).                                              |
 | `min-release-age` | _(package manager's own)_    | Only resolve versions published at least N seconds ago (see [Minimum release age](#minimum-release-age)); `0` disables. |
-| `format`          | `false`                      | Run the repo's formatter after the update (equivalent to `--format` / `-f`).                                            |
-| `approve`         | `false`                      | Approve install scripts after the update, pnpm/npm only (equivalent to `--approve` / `-a`).                             |
+| `format`          | `true`                       | Run the repo's formatter after the update (equivalent to `--format` / `-f`).                                            |
+| `approve`         | `true`                       | Approve install scripts after the update, pnpm/npm only (equivalent to `--approve` / `-a`).                             |
 | `token`           | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows).            |
 
 Module ids are the values from the `id` column in the [Modules](#modules) table.
 
 > **Note** — the default `GITHUB_TOKEN` can't push changes to `.github/workflows/*` (that needs the
-> `workflows` scope), so with it either pass `skip: github-actions` or provide a PAT/app token via
-> `token`. The formatter respects the skip: its edits to workflow files are reverted, not committed.
+> `workflows` scope), so with it the modules editing workflows (`github-actions`,
+> `github-version-files`) are skipped. Provide a PAT/app token via `token` to have them run. The
+> formatter respects the skip: its edits to workflow files are reverted, not committed.
+
+> **Note** — the action runs the bumper release its own ref carries: pin the action (to a tag or
+> commit) and the CLI stays on that release; `@main` follows the latest one.
 
 ### Outputs
 

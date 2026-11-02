@@ -52,7 +52,9 @@ inputs:
     description: Approve install scripts after the update, pnpm/npm only (equivalent to --approve / -a)
     default: 'true'
   token:
-    description: Token used to push the branch and open the PR (defaults to the job's GITHUB_TOKEN)
+    description: >-
+      Token used to push the branch and open the PR (defaults to the job's GITHUB_TOKEN). With the
+      default token, the modules editing .github/workflows/* are skipped: it can't push them.
     default: ${{ github.token }}
   registry-token:
     description: >-
@@ -179,8 +181,15 @@ runs:
     - name: Build bumper flags
       id: flags
       shell: bash
+      env:
+        DEFAULT_TOKEN: ${{ inputs.token == github.token }}
       run: |
         args="--ignore-config"
+        # GITHUB_TOKEN can never be granted the `workflows` permission a push of
+        # .github/workflows/* needs, so leave those files alone rather than fail the push
+        if [ "$DEFAULT_TOKEN" = "true" ]; then
+          args="$args --skip github-actions --skip github-version-files"
+        fi
         if [ -n "${{ inputs.only }}" ]; then
           for m in $(echo "${{ inputs.only }}" | tr ',' ' '); do
             args="$args --only $m"
@@ -213,7 +222,13 @@ runs:
       # the package manager bumper spawns (e.g. pnpm v11, which requires node:sqlite)
       # would run under Bun and crash ("No such built-in module: node:sqlite"). Plain
       # bunx runs bumper while letting spawned pnpm/npm/yarn use the real Node set up above.
-      run: bunx @enke.dev/bumper update --commit ${{ steps.flags.outputs.args }}
+      # The CLI release is the one this action ref carries, so pinning the action pins the CLI:
+      # an unversioned bunx would hand every pinned action the latest CLI.
+      env:
+        BUMPER_ACTION_PATH: ${{ github.action_path }}
+      run: |
+        version="$(node -p "require(process.env.BUMPER_ACTION_PATH + '/packages/cli/package.json').version")"
+        bunx "@enke.dev/bumper@${version}" update --commit ${{ steps.flags.outputs.args }}
 
     - name: Check for changes
       id: changed
