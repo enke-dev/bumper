@@ -266,7 +266,7 @@ that follow actually pick it up.
 
 ```sh
 bumper manage                 # scan ~/Projects, open the GUI in the browser
-bumper manage ~/work --port 3131 --no-open
+bumper manage ~/work --port 2011 --no-open
 ```
 
 - **Stages.** Repos are grouped by dependency stage, derived from the package names other repos in
