@@ -1,5 +1,17 @@
 # @enke.dev/bumper
 
+# [0.20.0](https://github.com/enke-dev/bumper/compare/0.19.0...0.20.0) (2026-11-11)
+
+### Bug Fixes
+
+* **core:** respect a prerelease latest tagged below a stable ([cc66bd1](https://github.com/enke-dev/bumper/commit/cc66bd191551140ef48e85a5a7a6df4a064ce7fb))
+* **ui:** disable the run mode picker whenever no run can start ([ef7f906](https://github.com/enke-dev/bumper/commit/ef7f9064d6636122a592b41b57f1849d38a75210))
+
+### Features
+
+* **ui:** toasts for notices, restart dev backend on source changes ([80b68cd](https://github.com/enke-dev/bumper/commit/80b68cda0ab1c13ed5b61a8b1ce52acf05c64e86))
+* **ui:** toggle-all footer in the repo list, drop the header Clear ([f43853b](https://github.com/enke-dev/bumper/commit/f43853b7300383651a1b3b5e7bf8a5297d98eaa6))
+
 # [0.19.0](https://github.com/enke-dev/bumper/compare/0.18.4...0.19.0) (2026-11-11)
 
 ### Bug Fixes
