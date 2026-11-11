@@ -19,7 +19,7 @@
     },
     "packages/cli": {
       "name": "@enke.dev/bumper",
-      "version": "0.18.3",
+      "version": "0.18.4",
       "bin": {
         "bmpr": "./dist/cli.mjs",
         "bumper": "./dist/cli.mjs",
