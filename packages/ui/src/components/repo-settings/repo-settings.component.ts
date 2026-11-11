@@ -185,9 +185,6 @@ export class BumperRepoSettings extends BumperElement.withUtilities().withStyles
       return;
     }
     await this.store.saveRepoConfig(repo.id, this.draft);
-    if (this.store.state.error === null) {
-      this.store.edit(null);
-    }
   }
 
   protected override render(): TemplateResult {

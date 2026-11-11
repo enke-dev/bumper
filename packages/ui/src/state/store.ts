@@ -30,11 +30,19 @@ export interface StoreState {
   editing: string | null;
   /** Repos whose slow diagnostics are being collected right now. */
   diagnosing: ReadonlySet<string>;
-  error: string | null;
   busy: boolean;
 }
 
 type Listener = (state: StoreState) => void;
+
+/** A message for the user; the app shows each one as a toast that stays until closed. */
+export interface Notice {
+  message: string;
+  variant: 'brand' | 'success' | 'warning' | 'danger' | 'neutral';
+}
+
+const message = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 /**
  * One store for the whole GUI, fed by the WebSocket and the JSON API. Components read it through
@@ -54,10 +62,10 @@ export class ManageStore {
     dryRun: false,
     editing: null,
     diagnosing: new Set(),
-    error: null,
     busy: false,
   };
   readonly #listeners = new Set<Listener>();
+  readonly #noticeListeners = new Set<(notice: Notice) => void>();
   #disconnect: (() => void) | null = null;
 
   get state(): StoreState {
@@ -67,6 +75,12 @@ export class ManageStore {
   subscribe(listener: Listener): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
+  }
+
+  /** Notices are events, not state: each one is shown once, however often it repeats. */
+  onNotice(listener: (notice: Notice) => void): () => void {
+    this.#noticeListeners.add(listener);
+    return () => this.#noticeListeners.delete(listener);
   }
 
   connect(): void {
@@ -165,7 +179,7 @@ export class ManageStore {
     try {
       await api.diagnose(id);
     } catch (error) {
-      this.#patch({ error: error instanceof Error ? error.message : String(error) });
+      this.#notify({ message: message(error), variant: 'danger' });
     } finally {
       const diagnosing = new Set(this.#state.diagnosing);
       diagnosing.delete(id);
@@ -175,10 +189,6 @@ export class ManageStore {
 
   edit(id: string | null): void {
     this.#patch({ editing: id });
-  }
-
-  dismissError(): void {
-    this.#patch({ error: null });
   }
 
   rescan(): Promise<void> {
@@ -215,12 +225,15 @@ export class ManageStore {
   fastForward(id: string): Promise<void> {
     return this.#guard(async () => {
       await api.fastForward(id);
+      this.#notify({ message: `${id} fast-forwarded`, variant: 'success' });
     });
   }
 
   saveRepoConfig(id: string, config: RepoConfig): Promise<void> {
     return this.#guard(async () => {
       await api.saveRepoConfig(id, config);
+      // only a successful save closes the drawer; a failure keeps the draft for another try
+      this.#patch({ editing: null });
     });
   }
 
@@ -236,14 +249,18 @@ export class ManageStore {
   }
 
   async #guard(fn: () => Promise<void>): Promise<void> {
-    this.#patch({ busy: true, error: null });
+    this.#patch({ busy: true });
     try {
       await fn();
     } catch (error) {
-      this.#patch({ error: error instanceof Error ? error.message : String(error) });
+      this.#notify({ message: message(error), variant: 'danger' });
     } finally {
       this.#patch({ busy: false });
     }
+  }
+
+  #notify(notice: Notice): void {
+    this.#noticeListeners.forEach(listener => listener(notice));
   }
 
   #onEvent(event: SessionEvent): void {

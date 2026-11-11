@@ -38,10 +38,6 @@ wa-split-panel > * {
   overflow: auto;
 }
 
-wa-callout {
-  margin: var(--wa-space-s) var(--wa-space-m) 0;
-}
-
 .mode {
   display: flex;
   flex-direction: column;

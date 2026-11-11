@@ -1,4 +1,6 @@
+import type { ChildProcess, ChildProcessByStdio } from 'node:child_process';
 import { spawn } from 'node:child_process';
+import type { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
 import type { Plugin, ProxyOptions } from 'vite';
@@ -17,35 +19,80 @@ const session = { token: '' };
 
 /**
  * Runs `bmpr manage` from source next to the dev server, so the GUI has its backend. The page
- * itself carries no token; the proxy adds it, so plain http://127.0.0.1:2010/ works.
+ * itself carries no token; the proxy adds it, so plain http://127.0.0.1:2010/ works. Edits to the
+ * core or cli sources restart it (an update in progress is cut off, fine for development).
  */
 function manageServer(): Plugin {
+  const cli = fileURLToPath(new URL('../cli/src/cli.ts', import.meta.url));
+  const sources = ['../core/src/', '../cli/src/'].map(dir =>
+    fileURLToPath(new URL(dir, import.meta.url))
+  );
+
+  /** Spawn the server; resolves once it printed its URL (and with it the new token). */
+  const start = (): Promise<ChildProcessByStdio<null, Readable, null>> => {
+    const child = spawn('bun', [cli, 'manage', '--port', String(apiPort), '--no-open'], {
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+    return new Promise((resolve, reject) => {
+      child.stdout.on('data', (chunk: Buffer) => {
+        process.stdout.write(chunk);
+        const [, token] = /[?&]token=([\w-]+)/.exec(chunk.toString()) ?? [];
+        if (token) {
+          session.token = token;
+          resolve(child);
+        }
+      });
+      child.once('exit', code => reject(new Error(`bmpr manage exited early (${code})`)));
+    });
+  };
+
+  /** Stop and wait for the exit, so the next start finds the port free. */
+  const stop = (child: ChildProcess): Promise<void> =>
+    child.exitCode !== null || child.signalCode !== null
+      ? Promise.resolve()
+      : new Promise(resolve => {
+          child.once('exit', () => resolve());
+          child.kill('SIGINT');
+        });
+
   return {
     name: 'bumper-manage-server',
     apply: 'serve',
     async configureServer(server) {
-      const cli = fileURLToPath(new URL('../cli/src/cli.ts', import.meta.url));
-      const child = spawn('bun', [cli, 'manage', '--port', String(apiPort), '--no-open'], {
-        stdio: ['ignore', 'pipe', 'inherit'],
-      });
-      server.httpServer?.once('close', () => child.kill('SIGINT'));
-      process.once('exit', () => child.kill());
-      // a signal's default exit skips 'exit' handlers, which would orphan the server on 2011
-      process.once('SIGINT', () => {
-        child.kill('SIGINT');
-        void server.close().finally(() => process.exit(130));
+      // vite waits for this hook, so the first page load already finds the API up
+      const state = {
+        child: await start(),
+        restart: Promise.resolve(),
+        timer: undefined as NodeJS.Timeout | undefined,
+      };
+
+      server.watcher.add(sources);
+      server.watcher.on('change', file => {
+        if (!sources.some(dir => file.startsWith(dir)) || file.includes('.spec.')) {
+          return;
+        }
+        // an editor save fires several events; restart once, after the burst, one at a time
+        clearTimeout(state.timer);
+        state.timer = setTimeout(() => {
+          state.restart = state.restart
+            .then(async () => {
+              server.config.logger.info('core/cli changed, restarting bmpr manage', {
+                timestamp: true,
+              });
+              await stop(state.child);
+              state.child = await start();
+            })
+            .catch((error: unknown) => server.config.logger.error(String(error)));
+        }, 200);
       });
 
-      // vite waits for this hook, so the first page load already finds the API up
-      session.token = await new Promise<string>((resolve, reject) => {
-        child.stdout.on('data', (chunk: Buffer) => {
-          process.stdout.write(chunk);
-          const [, token] = /[?&]token=([\w-]+)/.exec(chunk.toString()) ?? [];
-          if (token) {
-            resolve(token);
-          }
-        });
-        child.once('exit', code => reject(new Error(`bmpr manage exited early (${code})`)));
+      server.httpServer?.once('close', () => void stop(state.child));
+      process.once('exit', () => state.child.kill());
+      // a signal's default exit skips 'exit' handlers, which would orphan the server on 2011
+      process.once('SIGINT', () => {
+        void stop(state.child)
+          .then(() => server.close())
+          .finally(() => process.exit(130));
       });
     },
   };

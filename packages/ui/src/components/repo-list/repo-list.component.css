@@ -11,7 +11,7 @@ wa-tree-item::part(label) {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding-bottom: var(--wa-space-s);
+  margin-bottom: var(--wa-space-s);
   background: var(--wa-color-surface-default);
 }
 

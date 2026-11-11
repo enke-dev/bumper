@@ -2,12 +2,13 @@ import '../log-view/log-view.component.js';
 import '../repo-list/repo-list.component.js';
 import '../repo-settings/repo-settings.component.js';
 
+import type WaToast from '@awesome.me/webawesome/dist/components/toast/toast.js';
 import { provide } from '@lit/context';
 import type { TemplateResult } from 'lit';
 import { html } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
-import { when } from 'lit/directives/when.js';
+import { customElement, query, state } from 'lit/decorators.js';
 
+import type { Notice } from '../../state/store.js';
 import { ManageStore, storeContext, StoreController } from '../../state/store.js';
 import { BumperElement } from '../../utils/base.utils.js';
 import type { ThemeMode } from '../../utils/theme.utils.js';
@@ -29,18 +30,32 @@ export class BumperApp extends BumperElement.withUtilities().withStyles(styles) 
     new StoreController(this, () => this.store);
   }
 
+  @query('wa-toast')
+  private readonly toast!: WaToast | null;
+
+  #offNotice: (() => void) | null = null;
+
   override connectedCallback(): void {
     super.connectedCallback();
     this.store.connect();
+    this.#offNotice = this.store.onNotice(notice => this.#showToast(notice));
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.store.disconnect();
+    this.#offNotice?.();
+  }
+
+  // no auto-close: a notice stays until the user dismisses it
+  #showToast({ message, variant }: Notice): void {
+    const icon =
+      variant === 'danger' ? 'circle-xmark' : variant === 'success' ? 'check' : 'circle-question';
+    this.toast?.create(message, { variant, duration: 0, icon: { name: icon, library: 'system' } });
   }
 
   protected override render(): TemplateResult {
-    const { workspace, connected, running, selection, ignoreReleaseAge, dryRun, error, busy } =
+    const { workspace, connected, running, selection, ignoreReleaseAge, dryRun, busy } =
       this.store.state;
     return html`
       <header>
@@ -119,23 +134,12 @@ export class BumperApp extends BumperElement.withUtilities().withStyles(styles) 
           </wa-dropdown>
         </wa-button-group>
       </header>
-      ${when(
-        error,
-        message => html`
-          <wa-callout variant="danger" size="s">
-            <wa-icon slot="icon" library="system" name="circle-xmark"></wa-icon>
-            ${message}
-            <wa-button size="xs" appearance="plain" @click=${() => this.store.dismissError()}>
-              dismiss
-            </wa-button>
-          </wa-callout>
-        `
-      )}
       <wa-split-panel position="38">
         <bumper-repo-list slot="start"></bumper-repo-list>
         <bumper-log-view slot="end"></bumper-log-view>
       </wa-split-panel>
       <bumper-repo-settings></bumper-repo-settings>
+      <wa-toast placement="bottom-start"></wa-toast>
     `;
   }
 }
