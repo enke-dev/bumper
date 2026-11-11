@@ -57,6 +57,8 @@ export class BumperApp extends BumperElement.withUtilities().withStyles(styles) 
   protected override render(): TemplateResult {
     const { workspace, connected, running, selection, ignoreReleaseAge, dryRun, busy } =
       this.store.state;
+    // both modes start a run, so the mode picker is only useful when a run could start
+    const cannotRun = selection.size === 0 || running || busy;
     return html`
       <header>
         <strong class="wa-heading-s">bumper manage</strong>
@@ -104,7 +106,7 @@ export class BumperApp extends BumperElement.withUtilities().withStyles(styles) 
             size="s"
             variant="brand"
             ?loading=${running}
-            ?disabled=${selection.size === 0 || running || busy}
+            ?disabled=${cannotRun}
             @click=${() => this.store.start()}
           >
             <wa-icon slot="start" library="system" name="play"></wa-icon>
@@ -116,7 +118,7 @@ export class BumperApp extends BumperElement.withUtilities().withStyles(styles) 
             @wa-select=${(event: CustomEvent<{ item: { value: string } }>) =>
               this.store.setDryRun(event.detail.item.value === 'dry-run')}
           >
-            <wa-button slot="trigger" size="s" variant="brand" ?disabled=${running}>
+            <wa-button slot="trigger" size="s" variant="brand" ?disabled=${cannotRun}>
               <wa-icon library="system" name="chevron-down" label="Run mode"></wa-icon>
             </wa-button>
             <wa-dropdown-item type="checkbox" value="update" .checked=${!dryRun}>
