@@ -33,14 +33,14 @@
     "build:binaries": "sh scripts/build-binaries.sh"
   },
   "devDependencies": {
-    "@enke.dev/lint": "0.13.19",
+    "@enke.dev/lint": "0.13.21",
     "@tsconfig/strictest": "2.0.8",
     "@types/bun": "1.4.4",
     "@types/semver-utils": "1.1.3",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "eslint": "10.13.0",
+    "eslint": "10.14.0",
     "jiti": "2.7.0",
-    "prettier": "3.9.10",
+    "prettier": "3.10.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3"
   }
