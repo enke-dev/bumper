@@ -16,6 +16,11 @@ export interface RepoConfig {
    */
   checks: string[];
   /**
+   * Whether `bumper manage` pushes as soon as the checks pass. Off (the default): the run stops
+   * after the commit until the user pushes it or keeps it local.
+   */
+  push: boolean;
+  /**
    * Whether `bumper manage` waits for the pushed commit to show up as a new version on the
    * registry before starting dependents. Ignored for `"private": true` repos.
    */

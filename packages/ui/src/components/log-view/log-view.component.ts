@@ -1,3 +1,4 @@
+import { TERMINAL } from '@enke.dev/bumper-core/manage/events.js';
 import type { LogLine } from '@enke.dev/bumper-core/manage/view.types.js';
 import { consume } from '@lit/context';
 import type { PropertyValues, TemplateResult } from 'lit';
@@ -67,6 +68,8 @@ export class BumperLogView extends BumperElement.withUtilities().withStyles(styl
       `;
     }
     const status = repo.status;
+    // a repo the run still owns; git calls on it would race the runner
+    const inRun = status !== undefined && !TERMINAL.has(status);
     return html`
       <header>
         <span class="id">${repo.id}</span>
@@ -116,6 +119,29 @@ export class BumperLogView extends BumperElement.withUtilities().withStyles(styl
           `
         )}
         ${when(
+          status === 'awaiting-push',
+          () => html`
+            <wa-button
+              size="s"
+              appearance="plain"
+              title="End the run for this repo with the commit unpushed; dependents start anyway"
+              ?disabled=${busy}
+              @click=${() => this.store.control(repo.id, 'keep-local')}
+            >
+              Keep local
+            </wa-button>
+            <wa-button
+              size="s"
+              variant="brand"
+              ?disabled=${busy}
+              @click=${() => this.store.control(repo.id, 'push')}
+            >
+              <wa-icon slot="start" library="system" name="arrow-up"></wa-icon>
+              Push
+            </wa-button>
+          `
+        )}
+        ${when(
           status === 'awaiting-release',
           () => html`
             <wa-button
@@ -140,6 +166,21 @@ export class BumperLogView extends BumperElement.withUtilities().withStyles(styl
                         >${d.code}</wa-badge
                       >
                       ${d.message}
+                      ${when(
+                        d.code === 'behind-remote',
+                        () => html`
+                          <wa-button
+                            size="xs"
+                            appearance="plain"
+                            title="git pull --ff-only"
+                            ?disabled=${busy || inRun}
+                            @click=${() => this.store.fastForward(repo.id)}
+                          >
+                            <wa-icon slot="start" library="system" name="arrow-down"></wa-icon>
+                            Fast-forward
+                          </wa-button>
+                        `
+                      )}
                     </li>
                   `
                 )}

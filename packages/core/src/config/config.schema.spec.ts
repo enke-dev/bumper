@@ -9,7 +9,13 @@ const base = normalizeRepoConfig({});
 
 describe('config schema: defaults', () => {
   test('normalize fills every field with its default and leaves optional ones absent', () => {
-    assert.deepEqual(base, { exclude: [], modules: {}, checks: [], waitForRelease: true });
+    assert.deepEqual(base, {
+      exclude: [],
+      modules: {},
+      checks: [],
+      push: false,
+      waitForRelease: true,
+    });
     assert.equal('branch' in base, false);
   });
 
@@ -20,6 +26,7 @@ describe('config schema: defaults', () => {
       modules: {},
       branch: 'main',
       checks: [],
+      push: false,
       waitForRelease: false,
     });
   });

@@ -28,16 +28,20 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 const encode = (id: string): string => encodeURIComponent(id);
 
+/** What the user can do to a repo inside a run. */
+export type ControlVerb = 'retry' | 'run-anyway' | 'push' | 'keep-local' | 'skip-waiting';
+
 export const api = {
   workspace: () => call<WorkspaceView>('GET', '/api/workspace'),
   rescan: () => call<WorkspaceView>('POST', '/api/workspace/rescan'),
   diagnose: (id: string) => call<unknown>('POST', `/api/workspace/${encode(id)}/diagnose`),
+  fastForward: (id: string) => call<unknown>('POST', `/api/workspace/${encode(id)}/fast-forward`),
   config: () => call<BumperConfig>('GET', '/api/config'),
   saveConfig: (config: BumperConfig) => call<WorkspaceView>('PUT', '/api/config', config),
   saveRepoConfig: (id: string, config: RepoConfig) =>
     call<WorkspaceView>('PUT', `/api/config/repos/${encode(id)}`, config),
   start: (request: RunRequest) => call<{ running: boolean }>('POST', '/api/run', request),
-  control: (id: string, verb: 'retry' | 'run-anyway' | 'skip-waiting') =>
+  control: (id: string, verb: ControlVerb) =>
     call<{ ok: boolean }>('POST', `/api/run/${encode(id)}/${verb}`),
   logs: (id: string) => call<LogLine[]>('GET', `/api/logs/${encode(id)}`),
 };

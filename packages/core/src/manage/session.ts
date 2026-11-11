@@ -11,7 +11,8 @@ import type { exec as execFn } from '../utils/exec.utils.js';
 import { exec } from '../utils/exec.utils.js';
 import type { Diagnostic, DiagnosticCollector } from './diagnostics.js';
 import { collectDiagnostics, DEFAULT_COLLECTORS, FAST_COLLECTORS } from './diagnostics.js';
-import type { RepoStatus, RunEvent } from './events.js';
+import type { LogStream, RepoStatus, RunEvent } from './events.js';
+import { TERMINAL } from './events.js';
 import type { RepoGraph } from './graph.js';
 import { buildGraph, stageOf } from './graph.js';
 import type { RepoRunOptions } from './runner.js';
@@ -274,8 +275,40 @@ export class ManageSession {
     this.#afterControl();
   }
 
+  push(id: string): void {
+    this.#scheduler?.push(id);
+  }
+
+  keepLocal(id: string): void {
+    this.#scheduler?.keepLocal(id);
+  }
+
   skipWaiting(id: string): void {
     this.#scheduler?.skipWaiting(id);
+  }
+
+  /**
+   * `git pull --ff-only` for a repo outside the current run (the fix for `behind-remote`); the
+   * output goes to its log, then its diagnostics are refreshed.
+   */
+  async fastForward(id: string): Promise<Diagnostic[]> {
+    const repo = this.#repo(id);
+    const status = this.#scheduler?.statuses.get(id);
+    if (status !== undefined && !TERMINAL.has(status)) {
+      throw new Error(`${id} is part of the current run`);
+    }
+    const cmd = ['git', 'pull', '--ff-only', '--quiet'];
+    this.#log(id, 'system', `$ ${cmd.join(' ')}`);
+    const { exitCode, stdout, stderr } = await this.#deps.run(cmd, { cwd: repo.path });
+    const lines = (text: string): string[] => text.split('\n').filter(line => line.trim() !== '');
+    lines(stdout).forEach(line => this.#log(id, 'stdout', line));
+    lines(stderr).forEach(line => this.#log(id, 'stderr', line));
+    if (exitCode !== 0) {
+      throw new Error(
+        `fast-forward of ${id} failed: ${lines(stderr).at(-1) ?? `exit ${exitCode}`}`
+      );
+    }
+    return this.diagnose(id);
   }
 
   /** Statuses of the current run, by repo id. */
@@ -335,6 +368,10 @@ export class ManageSession {
         [...(this.#diagnostics.get(id) ?? []).filter(d => !fastCodes.has(d.code)), ...fresh],
       ])
     );
+  }
+
+  #log(repo: string, stream: LogStream, line: string): void {
+    this.#onRunEvent({ type: 'log', repo, stream, line, at: this.#deps.now() });
   }
 
   #onRunEvent(event: RunEvent): void {

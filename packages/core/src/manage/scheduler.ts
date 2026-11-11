@@ -6,6 +6,8 @@ import type { RepoInfo } from './workspace.types.js';
 /** The part of {@link RepoRun} the scheduler drives; tests pass fakes. */
 export interface Runnable {
   run(): Promise<RepoStatus>;
+  push(): void;
+  keepLocal(): void;
   skipWaiting(): void;
 }
 
@@ -29,7 +31,8 @@ export interface SchedulerOptions {
  * Dependency-ordered execution over the selection: a repo starts once every *selected* upstream
  * finished successfully, runs in parallel with everything else that is ready, and is blocked when
  * a selected upstream failed. Retry re-queues a repo and its blocked dependents; run-anyway starts
- * a blocked repo regardless; skip-waiting ends its release wait.
+ * a blocked repo regardless; push / keep-local settle a held commit; skip-waiting ends its release
+ * wait.
  */
 export class Scheduler {
   readonly statuses = new Map<string, RepoStatus>();
@@ -81,6 +84,14 @@ export class Scheduler {
     if (this.statuses.get(id) === 'blocked') {
       this.#launch(id);
     }
+  }
+
+  push(id: string): void {
+    this.#running.get(id)?.push();
+  }
+
+  keepLocal(id: string): void {
+    this.#running.get(id)?.keepLocal();
   }
 
   skipWaiting(id: string): void {

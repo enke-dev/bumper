@@ -9,6 +9,7 @@ import type {
 import { createContext } from '@lit/context';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
+import type { ControlVerb } from '../api/client.js';
 import { api, connectEvents } from '../api/client.js';
 
 export interface StoreState {
@@ -188,9 +189,15 @@ export class ManageStore {
     });
   }
 
-  control(id: string, verb: 'retry' | 'run-anyway' | 'skip-waiting'): Promise<void> {
+  control(id: string, verb: ControlVerb): Promise<void> {
     return this.#guard(async () => {
       await api.control(id, verb);
+    });
+  }
+
+  fastForward(id: string): Promise<void> {
+    return this.#guard(async () => {
+      await api.fastForward(id);
     });
   }
 

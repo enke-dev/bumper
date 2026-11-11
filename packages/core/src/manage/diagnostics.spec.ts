@@ -32,6 +32,7 @@ const config = (extra: Partial<RepoConfig> = {}): RepoConfig => ({
   exclude: [],
   modules: {},
   checks: ['lint'],
+  push: false,
   waitForRelease: true,
   ...extra,
 });

@@ -261,9 +261,9 @@ has to be committed alongside — and prunes pinned versions that have since cle
 
 `bumper manage [path]` scans every git repository under a folder (default `~/Projects`, nested
 `owner/repo` layouts included), serves a local GUI and runs cascading updates: each repo gets
-`bumper update -afc`, then its configured checks, then a push to its configured branch, and — for
-repos that publish a package — a wait until the registry lists the new version, so the dependents
-that follow actually pick it up.
+`bumper update -afc`, then its configured checks, then — once you confirm, or right away with
+`push` set — a push to its configured branch, and — for repos that publish a package — a wait until
+the registry lists the new version, so the dependents that follow actually pick it up.
 
 ```sh
 bumper manage                 # scan ~/Projects, open the GUI in the browser
@@ -280,16 +280,21 @@ bumper manage ~/work --port 2011 --no-open
   failed repo blocks its dependents, which offer _Retry_ and _Run anyway_ (consume whatever is
   published); a repo waiting for its release offers _Skip waiting_. The run belongs to the server
   process — reloading the browser doesn't stop it.
+- **Push.** Nothing is pushed unasked: after the checks a repo holds its commit as _awaiting push_
+  and offers _Push_ or _Keep local_ (ends its run unpushed; dependents start anyway). Its dependents
+  wait for that decision. The `push` setting skips the hold for repos you trust.
 - **Minimum release age.** Dependents receive the upstream packages as `--allow-young` (see
   [Minimum release age](#minimum-release-age)), so a freshly released version is consumed without
   lifting the cooldown for anything else. _Ignore minimum release age_ extends that to every
   upstream producer, selected or not.
 - **Settings.** The gear opens the repo's `~/.bumperrc` entry: excludes, push branch (an existing
   one or a custom name created from the current branch), checks (script names run through the
-  package manager, anything else through the shell), wait-for-release, and module overrides. Repos
+  package manager, anything else through the shell), push automatically, wait-for-release, and
+  module overrides. Repos
   without an entry run with bumper's defaults.
 - **Diagnostics.** Unsupported repos (no manifest, yarn), missing checks, dirty work tree, behind
-  the remote, missing registry credentials, graph cycles and ambiguous producers.
+  the remote (with a _Fast-forward_ button: `git pull --ff-only`), missing registry credentials,
+  graph cycles and ambiguous producers.
 
 `manage` needs the Bun runtime: the standalone binary has it built in, an npm install runs it via
 `bunx --bun @enke.dev/bumper manage`. Every other command works on Node as well. The server binds
@@ -467,6 +472,7 @@ entry, so the next run is already scoped:
       "modules": { "docker-node": false }, // explicit per-module on/off overrides, keyed by module id
       "branch": "chore/deps", // manage: branch to commit to and push (default: the current one)
       "checks": ["lint", "test"], // manage: run after the update, before the push
+      "push": false, // manage: push without asking once the checks pass (default: ask)
       "waitForRelease": true, // manage: wait for the registry release before dependents start
     },
   },
@@ -484,11 +490,13 @@ bumper config set exclude packages/a packages/b  # current repo
 bumper config set /path/to/repo modules.docker-node false
 bumper config set branch chore/deps               # manage: push branch ("-" removes it)
 bumper config set checks lint test                # manage: checks, in order
+bumper config set push true                       # manage: push without asking
 bumper config set waitForRelease false
 ```
 
 `get` and `set` default the path to the current repo — omit it to configure where you're standing.
-For `set` a leading config key (`exclude`, `modules.<id>`, `branch`, `checks`, `waitForRelease`) is
+For `set` a leading config key (`exclude`, `modules.<id>`, `branch`, `checks`, `push`,
+`waitForRelease`) is
 what signals the path was omitted.
 
 `bumper detect` marks anything the config drives — a forced module shows `(config: on|off)`, a

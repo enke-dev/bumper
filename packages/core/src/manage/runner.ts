@@ -50,20 +50,35 @@ export interface RepoRunOptions {
 class StepFailure extends Error {}
 
 /**
- * One repo's run: queued → preparing → updating → checking → pushing → awaiting-release → done,
- * or failed at any step. Every transition and output line goes to `emit`. The run owns a skip
- * signal for the release wait.
+ * One repo's run: queued → preparing → updating → checking → awaiting-push → pushing →
+ * awaiting-release → done, or failed at any step. Every transition and output line goes to `emit`.
+ * The run owns the user's push decision and a skip signal for the release wait.
  */
 export class RepoRun {
   status: RepoStatus = 'queued';
   detail: string | undefined;
   readonly #skip = new AbortController();
+  readonly #pushDecision = Promise.withResolvers<boolean>();
   readonly #deps: RunnerDeps;
   readonly #options: RepoRunOptions;
 
   constructor(options: RepoRunOptions, deps: RunnerDeps = realDeps) {
     this.#options = options;
     this.#deps = deps;
+  }
+
+  /** Push the commit the run is holding (only while `awaiting-push`). */
+  push(): void {
+    if (this.status === 'awaiting-push') {
+      this.#pushDecision.resolve(true);
+    }
+  }
+
+  /** End the run with the commit kept local; dependents consume whatever is published. */
+  keepLocal(): void {
+    if (this.status === 'awaiting-push') {
+      this.#pushDecision.resolve(false);
+    }
   }
 
   /** End an in-progress release wait early; dependents then consume whatever is published. */
@@ -80,6 +95,9 @@ export class RepoRun {
         return this.#finish('done', 'nothing to update');
       }
       await this.#check();
+      if (!(await this.#confirmPush(target))) {
+        return this.#finish('done', `committed to ${target}, not pushed`);
+      }
       await this.#push(target);
       return this.#awaitRelease(before);
     } catch (error) {
@@ -221,6 +239,16 @@ export class RepoRun {
       const cmd = check in scripts ? [...RUN_SCRIPT[pm], check] : shellCommand(check);
       await this.#run(cmd, `check "${check}" failed`);
     }, Promise.resolve());
+  }
+
+  /** Pushes right away when configured to, else holds until the user decides. */
+  async #confirmPush(branch: string): Promise<boolean> {
+    if (this.#options.config.push) {
+      return true;
+    }
+    this.#transition('awaiting-push', `committed to ${branch}; push or keep local`);
+    this.#log('system', `committed to ${branch}; waiting for push or keep local`);
+    return this.#pushDecision.promise;
   }
 
   async #push(branch: string): Promise<void> {

@@ -37,7 +37,7 @@ export const noChecksConfigured: DiagnosticCollector = ({ repo, config }) =>
         {
           code: 'no-checks',
           severity: 'info',
-          message: 'no checks configured: the update is pushed untested',
+          message: 'no checks configured: nothing tests the update before it is pushed',
         },
       ]
     : [];

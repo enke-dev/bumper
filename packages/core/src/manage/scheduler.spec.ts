@@ -33,11 +33,18 @@ const REPOS = [
 class FakeRun implements Runnable {
   resolve: (status: RepoStatus) => void = () => undefined;
   skipped = false;
+  decision: 'push' | 'keep-local' | null = null;
   readonly done = new Promise<RepoStatus>(resolve => {
     this.resolve = resolve;
   });
   run(): Promise<RepoStatus> {
     return this.done;
+  }
+  push(): void {
+    this.decision = 'push';
+  }
+  keepLocal(): void {
+    this.decision = 'keep-local';
   }
   skipWaiting(): void {
     this.skipped = true;
@@ -133,6 +140,18 @@ describe('manage scheduler', () => {
     assert.equal(runs.get('lint')?.skipped, true);
   });
 
+  test('push and keepLocal reach the running repo', () => {
+    const { scheduler, runs } = harness(['lint', 'utils']);
+    void scheduler.start();
+    scheduler.push('lint');
+    assert.equal(runs.get('lint')?.decision, 'push');
+    scheduler.keepLocal('lint');
+    assert.equal(runs.get('lint')?.decision, 'keep-local');
+    // utils waits for lint; there is no run to reach yet
+    scheduler.push('utils');
+    assert.equal(runs.has('utils'), false);
+  });
+
   test('a rejected run counts as failed', async () => {
     const events: RunEvent[] = [];
     const scheduler = new Scheduler({
@@ -142,6 +161,8 @@ describe('manage scheduler', () => {
       emit: event => events.push(event),
       createRun: () => ({
         run: () => Promise.reject(new Error('boom')),
+        push: () => undefined,
+        keepLocal: () => undefined,
         skipWaiting: () => undefined,
       }),
     });

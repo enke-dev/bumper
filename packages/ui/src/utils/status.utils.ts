@@ -18,6 +18,7 @@ export function statusVariant(status: RepoStatus): Variant {
     case 'failed':
       return 'danger';
     case 'blocked':
+    case 'awaiting-push':
       return 'warning';
     case 'queued':
     case 'skipped':

@@ -84,6 +84,7 @@ describe('manage runner (e2e, real git)', () => {
           modules: {},
           branch: 'chore/deps',
           checks: ['test -f package.json'],
+          push: true,
           waitForRelease: true,
         },
         selfCommand: [fakeBumper],
@@ -139,7 +140,7 @@ describe('manage runner (e2e, real git)', () => {
     const run = new RepoRun(
       {
         repo: repo(),
-        config: { exclude: [], modules: {}, checks: [], waitForRelease: false },
+        config: { exclude: [], modules: {}, checks: [], push: false, waitForRelease: false },
         selfCommand: [fakeBumper],
         allowYoung: [],
         waitTimeoutMs: 1,

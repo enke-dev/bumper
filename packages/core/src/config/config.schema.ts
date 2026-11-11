@@ -47,6 +47,14 @@ export const REPO_CONFIG_FIELDS: readonly ConfigField[] = [
     placeholder: 'command...',
   },
   {
+    key: 'push',
+    kind: 'boolean',
+    title: 'Push automatically',
+    description:
+      'Push the update as soon as the checks pass. Off: the run stops after the commit and waits for Push or Keep local; dependents start after that.',
+    default: false,
+  },
+  {
     key: 'waitForRelease',
     kind: 'boolean',
     title: 'Wait for release',

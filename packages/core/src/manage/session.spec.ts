@@ -6,7 +6,7 @@ import { PackageManager } from '../context/context.types.js';
 import type { RepoStatus } from './events.js';
 import type { RepoRunOptions } from './runner.js';
 import type { Runnable } from './scheduler.js';
-import type { SessionEvent } from './session.js';
+import type { SessionDeps, SessionEvent } from './session.js';
 import { ManageSession } from './session.js';
 import type { RepoInfo } from './workspace.types.js';
 
@@ -23,6 +23,8 @@ function repo(id: string, published: string[], dependencies: string[]): RepoInfo
     fork: false,
   };
 }
+
+const ok: SessionDeps['run'] = async () => ({ exitCode: 0, stdout: '', stderr: '' });
 
 const REPOS = [repo('lint', ['@x/lint'], []), repo('utils', ['@x/utils'], ['@x/lint'])];
 
@@ -45,12 +47,18 @@ class FakeRun implements Runnable {
       };
     });
   }
+  push(): void {
+    // nothing is held in the fake
+  }
+  keepLocal(): void {
+    // nothing is held in the fake
+  }
   skipWaiting(): void {
     // nothing waits in the fake
   }
 }
 
-function harness(stored: BumperConfig = { repos: {} }) {
+function harness(stored: BumperConfig = { repos: {} }, run: SessionDeps['run'] = ok) {
   const saved: BumperConfig[] = [];
   const runs = new Map<string, FakeRun>();
   const events: SessionEvent[] = [];
@@ -59,7 +67,7 @@ function harness(stored: BumperConfig = { repos: {} }) {
     selfCommand: ['bmpr'],
     deps: {
       scan: async root => ({ root, repos: REPOS }),
-      run: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+      run,
       loadConfig: async () => stored,
       saveConfig: async config => {
         saved.push(config);
@@ -105,6 +113,7 @@ describe('manage session', () => {
       exclude: [],
       modules: {},
       checks: ['lint'],
+      push: false,
       waitForRelease: false,
     });
     assert.deepEqual(saved.at(-1)?.repos['/w/utils']?.checks, ['lint']);
@@ -161,6 +170,35 @@ describe('manage session', () => {
     assert.equal(session.view().repos.find(r => r.id === 'lint')?.diagnosed, true);
     assert.ok(events.some(e => e.type === 'diagnostics' && e.repo === 'lint' && e.diagnosed));
     await assert.rejects(() => session.diagnose('ghost'), /unknown repo/);
+  });
+
+  test('fastForward pulls outside a run, logs the output and re-diagnoses', async () => {
+    const calls: string[] = [];
+    const { session, events } = harness({ repos: {} }, async (cmd, options) => {
+      calls.push(`${options?.cwd}: ${cmd.join(' ')}`);
+      return { exitCode: 0, stdout: 'Updating 1..2\n', stderr: '' };
+    });
+    await session.scan();
+    await session.fastForward('lint');
+    assert.deepEqual(calls, ['/w/lint: git pull --ff-only --quiet']);
+    assert.deepEqual(
+      session.logs('lint').map(l => l.line),
+      ['$ git pull --ff-only --quiet', 'Updating 1..2']
+    );
+    assert.ok(events.some(e => e.type === 'diagnostics' && e.repo === 'lint'));
+  });
+
+  test('fastForward reports a refused pull and leaves running repos alone', async () => {
+    const failing: SessionDeps['run'] = async () => ({
+      exitCode: 128,
+      stdout: '',
+      stderr: 'fatal: Not possible to fast-forward, aborting.\n',
+    });
+    const { session } = harness({ repos: {} }, failing);
+    await session.scan();
+    await assert.rejects(() => session.fastForward('lint'), /Not possible to fast-forward/);
+    await session.start({ selection: ['lint', 'utils'] });
+    await assert.rejects(() => session.fastForward('utils'), /part of the current run/);
   });
 
   test('start validates the selection', async () => {

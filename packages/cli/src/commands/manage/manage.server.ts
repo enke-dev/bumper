@@ -43,6 +43,10 @@ export function startServer({ session, html, token, port, hostname = '127.0.0.1'
     if (req.method === 'POST' && head === 'workspace' && id === 'rescan') {
       return json(await session.scan());
     }
+    if (req.method === 'POST' && head === 'workspace' && path.endsWith('/fast-forward')) {
+      const repoId = decodeURIComponent(path.split('/').slice(2, -1).join('/'));
+      return json(await session.fastForward(repoId));
+    }
     if (req.method === 'POST' && head === 'workspace' && path.endsWith('/diagnose')) {
       const repoId = decodeURIComponent(path.split('/').slice(2, -1).join('/'));
       return json(await session.diagnose(repoId));
@@ -79,6 +83,12 @@ export function startServer({ session, html, token, port, hostname = '127.0.0.1'
           return json({ ok: true });
         case 'run-anyway':
           session.runAnyway(repoId);
+          return json({ ok: true });
+        case 'push':
+          session.push(repoId);
+          return json({ ok: true });
+        case 'keep-local':
+          session.keepLocal(repoId);
           return json({ ok: true });
         case 'skip-waiting':
           session.skipWaiting(repoId);

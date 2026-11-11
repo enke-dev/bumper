@@ -41,6 +41,7 @@ const config = (extra: Partial<RepoConfig> = {}): RepoConfig => ({
   exclude: [],
   modules: {},
   checks: ['lint', 'echo free'],
+  push: true,
   waitForRelease: true,
   ...extra,
 });
@@ -250,6 +251,66 @@ describe('manage runner', () => {
     );
     assert.equal(await run.run(), 'failed');
     assert.equal(run.detail, 'check "lint" failed (exit 2)');
+    assert.equal(
+      streamed.some(c => c[1] === 'push'),
+      false
+    );
+  });
+
+  test('without push configured, the run holds after the checks until the user pushes', async () => {
+    const { deps, streamed } = fakes(world());
+    const events: RunEvent[] = [];
+    const run: RepoRun = new RepoRun(
+      {
+        repo: repo({ published: [], private: true }),
+        config: config({ push: false }),
+        selfCommand: ['bmpr'],
+        allowYoung: [],
+        waitTimeoutMs: 1,
+        emit: e => {
+          events.push(e);
+          if (e.type === 'status' && e.status === 'awaiting-push') {
+            // the user reviews, then pushes
+            setTimeout(() => run.push(), 0);
+          }
+        },
+      },
+      deps
+    );
+    // too early: not holding yet, so this must not pre-decide the push
+    run.keepLocal();
+    assert.equal(await run.run(), 'done');
+    assert.equal(run.detail, 'pushed');
+    assert.deepEqual(statuses(events), [
+      'preparing',
+      'updating',
+      'checking',
+      'awaiting-push',
+      'pushing',
+      'done',
+    ]);
+    assert.equal(streamed.at(-1)?.join(' '), 'git push --quiet --set-upstream origin main');
+  });
+
+  test('keepLocal ends a held run as done without pushing', async () => {
+    const { deps, streamed } = fakes(world());
+    const run: RepoRun = new RepoRun(
+      {
+        repo: repo(),
+        config: config({ push: false, checks: [] }),
+        selfCommand: ['bmpr'],
+        allowYoung: [],
+        waitTimeoutMs: 1,
+        emit: e => {
+          if (e.type === 'status' && e.status === 'awaiting-push') {
+            setTimeout(() => run.keepLocal(), 0);
+          }
+        },
+      },
+      deps
+    );
+    assert.equal(await run.run(), 'done');
+    assert.equal(run.detail, 'committed to main, not pushed');
     assert.equal(
       streamed.some(c => c[1] === 'push'),
       false

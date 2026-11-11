@@ -4,6 +4,7 @@ export type RepoStatus =
   | 'preparing'
   | 'updating'
   | 'checking'
+  | 'awaiting-push'
   | 'pushing'
   | 'awaiting-release'
   | 'done'
