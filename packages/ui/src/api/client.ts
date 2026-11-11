@@ -44,6 +44,7 @@ export const api = {
   control: (id: string, verb: ControlVerb) =>
     call<{ ok: boolean }>('POST', `/api/run/${encode(id)}/${verb}`),
   logs: (id: string) => call<LogLine[]>('GET', `/api/logs/${encode(id)}`),
+  clearLogs: (id: string) => call<{ ok: boolean }>('DELETE', `/api/logs/${encode(id)}`),
 };
 
 /**

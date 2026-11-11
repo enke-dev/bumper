@@ -221,6 +221,10 @@ export class ManageSession {
     return this.#logs.get(id) ?? [];
   }
 
+  clearLogs(id: string): void {
+    this.#logs.delete(id);
+  }
+
   /** Start a run over `selection`. Rejects while another run is in progress. */
   async start(request: RunRequest): Promise<void> {
     if (this.running) {
@@ -254,6 +258,7 @@ export class ManageSession {
           config: this.configFor(repo),
           selfCommand: this.#options.selfCommand,
           allowYoung,
+          dryRun: request.dryRun ?? false,
           waitTimeoutMs: this.#options.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
           emit: event => this.#onRunEvent(event),
         }),
@@ -357,7 +362,6 @@ export class ManageSession {
     const fastCodes = new Set([
       'unsupported',
       'fork',
-      'no-checks',
       'graph-cycle',
       'ambiguous-producer',
       'branch-switch',

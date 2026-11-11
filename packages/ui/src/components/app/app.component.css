@@ -41,3 +41,15 @@ wa-split-panel > * {
 wa-callout {
   margin: var(--wa-space-s) var(--wa-space-m) 0;
 }
+
+.mode {
+  display: flex;
+  flex-direction: column;
+  max-width: 18rem;
+  white-space: normal;
+}
+
+.mode span {
+  color: var(--wa-color-text-quiet);
+  font-size: var(--wa-font-size-xs);
+}

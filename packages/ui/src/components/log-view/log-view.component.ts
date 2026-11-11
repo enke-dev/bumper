@@ -86,12 +86,22 @@ export class BumperLogView extends BumperElement.withUtilities().withStyles(styl
         <wa-button
           size="s"
           appearance="plain"
-          title=${repo.diagnosed ? 'Re-run the git and registry checks' : 'Run the git and registry checks'}
+          title="Clear this repo's log"
+          ?disabled=${busy || logs.length === 0}
+          @click=${() => this.store.clearLogs(repo.id)}
+        >
+          <wa-icon slot="start" library="system" name="xmark"></wa-icon>
+          Clear
+        </wa-button>
+        <wa-button
+          size="s"
+          appearance="plain"
+          title="Run the git and registry checks"
           ?loading=${diagnosing.has(repo.id)}
           @click=${() => this.store.diagnose(repo.id)}
         >
           <wa-icon slot="start" library="system" name="magnifying-glass"></wa-icon>
-          ${repo.diagnosed ? 'Re-check' : 'Check'}
+          Check
         </wa-button>
         ${when(
           status === 'failed' || status === 'blocked',

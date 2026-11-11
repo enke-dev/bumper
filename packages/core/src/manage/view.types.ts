@@ -55,6 +55,8 @@ export interface RunRequest {
   selection: string[];
   /** Per-run "Ignore minimum release age". */
   ignoreReleaseAge?: boolean;
+  /** Per-run "Dry run": `update --dry-run` on the current branch; nothing is changed or pushed. */
+  dryRun?: boolean;
 }
 
 export type { BumperConfig, Diagnostic, RepoConfig, Severity };

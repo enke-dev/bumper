@@ -317,6 +317,28 @@ describe('manage runner', () => {
     );
   });
 
+  test('a dry run leaves the work tree alone and only reports', async () => {
+    const { deps, streamed } = fakes(world({ dirty: ' M file' }));
+    const run = new RepoRun(
+      {
+        repo: repo(),
+        config: config({ branch: 'chore/deps' }),
+        selfCommand: ['bmpr'],
+        allowYoung: ['@x/lint'],
+        dryRun: true,
+        waitTimeoutMs: 1,
+        emit: () => undefined,
+      },
+      deps
+    );
+    assert.equal(await run.run(), 'done');
+    assert.equal(run.detail, 'dry run: nothing changed');
+    assert.deepEqual(
+      streamed.map(c => c.join(' ')),
+      ['bmpr update --dry-run --approve --format --allow-young @x/lint']
+    );
+  });
+
   test('skipWaiting ends the release wait as done', async () => {
     const { deps } = fakes(world());
     const run = new RepoRun(

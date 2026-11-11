@@ -287,12 +287,15 @@ bumper manage ~/work --port 2011 --no-open
   [Minimum release age](#minimum-release-age)), so a freshly released version is consumed without
   lifting the cooldown for anything else. _Ignore minimum release age_ extends that to every
   upstream producer, selected or not.
+- **Dry run.** The arrow next to _Update_ switches the button to _Dry run_: `bumper update
+--dry-run` in each selected repo, in stage order, on the branch it is on: no fetch, checkout,
+  commit, checks or push. The log shows what an update would change.
 - **Settings.** The gear opens the repo's `~/.bumperrc` entry: excludes, push branch (an existing
   one or a custom name created from the current branch), checks (script names run through the
   package manager, anything else through the shell), push automatically, wait-for-release, and
   module overrides. Repos
   without an entry run with bumper's defaults.
-- **Diagnostics.** Unsupported repos (no manifest, yarn), missing checks, dirty work tree, behind
+- **Diagnostics.** Unsupported repos (no manifest, yarn), dirty work tree, behind
   the remote (with a _Fast-forward_ button: `git pull --ff-only`), missing registry credentials,
   graph cycles and ambiguous producers.
 

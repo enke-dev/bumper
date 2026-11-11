@@ -41,6 +41,8 @@ export interface RepoRunOptions {
   selfCommand: string[];
   /** Package names the update may take past the cooldown (the upstream repos' packages). */
   allowYoung: string[];
+  /** Read-only run: no branch switch or pull, `update --dry-run`, no checks, no push. */
+  dryRun?: boolean;
   /** How long to wait for the registry release before giving up. */
   waitTimeoutMs: number;
   emit: EventSink;
@@ -88,6 +90,9 @@ export class RepoRun {
 
   async run(): Promise<RepoStatus> {
     try {
+      if (this.#options.dryRun) {
+        return await this.#dryRun();
+      }
       const target = await this.#prepare();
       const before = await this.#snapshot();
       const changed = await this.#update();
@@ -177,6 +182,22 @@ export class RepoRun {
       await this.#run(['git', 'pull', '--ff-only', '--quiet'], 'git pull --ff-only failed');
     }
     return target;
+  }
+
+  /** Leaves the work tree as it is: no fetch, checkout or pull, and the update only reports. */
+  async #dryRun(): Promise<RepoStatus> {
+    this.#transition('preparing');
+    if (this.#repo.packageManager === null) {
+      throw new StepFailure(this.#repo.unsupported ?? 'unsupported repository');
+    }
+    this.#transition('updating', 'dry run');
+    const allow = this.#options.allowYoung.flatMap(name => ['--allow-young', name]);
+    await this.#run(
+      [...this.#options.selfCommand, 'update', '--dry-run', '--approve', '--format', ...allow],
+      'bumper update --dry-run failed',
+      { FORCE_COLOR: '1' }
+    );
+    return this.#finish('done', 'dry run: nothing changed');
   }
 
   /** Check out an existing local branch, track an existing remote one, or create it from HEAD. */

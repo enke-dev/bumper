@@ -31,17 +31,6 @@ export const forkRepo: DiagnosticCollector = ({ repo }) =>
       ]
     : [];
 
-export const noChecksConfigured: DiagnosticCollector = ({ repo, config }) =>
-  repo.packageManager !== null && config.checks.length === 0
-    ? [
-        {
-          code: 'no-checks',
-          severity: 'info',
-          message: 'no checks configured: nothing tests the update before it is pushed',
-        },
-      ]
-    : [];
-
 export const graphCycle: DiagnosticCollector = ({ repo, graph }) =>
   graph.cycles
     .filter(cycle => cycle.includes(repo.id))
@@ -122,7 +111,6 @@ export const registryAuth: DiagnosticCollector = async ({ repo, config, run }) =
 export const FAST_COLLECTORS: readonly DiagnosticCollector[] = [
   unsupportedRepo,
   forkRepo,
-  noChecksConfigured,
   graphCycle,
   ambiguousProducer,
   branchMismatch,
@@ -138,7 +126,6 @@ export const SLOW_COLLECTORS: readonly DiagnosticCollector[] = [
 export const DEFAULT_COLLECTORS: readonly DiagnosticCollector[] = [
   unsupportedRepo,
   forkRepo,
-  noChecksConfigured,
   graphCycle,
   ambiguousProducer,
   branchMismatch,

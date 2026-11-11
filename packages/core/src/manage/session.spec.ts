@@ -148,6 +148,19 @@ describe('manage session', () => {
     assert.equal(events.filter(e => e.type === 'run').at(-1)?.running, false);
   });
 
+  test('dry run reaches every run; clearLogs empties one repo log', async () => {
+    const { session, runs } = harness();
+    await session.scan();
+    await session.start({ selection: ['lint'], dryRun: true });
+    assert.equal(runs.get('lint')?.options.dryRun, true);
+    assert.deepEqual(
+      session.logs('lint').map(l => l.line),
+      ['hello']
+    );
+    session.clearLogs('lint');
+    assert.deepEqual(session.logs('lint'), []);
+  });
+
   test('retry re-runs a failed repo and clears nothing else', async () => {
     const { session, runs, settle } = harness();
     await session.scan();

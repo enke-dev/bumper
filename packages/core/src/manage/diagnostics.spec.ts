@@ -57,7 +57,7 @@ describe('manage diagnostics', () => {
     assert.deepEqual(found, []);
   });
 
-  test('reports git state, missing checks, branch switch and registry auth', async () => {
+  test('reports git state, branch switch and registry auth', async () => {
     const repos = [repo('a', ['a'], [])];
     const found = await collectDiagnostics({
       repo: repos[0] as RepoInfo,
@@ -73,7 +73,6 @@ describe('manage diagnostics', () => {
       'behind-remote',
       'branch-switch',
       'dirty-tree',
-      'no-checks',
       'registry-auth',
     ]);
     assert.equal(

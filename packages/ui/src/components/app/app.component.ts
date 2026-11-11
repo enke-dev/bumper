@@ -40,7 +40,7 @@ export class BumperApp extends BumperElement.withUtilities().withStyles(styles) 
   }
 
   protected override render(): TemplateResult {
-    const { workspace, connected, running, selection, ignoreReleaseAge, error, busy } =
+    const { workspace, connected, running, selection, ignoreReleaseAge, dryRun, error, busy } =
       this.store.state;
     return html`
       <header>
@@ -84,16 +84,40 @@ export class BumperApp extends BumperElement.withUtilities().withStyles(styles) 
         >
           Clear
         </wa-button>
-        <wa-button
-          size="s"
-          variant="brand"
-          ?loading=${running}
-          ?disabled=${selection.size === 0 || running || busy}
-          @click=${() => this.store.start()}
-        >
-          <wa-icon slot="start" library="system" name="play"></wa-icon>
-          Update ${selection.size > 0 ? `(${selection.size})` : ''}
-        </wa-button>
+        <wa-button-group label="Run">
+          <wa-button
+            size="s"
+            variant="brand"
+            ?loading=${running}
+            ?disabled=${selection.size === 0 || running || busy}
+            @click=${() => this.store.start()}
+          >
+            <wa-icon slot="start" library="system" name="play"></wa-icon>
+            ${dryRun ? 'Dry run' : 'Update'} ${selection.size > 0 ? `(${selection.size})` : ''}
+          </wa-button>
+          <!-- the mode only picks what the main button does, like GitHub's draft pull request -->
+          <wa-dropdown
+            placement="bottom-end"
+            @wa-select=${(event: CustomEvent<{ item: { value: string } }>) =>
+              this.store.setDryRun(event.detail.item.value === 'dry-run')}
+          >
+            <wa-button slot="trigger" size="s" variant="brand" ?disabled=${running}>
+              <wa-icon library="system" name="chevron-down" label="Run mode"></wa-icon>
+            </wa-button>
+            <wa-dropdown-item type="checkbox" value="update" .checked=${!dryRun}>
+              <div class="mode">
+                <strong>Update</strong>
+                <span>Commit, run the checks, then push or hold for you</span>
+              </div>
+            </wa-dropdown-item>
+            <wa-dropdown-item type="checkbox" value="dry-run" .checked=${dryRun}>
+              <div class="mode">
+                <strong>Dry run</strong>
+                <span>Only report what would change; no checkout, commit or push</span>
+              </div>
+            </wa-dropdown-item>
+          </wa-dropdown>
+        </wa-button-group>
       </header>
       ${when(
         error,

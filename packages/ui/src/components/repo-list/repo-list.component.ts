@@ -8,6 +8,7 @@ import { when } from 'lit/directives/when.js';
 
 import { ManageStore, storeContext, StoreController } from '../../state/store.js';
 import { BumperElement } from '../../utils/base.utils.js';
+import { storeCollapsed, storedCollapsed } from '../../utils/collapse.utils.js';
 import { ACTIVE, severityVariant, statusLabel, statusVariant } from '../../utils/status.utils.js';
 import styles from './repo-list.component.css';
 
@@ -17,10 +18,28 @@ export class BumperRepoList extends BumperElement.withUtilities().withStyles(sty
   @consume({ context: storeContext })
   store!: ManageStore;
 
+  /** Collapsed stages survive reloads; a per-browser convenience, not server state. */
+  #collapsed = storedCollapsed();
+
   constructor() {
     super();
     // re-render on every store change
     new StoreController(this, () => this.store);
+  }
+
+  #onToggle(index: number, expanded: boolean, event: Event): void {
+    // expand/collapse events bubble; only the stage item itself counts
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    const collapsed = new Set(this.#collapsed);
+    if (expanded) {
+      collapsed.delete(index);
+    } else {
+      collapsed.add(index);
+    }
+    this.#collapsed = collapsed;
+    storeCollapsed(collapsed);
   }
 
   #onSelection(event: CustomEvent<{ selection: HTMLElement[] }>): void {
@@ -171,7 +190,11 @@ export class BumperRepoList extends BumperElement.withUtilities().withStyles(sty
                 ${map(
                   stages,
                   ({ index, repos }) => html`
-                    <wa-tree-item expanded>
+                    <wa-tree-item
+                      ?expanded=${!this.#collapsed.has(index)}
+                      @wa-expand=${(event: Event) => this.#onToggle(index, true, event)}
+                      @wa-collapse=${(event: Event) => this.#onToggle(index, false, event)}
+                    >
                       <span
                         class="stage"
                         title=${

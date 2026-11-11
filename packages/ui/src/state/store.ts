@@ -24,6 +24,8 @@ export interface StoreState {
   filter: string;
   logs: LogLine[];
   ignoreReleaseAge: boolean;
+  /** Per-run "Dry run": report what the update would do, change nothing. */
+  dryRun: boolean;
   /** Repo whose settings drawer is open. */
   editing: string | null;
   /** Repos whose slow diagnostics are being collected right now. */
@@ -49,6 +51,7 @@ export class ManageStore {
     filter: '',
     logs: [],
     ignoreReleaseAge: false,
+    dryRun: false,
     editing: null,
     diagnosing: new Set(),
     error: null,
@@ -137,6 +140,10 @@ export class ManageStore {
     this.#patch({ ignoreReleaseAge: value });
   }
 
+  setDryRun(value: boolean): void {
+    this.#patch({ dryRun: value });
+  }
+
   async focus(id: string | null): Promise<void> {
     this.#patch({ focused: id, logs: [] });
     if (id !== null) {
@@ -185,6 +192,7 @@ export class ManageStore {
       await api.start({
         selection: [...this.#state.selection],
         ignoreReleaseAge: this.#state.ignoreReleaseAge,
+        dryRun: this.#state.dryRun,
       });
     });
   }
@@ -192,6 +200,15 @@ export class ManageStore {
   control(id: string, verb: ControlVerb): Promise<void> {
     return this.#guard(async () => {
       await api.control(id, verb);
+    });
+  }
+
+  clearLogs(id: string): Promise<void> {
+    return this.#guard(async () => {
+      await api.clearLogs(id);
+      if (this.#state.focused === id) {
+        this.#patch({ logs: [] });
+      }
     });
   }
 

@@ -95,6 +95,10 @@ export function startServer({ session, html, token, port, hostname = '127.0.0.1'
           return json({ ok: true });
       }
     }
+    if (req.method === 'DELETE' && head === 'logs' && id !== undefined) {
+      session.clearLogs(decodeURIComponent(path.split('/').slice(2).join('/')));
+      return json({ ok: true });
+    }
     if (req.method === 'GET' && head === 'logs' && id !== undefined) {
       const repoId = decodeURIComponent(path.split('/').slice(2).join('/'));
       return json(session.logs(repoId));
