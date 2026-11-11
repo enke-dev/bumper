@@ -5,10 +5,12 @@ import utilities from '@awesome.me/webawesome/dist/styles/utilities.css?inline';
 
 const UTILITIES = unsafeCSS(utilities);
 
-/** Shared host defaults: components are block-level and honour `hidden`. */
+/** Shared host defaults: components are block-level, border-boxed and honour `hidden`. */
 const BASE = css`
   :host {
     display: block;
+    /* a host sized to its slot (height: 100%) must keep its padding inside */
+    box-sizing: border-box;
   }
   :host([hidden]) {
     display: none;

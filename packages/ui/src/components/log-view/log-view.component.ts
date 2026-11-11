@@ -41,13 +41,13 @@ export class BumperLogView extends BumperElement.withUtilities().withStyles(styl
     }
   }
 
+  // lines arrive without their newline; inside <pre> every character counts, so add it explicitly
   #renderLine(line: LogLine): TemplateResult {
-    return html`<span class=${line.stream}
-      >${map(
-        parseAnsi(line.line),
-        span => html`<span class=${span.classes.join(' ')}>${span.text}</span>`
-      )}</span
-    > `;
+    const spans = map(
+      parseAnsi(line.line),
+      span => html`<span class=${span.classes.join(' ')}>${span.text}</span>`
+    );
+    return html`<span class=${line.stream}>${spans}</span>${'\n'}`;
   }
 
   protected override render(): TemplateResult {
