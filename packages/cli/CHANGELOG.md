@@ -1,5 +1,16 @@
 # @enke.dev/bumper
 
+# [0.19.0](https://github.com/enke-dev/bumper/compare/0.18.4...0.19.0) (2026-11-11)
+
+### Bug Fixes
+
+* **ui:** keep the repo list inside its panel, break log lines ([5595519](https://github.com/enke-dev/bumper/commit/55955194658a07ffbbd5a3f8248f9241fbd61197))
+
+### Features
+
+* **manage:** ask before pushing, fast-forward repos behind remote ([205b9cd](https://github.com/enke-dev/bumper/commit/205b9cd078dfc891a6764358d1b9c0ea8b85e2d8))
+* **manage:** dry run, log clearing, remembered stage collapse ([e710253](https://github.com/enke-dev/bumper/commit/e710253f0566d319c3fbf7f614e8c9fd74a9ee79))
+
 ## [0.18.4](https://github.com/enke-dev/bumper/compare/0.18.3...0.18.4) (2026-11-11)
 
 ## [0.18.3](https://github.com/enke-dev/bumper/compare/0.18.2...0.18.3) (2026-11-04)
