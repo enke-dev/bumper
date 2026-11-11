@@ -1,5 +1,7 @@
 # @enke.dev/bumper
 
+## [0.18.4](https://github.com/enke-dev/bumper/compare/0.18.3...0.18.4) (2026-11-11)
+
 ## [0.18.3](https://github.com/enke-dev/bumper/compare/0.18.2...0.18.3) (2026-11-04)
 
 ## [0.18.2](https://github.com/enke-dev/bumper/compare/0.18.1...0.18.2) (2026-11-02)
