@@ -62,3 +62,24 @@ wa-spinner {
   color: var(--wa-color-text-quiet);
   text-align: center;
 }
+
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--wa-space-m);
+  margin-top: var(--wa-space-s);
+  padding: var(--wa-space-xs) var(--wa-space-m);
+  border: 1px solid var(--wa-color-surface-border);
+  border-radius: var(--wa-border-radius-m);
+  background: var(--wa-color-surface-raised);
+  box-shadow: var(--wa-shadow-m);
+}
+
+.footer .count {
+  margin-left: auto;
+  color: var(--wa-color-text-quiet);
+  font-size: var(--wa-font-size-s);
+}

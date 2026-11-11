@@ -93,14 +93,6 @@ export class BumperApp extends BumperElement.withUtilities().withStyles(styles) 
         >
           Ignore minimum release age
         </wa-checkbox>
-        <wa-button
-          size="s"
-          appearance="plain"
-          ?disabled=${selection.size === 0 || running}
-          @click=${() => this.store.clearSelection()}
-        >
-          Clear
-        </wa-button>
         <wa-button-group label="Run">
           <wa-button
             size="s"

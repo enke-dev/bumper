@@ -275,7 +275,7 @@ bumper manage ~/work --port 2011 --no-open
   are shown as diagnostics instead of edges.
 - **Selection.** Each checkbox selects only its repo; nothing cascades on its own. An unselected repo
   whose selected upstream changes is flagged _upstream changes_; the arrow button selects a repo
-  together with its dependents.
+  together with its dependents. A footer under the list offers _Toggle all_ (selects every repo, or clears the selection when all are selected; with a filter, only the matching ones).
 - **Run.** Repos start as soon as their selected upstreams are done, in parallel where possible. A
   failed repo blocks its dependents, which offer _Retry_ and _Run anyway_ (consume whatever is
   published); a repo waiting for its release offers _Skip waiting_. The run belongs to the server

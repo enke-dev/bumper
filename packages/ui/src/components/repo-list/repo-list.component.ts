@@ -3,6 +3,7 @@ import { consume } from '@lit/context';
 import type { TemplateResult } from 'lit';
 import { html, nothing } from 'lit';
 import { customElement } from 'lit/decorators.js';
+import { live } from 'lit/directives/live.js';
 import { map } from 'lit/directives/map.js';
 import { when } from 'lit/directives/when.js';
 
@@ -149,6 +150,29 @@ export class BumperRepoList extends BumperElement.withUtilities().withStyles(sty
     `;
   }
 
+  /** Floats over the list's bottom edge. */
+  #renderFooter(visible: readonly string[], filtered: boolean): TemplateResult {
+    const { selection, running, workspace } = this.store.state;
+    const total = workspace?.repos.filter(repo => repo.packageManager !== null).length ?? 0;
+    const all = visible.length > 0 && visible.every(id => selection.has(id));
+    const some = visible.some(id => selection.has(id));
+    return html`
+      <div class="footer">
+        <wa-checkbox
+          size="s"
+          title="${all ? 'Deselect all' : 'Select all'}${filtered ? ' matching the filter' : ''}"
+          .checked=${live(all)}
+          .indeterminate=${live(some && !all)}
+          ?disabled=${running || visible.length === 0}
+          @change=${() => this.store.toggleAll(visible)}
+        >
+          Toggle all${filtered ? ' shown' : ''}
+        </wa-checkbox>
+        <span class="count">${selection.size} of ${total} selected</span>
+      </div>
+    `;
+  }
+
   protected override render(): TemplateResult {
     const workspace = this.store.state.workspace;
     if (workspace === null) {
@@ -169,6 +193,9 @@ export class BumperRepoList extends BumperElement.withUtilities().withStyles(sty
     const stages = workspace.stages
       .map((stage, index) => ({ index, repos: stage.map(id => byId.get(id)).filter(matches) }))
       .filter(stage => stage.repos.length > 0);
+    const visible = stages.flatMap(stage =>
+      stage.repos.filter(repo => repo.packageManager !== null).map(repo => repo.id)
+    );
     return html`
       <div class="filter">
         <wa-input
@@ -218,6 +245,7 @@ export class BumperRepoList extends BumperElement.withUtilities().withStyles(sty
               </wa-tree>
             `
       }
+      ${this.#renderFooter(visible, query !== '')}
     `;
   }
 }

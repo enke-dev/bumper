@@ -146,8 +146,12 @@ export class ManageStore {
     this.#patch({ filter });
   }
 
-  clearSelection(): void {
-    this.#patch({ selection: new Set() });
+  /** Select every one of `ids`, or, when all of them already are, deselect them. */
+  toggleAll(ids: readonly string[]): void {
+    const selection = new Set(this.#state.selection);
+    const all = ids.every(id => selection.has(id));
+    ids.forEach(id => (all ? selection.delete(id) : selection.add(id)));
+    this.#patch({ selection });
   }
 
   setIgnoreReleaseAge(value: boolean): void {
