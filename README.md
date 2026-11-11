@@ -99,7 +99,8 @@ Requires [Bun](https://bun.sh) to build.
 
 ```sh
 bun install     # installs deps + builds ./packages/cli/dist/cli.mjs (prepare hook)
-bun run dev …   # run the CLI straight from source, no build needed
+bun run cli …   # run the CLI straight from source, no build needed
+bun run dev     # manage GUI with hot reload on 127.0.0.1:2010 (starts `manage` from source on 2011)
 ```
 
 To get a global `bumper` on your `PATH` from the working tree (e.g. to dogfood it in other

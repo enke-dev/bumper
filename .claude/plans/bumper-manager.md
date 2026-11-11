@@ -261,7 +261,7 @@ query or `x-bumper-token` header, routes `GET /api/workspace`, `POST /api/worksp
 skip-waiting}`, `GET /api/logs/<id>`, `GET /ws`). **Assets:** instead of an asset provider, the UI is one
 self-contained `packages/ui/dist/index.html` (vite flat build + `scripts/inline.ts`) imported by the CLI
 with `import … with { type: text }` — verified inlined by `bun build --target=node`, `--compile` and
-`bun run`. Dev: `bun run dev:manage` (port 2011) + `bun run dev:ui` (vite proxies `/api` and `/ws`).
+`bun run`. Dev: `bun run dev` (vite on 2010 spawns `manage` on 2011, proxies `/api` and `/ws` with its token).
 
 ## Phase 4 — UI (Lit + Web Awesome, minimal local styles)
 

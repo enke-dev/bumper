@@ -18,20 +18,19 @@
   ],
   "scripts": {
     "check": "tsgo --noEmit && tsgo -p packages/ui --noEmit",
-    "lint": "run-p lint:*",
+    "lint": "bun run --parallel 'lint:*'",
     "lint:eslint": "bun --bun eslint --config eslint.config.ts",
     "lint:prettier": "bun --bun prettier --config prettier.config.ts --check .",
-    "format": "run-p format:*",
+    "format": "bun run --sequential 'format:*'",
     "format:eslint": "bun --bun eslint --config eslint.config.ts --fix",
     "format:prettier": "bun --bun prettier --config prettier.config.ts --write .",
-    "test": "run-p -c test:*",
+    "test": "bun run --parallel --no-exit-on-error 'test:*'",
     "test:bun": "bun test --reporter=junit --reporter-outfile=reports/junit.bun.xml",
     "test:node": "node --import tsx --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=reports/junit.node.xml \"packages/*/src/**/*.spec.ts\"",
-    "dev": "bun run --bun packages/cli/src/cli.ts",
+    "cli": "bun run --bun packages/cli/src/cli.ts",
+    "dev": "bun run --filter @enke.dev/bumper-ui dev",
     "build": "bun run --filter @enke.dev/bumper build",
-    "build:binaries": "sh scripts/build-binaries.sh",
-    "dev:ui": "bun run --filter @enke.dev/bumper-ui dev",
-    "dev:manage": "bun run --bun packages/cli/src/cli.ts manage --port 2011 --no-open"
+    "build:binaries": "sh scripts/build-binaries.sh"
   },
   "devDependencies": {
     "@enke.dev/lint": "0.13.19",
@@ -41,7 +40,6 @@
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "eslint": "10.13.0",
     "jiti": "2.7.0",
-    "npm-run-all2": "9.0.4",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "6.0.3"

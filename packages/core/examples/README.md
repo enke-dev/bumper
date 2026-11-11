@@ -16,8 +16,8 @@ They double as living documentation of what `bumper detect` recognises.
 Try it against any of them:
 
 ```sh
-bun run dev detect packages/core/examples/node-npm
-bun run dev detect packages/core/examples/bun --json
+bun run cli detect packages/core/examples/node-npm
+bun run cli detect packages/core/examples/bun --json
 ```
 
 The lockfiles are intentionally stubbed — detection only checks for their presence,
