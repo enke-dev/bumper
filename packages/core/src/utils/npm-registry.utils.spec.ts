@@ -95,6 +95,16 @@ describe('latestVersion', () => {
     assert.equal(version, '7.10.1');
   });
 
+  test('keeps a prerelease latest tagged below a published stable', async () => {
+    const version = await latestVersion(
+      '@esm-bundle/chai',
+      'npm',
+      '/repo',
+      registry('4.3.4-fix.0', { '4.3.3': '', '4.3.4': '', '4.3.4-fix.0': '' })
+    );
+    assert.equal(version, '4.3.4-fix.0');
+  });
+
   test('keeps a prerelease latest when nothing stable was published', async () => {
     const version = await latestVersion(
       'next-only',
@@ -375,6 +385,21 @@ describe('latestEligibleVersion', () => {
           : ok(JSON.stringify({ version: '8.0.0-rc.28' }))
     );
     assert.equal(version, '7.10.1');
+  });
+
+  test('keeps a prerelease latest tagged below a published stable without publish times', async () => {
+    const versions = ['4.3.3', '4.3.4', '4.3.4-fix.0'];
+    const version = await latestEligibleVersion(
+      '@esm-bundle/chai',
+      'npm',
+      '/repo',
+      gate(HOUR / 1000),
+      async cmd =>
+        cmd.includes('versions')
+          ? ok(JSON.stringify(versions))
+          : ok(JSON.stringify({ version: '4.3.4-fix.0' }))
+    );
+    assert.equal(version, '4.3.4-fix.0');
   });
 
   test('returns latest when it already cleared the cooldown', async () => {

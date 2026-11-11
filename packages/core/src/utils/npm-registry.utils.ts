@@ -1,4 +1,4 @@
-import { compareReversed, isLessThanOrEqual, isStable, satisfies } from 'verkit';
+import { compareReversed, isLessThan, isLessThanOrEqual, isStable, satisfies } from 'verkit';
 
 import { PackageManager } from '../context/context.types.js';
 import { exec, execOk } from './exec.utils.js';
@@ -28,7 +28,8 @@ export function viewTool(pm: PackageManager): string {
  * the repo so its `.npmrc` (scoped registries, auth) applies. Null if
  * unresolvable (network, private without access, 404).
  *
- * A prerelease under `latest` yields the highest stable version instead, see {@link stableLatest}.
+ * A prerelease under `latest` ahead of every stable yields the highest stable version instead, see
+ * {@link stableLatest}.
  */
 export async function latestVersion(
   pkg: string,
@@ -54,13 +55,17 @@ export async function latestVersion(
 }
 
 /**
- * The highest stable version when the `latest` dist-tag points to a prerelease, as maintainers
- * sometimes tag one by mistake (prisma tagged `8.0.0-rc.28`): every stable pin would slide into
- * it. A pinned prerelease above that stays put, as pins are never walked back. `latest` itself
- * when nothing stable was published.
+ * The highest stable version when the `latest` dist-tag points to a prerelease ahead of every
+ * stable release, as maintainers sometimes tag one by mistake (prisma tagged `8.0.0-rc.28`):
+ * every stable pin would slide into it. A pinned prerelease above that stays put, as pins are
+ * never walked back. `latest` itself when nothing stable was published.
+ *
+ * A prerelease tagged `latest` *below* a published stable is deliberate: the maintainer moved the
+ * tag back, so it wins (`@esm-bundle/chai` tagged `4.3.4-fix.0` to repair a broken `4.3.4`).
  */
 function stableLatest(latest: string, versions: readonly string[]): string {
-  return versions.filter(version => isStable(version)).sort(compareReversed)[0] ?? latest;
+  const stable = versions.filter(version => isStable(version)).sort(compareReversed)[0];
+  return stable !== undefined && isLessThan(stable, latest) ? stable : latest;
 }
 
 /**
