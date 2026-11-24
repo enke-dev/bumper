@@ -39,6 +39,12 @@ export interface Module {
    * when the module manages no specific image.
    */
   managedImages?(ctx: ModuleContext): Promise<string[]>;
+  /**
+   * Crate names this module owns when {@link isUsed} — the generic cargo update leaves them alone
+   * so the module can lock them itself (e.g. the tauri feature locks each `tauri-plugin-*` crate to
+   * the version of its JavaScript package). Omit when the module manages no specific crate.
+   */
+  managedCrates?(ctx: ModuleContext): Promise<string[]>;
   /** Action: perform the bump. Must honor `ctx.dryRun`. */
   update(ctx: ModuleContext): Promise<void>;
 }

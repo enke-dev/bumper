@@ -246,6 +246,24 @@ bumper detect --json | jq .releaseAge
 # { "seconds": 86400, "excludes": [], "strict": false, "ignoreMissingTime": true, "source": "pnpm 11 default" }
 ```
 
+#### Crates
+
+The `cargo` module holds crates to the same cooldown, through cargo's own gate
+(`registry.global-min-publish-age`, cargo 1.100 and newer): bumper hands it the detected value as
+`CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE`, unless you set a crates.io publish age yourself, in the
+environment, in a `.cargo/config.toml` between the crate and the repo root or in
+`$CARGO_HOME/config.toml`. Without either (an npm repo, or a Rust one without a package manager,
+and no `--min-release-age`) crates update ungated. An older cargo only warns about the setting and
+resolves without it, so with a cooldown in force bumper refuses to run on one
+(`rustup update stable`).
+
+A full `cargo update` under the gate rolls every locked version younger than the cooldown back. So
+bumper runs it as a dry run only and then updates just the crates that move forward
+(`cargo update -p name@version …`), keeping young versions someone locked on purpose. Updates stay
+inside the ranges of the `Cargo.toml`s, a new major remains a manual edit, and so do git
+dependencies. A `Cargo.toml` requiring a crate younger than the cooldown fails cargo's whole
+resolve, so that crate dir is skipped with a note until it clears.
+
 #### Consuming your own fresh releases (`--allow-young`)
 
 The cooldown also bites when a repo should pick up a version _you_ just published from another
@@ -309,7 +327,7 @@ machine (or a page in another tab) can drive it.
 Each concern is a self-detecting, self-updating unit behind a common `Module` interface, in one of
 three families (mirrored by the `modules/` folder layout): **runtimes**, **package-managers** and
 **features**. The update procedure just runs every module whose detector matches, in registry order
-— runtimes first (pin versions), then dependency-pinning features, then package managers install,
+— runtimes first (pin versions), then dependency-pinning features, then package managers install (crates included),
 then the remaining file-rewriting features:
 
 | id                     | kind            | detects                                                                                                                               | does                                                                                                                                                                                                                                   |
@@ -322,6 +340,7 @@ then the remaining file-rewriting features:
 | `bun`                  | package-manager | bun packageManager / lockfile                                                                                                         | self-upgrade, bump specs + `bun@x` packageManager field to the pinned release, reinstall                                                                                                                                               |
 | `npm`                  | package-manager | npm packageManager / lockfile                                                                                                         | bump specs to latest, clean reinstall, `approve-scripts --all`                                                                                                                                                                         |
 | `pnpm`                 | package-manager | pnpm packageManager / lockfile                                                                                                        | self-update, bump specs to latest, clean reinstall, `approve-builds --all`                                                                                                                                                             |
+| `cargo`                | package-manager | `Cargo.lock` beside a `Cargo.toml`                                                                                                    | refresh the lockfile within the `Cargo.toml` ranges and the release age (cargo ≥ 1.100), moving crates forward only, see [Crates](#crates)                                                                                             |
 | `docker-node`          | feature         | `Dockerfile*` / `compose*.yaml`                                                                                                       | align `node:<ver>` / `NODE_VERSION=` to LTS                                                                                                                                                                                            |
 | `devcontainer-node`    | feature         | a node image / feature in `.devcontainer.json` / `.devcontainer/[*/]devcontainer.json`, or a node devcontainer image in a Docker file | align the `typescript-node`/`javascript-node` image major (only to a published tag; owns these images) and the node feature's `version` to LTS                                                                                         |
 | `github-version-files` | feature         | `actions/setup-node` / `oven-sh/setup-bun` / `pnpm/action-setup` with a hand-written version, and the pin to read                     | point setup-node/setup-bun at `.node-version` / `.bun-version` (`*-version-file`), drop pnpm's `version` so it reads `packageManager`; expressions, lists, `canary`, steps ahead of `actions/checkout` and `# bumper: skip` lines stay |

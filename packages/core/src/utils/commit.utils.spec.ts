@@ -108,6 +108,20 @@ describe('summarizeChanges', () => {
     assert.deepEqual(s.otherFiles, ['Dockerfile']);
   });
 
+  test('lists moved crates of every Cargo.lock once, under their own section', () => {
+    const lock = (tokio: string) =>
+      `[[package]]\nname = "tokio"\nversion = "${tokio}"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\n`;
+    const s = summarizeChanges([
+      { path: 'a/Cargo.lock', before: lock('1.53.2'), after: lock('1.53.3') },
+      { path: 'b/Cargo.lock', before: lock('1.53.2'), after: lock('1.53.3') },
+      { path: 'c/Cargo.lock', before: lock('1.53.2'), after: `${lock('1.53.2')}\n[[package]]` },
+    ]);
+    assert.deepEqual(s.crates, [{ name: 'tokio', from: '1.53.2', to: '1.53.3' }]);
+    // a lockfile without a moved crate stays visible by path
+    assert.deepEqual(s.otherFiles, ['c/Cargo.lock']);
+    assert.match(renderCommitBody(s), /### Crates\n\n- `tokio`: 1\.53\.2 → 1\.53\.3/);
+  });
+
   test('a new (before: null) package.json is listed, not dep-diffed', () => {
     const s = summarizeChanges([
       { path: 'package.json', before: null, after: pkg({ a: '1.0.0' }) },

@@ -85,6 +85,12 @@ export interface ModuleContext {
    * Populated by `runUpdate` before modules run.
    */
   managedImages?: ReadonlySet<string>;
+  /**
+   * Crate names owned by the active modules; the generic cargo update skips them so each owning
+   * module locks its own crate (e.g. tauri pairs plugin crates with their JavaScript packages).
+   * Populated by `runUpdate` before modules run.
+   */
+  managedCrates?: ReadonlySet<string>;
   /** When true, modules print intended steps without mutating anything. */
   dryRun: boolean;
 }

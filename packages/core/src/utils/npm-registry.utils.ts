@@ -10,8 +10,13 @@ import { isExemptFromReleaseAge, NO_RELEASE_AGE, releaseAgeCutoff } from './rele
  * real `execOk` and is only overridden by tests, so the network call can be driven offline.
  */
 export async function curlJson<T>(url: string, run: typeof execOk = execOk): Promise<T> {
+  return JSON.parse(await curlText(url, run)) as T;
+}
+
+/** A URL's body as text, e.g. the line-delimited JSON of the crates.io sparse index. */
+export async function curlText(url: string, run: typeof execOk = execOk): Promise<string> {
   const { stdout } = await run(['curl', '-sSL', '--fail', '--connect-timeout', '20', url]);
-  return JSON.parse(stdout) as T;
+  return stdout;
 }
 
 /**

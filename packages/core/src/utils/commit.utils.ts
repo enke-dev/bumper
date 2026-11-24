@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 
+import { diffCargoLock } from './cargo.utils.js';
 import { isDockerFileName, parseImageRef, parseImageRefs, refKey } from './docker.utils.js';
 import { exec } from './exec.utils.js';
 import type { PackageJson } from './package.types.js';
@@ -14,6 +15,8 @@ export interface Change {
 /** Structured diff of an `update` run, grouped for the commit body. */
 export interface ChangeSummary {
   deps: Change[];
+  /** Locked crate versions that moved, across every `Cargo.lock`. */
+  crates: Change[];
   packageManager?: Change;
   node?: Change;
   bun?: Change;
@@ -123,8 +126,15 @@ function diffImages(before: string, after: string): Change[] {
  * pins; workflow YAML → action pins; anything else is listed by path.
  */
 export function summarizeChanges(files: FileDiff[]): ChangeSummary {
-  const summary: ChangeSummary = { deps: [], actions: [], images: [], otherFiles: [] };
+  const summary: ChangeSummary = {
+    deps: [],
+    crates: [],
+    actions: [],
+    images: [],
+    otherFiles: [],
+  };
   const seenDep = new Set<string>();
+  const seenCrate = new Set<string>();
 
   files.forEach(file => {
     const name = basename(file.path);
@@ -154,6 +164,22 @@ export function summarizeChanges(files: FileDiff[]): ChangeSummary {
           to: after.packageManager,
         };
       }
+      return;
+    }
+
+    if (name === 'Cargo.lock' && file.before !== null) {
+      const crateChanges = diffCargoLock(file.before, file.after);
+      if (crateChanges.length === 0) {
+        // only crates added or dropped → keep it visible by path
+        summary.otherFiles.push(file.path);
+      }
+      crateChanges.forEach(change => {
+        const key = `${change.name}\t${change.from}\t${change.to}`;
+        if (!seenCrate.has(key)) {
+          seenCrate.add(key);
+          summary.crates.push(change);
+        }
+      });
       return;
     }
 
@@ -192,6 +218,7 @@ export function summarizeChanges(files: FileDiff[]): ChangeSummary {
 export function isEmptySummary(s: ChangeSummary): boolean {
   return (
     s.deps.length === 0 &&
+    s.crates.length === 0 &&
     s.actions.length === 0 &&
     s.images.length === 0 &&
     s.otherFiles.length === 0 &&
@@ -213,6 +240,10 @@ export function renderCommitBody(s: ChangeSummary): string {
   list(
     'Dependencies',
     s.deps.map(d => `\`${d.name}\`: ${d.from} → ${d.to}`)
+  );
+  list(
+    'Crates',
+    s.crates.map(c => `\`${c.name}\`: ${c.from} → ${c.to}`)
   );
   list(
     'Package manager',

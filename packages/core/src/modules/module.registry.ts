@@ -11,6 +11,7 @@ import { typesBunFeature } from './features/types-bun/types-bun.feature.js';
 import { typesNodeFeature } from './features/types-node/types-node.feature.js';
 import type { Module } from './module.types.js';
 import { bunPackageManager } from './package-managers/bun/bun.package-manager.js';
+import { cargoPackageManager } from './package-managers/cargo/cargo.package-manager.js';
 import { npmPackageManager } from './package-managers/npm/npm.package-manager.js';
 import { pnpmPackageManager } from './package-managers/pnpm/pnpm.package-manager.js';
 import { bunRuntime } from './runtimes/bun/bun.runtime.js';
@@ -32,6 +33,7 @@ const MODULES: readonly Module[] = [
   bunPackageManager,
   npmPackageManager,
   pnpmPackageManager,
+  cargoPackageManager,
   dockerNodeFeature,
   devcontainerNodeFeature,
   githubVersionFilesFeature,
@@ -58,23 +60,16 @@ export interface RunOptions {
   skip?: string[] | undefined;
 }
 
-/** Union of dependency names owned by every module that applies to this repo. */
-export async function collectManagedDependencies(ctx: ModuleContext): Promise<Set<string>> {
-  const owned = await Promise.all(
-    MODULES.map(async module =>
-      module.managedDependencies && (await module.isUsed(ctx))
-        ? module.managedDependencies(ctx)
-        : []
-    )
-  );
-  return new Set(owned.flat());
-}
+/** The names a module can own, each skipped by the matching generic bump. Context and modules
+ * share the keys: `ctx.managedImages` holds what every module's `managedImages()` returned. */
+const MANAGED_KEYS = ['managedDependencies', 'managedImages', 'managedCrates'] as const;
+type ManagedKey = (typeof MANAGED_KEYS)[number];
 
-/** Union of container image repos owned by every module that applies to this repo. */
-export async function collectManagedImages(ctx: ModuleContext): Promise<Set<string>> {
+/** Union of the names (dependencies, images or crates) owned by every module applying here. */
+export async function collectManaged(ctx: ModuleContext, key: ManagedKey): Promise<Set<string>> {
   const owned = await Promise.all(
     MODULES.map(async module =>
-      module.managedImages && (await module.isUsed(ctx)) ? module.managedImages(ctx) : []
+      module[key] && (await module.isUsed(ctx)) ? (module[key]?.(ctx) ?? []) : []
     )
   );
   return new Set(owned.flat());
@@ -82,9 +77,12 @@ export async function collectManagedImages(ctx: ModuleContext): Promise<Set<stri
 
 /** Generic update procedure: run every applicable module, in registry order. */
 export async function runUpdate(ctx: ModuleContext, options: RunOptions = {}): Promise<void> {
-  // resolve owned deps + images up front so the generic bumps can skip them, whatever the run order
-  ctx.managedDependencies = await collectManagedDependencies(ctx);
-  ctx.managedImages = await collectManagedImages(ctx);
+  // resolve owned names up front so the generic bumps can skip them, whatever the run order
+  await Promise.all(
+    MANAGED_KEYS.map(async key => {
+      ctx[key] = await collectManaged(ctx, key);
+    })
+  );
 
   // reduce over a promise accumulator to keep modules strictly sequential (ordering
   // matters: runtimes pin versions before the features that read them)
