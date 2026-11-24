@@ -368,7 +368,8 @@ detection, so a later multi-step CLI or GUI can build on top of the same registr
 
 The composite action at the repo root runs `bumper update --commit`, pushes the result to a
 dedicated branch, and opens (or updates) a pull request — no local installation needed. Drop it
-into a scheduled workflow in any target repo.
+into a scheduled workflow in any target repo. In a repo with a `Cargo.lock` it also installs a
+minimal stable Rust toolchain through the runner's rustup, for the `cargo` module.
 
 ### Minimal setup
 

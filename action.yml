@@ -131,6 +131,21 @@ runs:
           npm | pnpm | yarn) corepack prepare --activate ;;
         esac
 
+    - name: Set up Rust
+      # Only for repos with a Cargo.lock: the cargo module needs cargo 1.100 or newer, which
+      # enforces the release age (min-publish-age). Hosted runners ship rustup; a minimal stable
+      # toolchain is enough, `cargo update` compiles nothing. A rust-toolchain.toml pinning an older
+      # one makes bumper fail loudly rather than update without the gate.
+      shell: bash
+      run: |
+        if [ -z "$(git ls-files '*Cargo.lock')" ]; then exit 0; fi
+        if ! command -v rustup >/dev/null; then
+          echo "::warning::rustup not found, the cargo module runs on whatever cargo is on PATH"
+          exit 0
+        fi
+        rustup toolchain install stable --profile minimal --no-self-update
+        rustup default stable
+
     - name: Configure registry auth
       # Written AFTER checkout (which cleans untracked files) and BEFORE install. Written to
       # both the project .npmrc and ~/.npmrc: pnpm/npm read $HOME/.npmrc, but bun reads only
