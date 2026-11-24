@@ -282,8 +282,14 @@ the subsequent install working: for **pnpm** bumper writes a version-pinned rule
 (`'@scope/pkg@1.2.3'`, merged into an existing union) into `minimumReleaseAgeExclude` in
 `pnpm-workspace.yaml` — pnpm re-checks the lockfile against the cooldown on every install, so the rule
 has to be committed alongside — and prunes pinned versions that have since cleared the cooldown. For
-**bun**, whose excludes are plain names, the install runs with `--minimum-release-age 0` once;
+**bun**, whose `bunfig.toml` excludes are plain names and permanent, the install exempts the
+package for this run only (`--minimum-release-age-excludes`, bun 1.4.4 and newer, along with the
+repo's own excludes, as the flag replaces their list); its dependencies stay gated, and
 `--frozen-lockfile` keeps the versions afterwards. `bumper manage` passes the flag automatically.
+
+A pin someone set while it was still inside the cooldown gets the same treatment without the flag:
+bumper never walks a pin back, and its clean install re-resolves without a lockfile, which the gate
+would refuse. Such pins are found by their publish time and handled like `--allow-young` packages.
 
 ## Manage
 

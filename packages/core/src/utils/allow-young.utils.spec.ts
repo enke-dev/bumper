@@ -71,6 +71,16 @@ describe('allow-young: youngConsumptions', () => {
     assert.deepEqual(await youngConsumptions(open, times, NOW), []);
   });
 
+  test('a pin the bump kept ahead counts like an allow-young package', async () => {
+    const kept = ctx({ allowYoung: [], keptAhead: ['@enke.dev/lit-utils', 'lit'] });
+    const result = await youngConsumptions(kept, times, NOW);
+    // lit has no young publish time, so only lit-utils needs the gate lifted
+    assert.deepEqual(
+      result.map(entry => [entry.name, entry.young]),
+      [['@enke.dev/lit-utils', ['0.6.2']]]
+    );
+  });
+
   test('a version the repo already exempts needs no help', async () => {
     const exempt = ctx();
     exempt.releaseAge = { ...exempt.releaseAge, excludes: ['@enke.dev/lit-utils@0.6.2'] };
@@ -108,10 +118,46 @@ describe('allow-young: recordYoungConsumptions (pnpm)', () => {
   });
 });
 
+/** Fake runner answering `bun --version` with `version`. */
+const bunAt = (version: string) => async () => ({
+  exitCode: 0,
+  stdout: `${version}\n`,
+  stderr: '',
+});
+
 describe('allow-young: youngInstallArgs (bun)', () => {
-  test('lifts the gate for the install only when something young was consumed', async () => {
+  test('exempts the young pins by name, with the repo excludes, only when one is young', async () => {
+    const releaseAge = { ...ctx().releaseAge, excludes: ['typescript'] };
+    const bun = ctx({ packageManager: PackageManager.Bun, releaseAge });
+    assert.deepEqual(await youngInstallArgs(bun, times, NOW, bunAt('1.4.4')), [
+      '--minimum-release-age-excludes',
+      'typescript',
+      '--minimum-release-age-excludes',
+      '@enke.dev/lit-utils',
+    ]);
+    assert.deepEqual(await youngInstallArgs(bun, times, NOW + 2 * DAY, bunAt('1.4.4')), []);
+  });
+
+  test('refuses a bun without the excludes flag, or no bun at all', async () => {
     const bun = ctx({ packageManager: PackageManager.Bun });
-    assert.deepEqual(await youngInstallArgs(bun, times, NOW), ['--minimum-release-age', '0']);
-    assert.deepEqual(await youngInstallArgs(bun, times, NOW + 2 * DAY), []);
+    await assert.rejects(
+      youngInstallArgs(bun, times, NOW, bunAt('1.4.3')),
+      /bun 1\.4\.3 can't exempt single packages from the release age, update to 1\.4\.4/
+    );
+    const missing = async () => ({ exitCode: 127, stdout: '', stderr: 'not found' });
+    await assert.rejects(youngInstallArgs(bun, times, NOW, missing), /bun not found on PATH/);
+  });
+
+  test('the dry run plans the flags without asking bun', async () => {
+    const bun = ctx({ packageManager: PackageManager.Bun, dryRun: true });
+    const unasked = async () => {
+      throw new Error('bun asked');
+    };
+    assert.deepEqual(await youngInstallArgs(bun, times, NOW, unasked), [
+      '--minimum-release-age-excludes',
+      '@enke.dev/lit-utils@0.4.4 || 0.6.1',
+      '--minimum-release-age-excludes',
+      '@enke.dev/lit-utils',
+    ]);
   });
 });

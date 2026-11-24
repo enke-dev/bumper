@@ -112,6 +112,18 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.devDependencies?.['lit'], '^3.2.0', 'normal dep still bumps');
   });
 
+  test('names the pins it keeps ahead of their target, for the install to accept them', async () => {
+    // a pin set by hand while younger than the cooldown: the newest version clearing it is lower
+    latest = { astro: '7.4.12', lit: '3.2.0' };
+    await writePkg({ name: 'root', dependencies: { astro: '7.4.13', lit: '^3.0.0' } });
+    const context = ctx();
+
+    await upgradeAllWorkspaces(context, lookups);
+
+    assert.equal((await readPackageJson(dir))?.dependencies?.['astro'], '7.4.13', 'pin kept');
+    assert.deepEqual(context.keptAhead, ['astro']);
+  });
+
   test('a peer cap never downgrades a pinned prerelease that still satisfies the peer range', async () => {
     // Regression (lit-utils): vitepress is pinned to a `next` prerelease and peer-capped by
     // vitepress-plugin-pagefind (`^1.0.0-0 || ^2.0.0-0`, which the alpha satisfies). The cap

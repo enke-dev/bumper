@@ -229,6 +229,15 @@ async function detectBun(cwd: string): Promise<ReleaseAgePolicy> {
       };
 }
 
+/** bunfig's excludes, which bun applies to a command-line age too: the repo's, else the global
+ * ones. */
+async function bunfigExcludes(cwd: string): Promise<string[]> {
+  const local = parseBunfig(await readIfPresent(join(cwd, 'bunfig.toml')));
+  return local.excludes.length > 0
+    ? local.excludes
+    : parseBunfig(await readIfPresent(join(homedir(), '.bunfig.toml'))).excludes;
+}
+
 /**
  * pnpm's gate, in minutes: `pnpm-workspace.yaml` first, then `.npmrc` (its pre-11 home). With
  * neither set, pnpm ≥11 still enforces a 1-day cooldown by default — so the installed major
@@ -283,8 +292,15 @@ export async function detectReleaseAge(
   run: typeof exec = exec
 ): Promise<ReleaseAgePolicy> {
   if (override !== undefined) {
-    // an explicit cooldown is an explicit policy: strict, like pnpm treats a configured one
-    return { ...NO_RELEASE_AGE, seconds: Math.max(0, override), source: OVERRIDE_SOURCE };
+    // an explicit cooldown is an explicit policy: strict, like pnpm treats a configured one. bun
+    // keeps honouring its bunfig excludes under a command-line age, so they carry over
+    const excludes = pm === PackageManager.Bun ? await bunfigExcludes(cwd) : [];
+    return {
+      ...NO_RELEASE_AGE,
+      seconds: Math.max(0, override),
+      excludes,
+      source: OVERRIDE_SOURCE,
+    };
   }
   switch (pm) {
     case PackageManager.Bun:

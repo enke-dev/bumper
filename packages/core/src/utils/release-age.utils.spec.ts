@@ -2,9 +2,12 @@
 // The config parsers are pure, and `detectReleaseAge` takes an injectable executor, so the
 // pnpm-version probe is driven offline.
 import assert from 'node:assert/strict';
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
 import { PackageManager } from '../context/context.types.js';
+import { withTempDir } from '../testing/with-temp-dir.harness.js';
 import type { ExecResult } from './exec.utils.js';
 import type { ReleaseAgePolicy } from './release-age.utils.js';
 import {
@@ -99,6 +102,17 @@ describe('detectReleaseAge', () => {
     const policy = await detectReleaseAge('/repo', PackageManager.Bun, 120);
     assert.equal(policy.seconds, 120);
     assert.equal(policy.source, '--min-release-age');
+  });
+
+  test("a bun override keeps bunfig's excludes, which bun still applies", async () => {
+    await withTempDir('release-age', async dir => {
+      await writeFile(
+        join(dir, 'bunfig.toml'),
+        '[install]\nminimumReleaseAge = 86400\nminimumReleaseAgeExcludes = ["@own/pkg"]\n'
+      );
+      const policy = await detectReleaseAge(dir, PackageManager.Bun, 120);
+      assert.deepEqual([policy.seconds, policy.excludes], [120, ['@own/pkg']]);
+    });
   });
 
   test('an override of 0 disables the clamp', async () => {

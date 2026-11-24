@@ -143,7 +143,7 @@ export const updateCommand: Command = {
       '--min-release-age n  Only resolve versions published at least n seconds ago',
       "                     (default: the package manager's own cooldown; 0 disables)",
       '--allow-young pkg    Let pkg resolve past the cooldown (repeat for several); pnpm gets a',
-      '                     version-pinned minimumReleaseAgeExclude rule, bun installs ungated',
+      '                     version-pinned minimumReleaseAgeExclude rule, bun exempts it on install',
     ],
   }),
 };

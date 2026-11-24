@@ -71,9 +71,16 @@ export interface ModuleContext {
    * Packages exempt from the cooldown for this run only (`--allow-young`): resolution may pick
    * their newest version regardless of age, and the install gate is relaxed for them — pnpm via a
    * version-pinned `minimumReleaseAgeExclude` rule committed with the update, bun via
-   * `--minimum-release-age 0` on the install. Empty for a plain `update`.
+   * `--minimum-release-age-excludes` on the install. Empty for a plain `update`.
    */
   allowYoung: readonly string[];
+  /**
+   * Dependencies whose pin the bump kept because it is ahead of the newest version the resolution
+   * accepted — a version younger than the cooldown someone pinned by hand, or a prerelease ahead
+   * of `latest`. The young ones among them get the same install treatment as `allowYoung`, or the
+   * clean install, which re-resolves without a lockfile, would refuse them. Set by the bump.
+   */
+  keptAhead?: readonly string[];
   /**
    * Dependency names owned by the active modules; the generic bump skips them so each
    * owning module pins its own package. Populated by `runUpdate` before modules run.

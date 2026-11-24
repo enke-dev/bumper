@@ -363,6 +363,7 @@ export async function upgradeAllWorkspaces(
   // trees are realigned to these afterwards, so a pin follows its dependency rather than `latest`.
   const applied = new Map<string, string>();
   const heldBack = new Map<string, HeldBack>();
+  const keptAhead = new Set<string>();
   const specsChanged = new Map<string, boolean>();
   await Promise.all(
     [...pkgs].map(async ([dir, pkg]) => {
@@ -377,11 +378,13 @@ export async function upgradeAllWorkspaces(
           ctx.cwd,
           lookups,
           applied,
-          heldBack
+          heldBack,
+          keptAhead
         )
       );
     })
   );
+  ctx.keptAhead = [...keptAhead];
   // a cap silently keeping a package off `latest` looks like a bumper bug, so name its cause
   heldBack.forEach(({ version, latest: newest, caps }, name) => {
     const causes = caps.map(({ range, by }) => `${range} (${by})`).join(', ');
@@ -432,7 +435,8 @@ function cappedRanges(pkg: PackageJson, managed: ReadonlySet<string>): Map<strin
  * all are intersected (semver AND) by {@link RegistryLookups.maxSatisfyingRanges}. Returns true
  * if anything changed. `reduce` (not `some`) so every bucket + entry is visited. Every version an
  * entry ends up on - rewritten or deliberately kept - is recorded in `applied`, the lowest
- * winning when manifests disagree, so the override trees can follow the buckets. */
+ * winning when manifests disagree, so the override trees can follow the buckets. A pin kept
+ * because it is ahead of its resolved target lands in `keptAhead`. */
 async function rewriteSpecs(
   pkg: PackageJson,
   managed: ReadonlySet<string>,
@@ -442,7 +446,8 @@ async function rewriteSpecs(
   cwd: string,
   lookups: RegistryLookups,
   applied: Map<string, string>,
-  heldBack: Map<string, HeldBack>
+  heldBack: Map<string, HeldBack>,
+  keptAhead: Set<string>
 ): Promise<boolean> {
   const present = allDependencies(pkg);
   // Collect every capping range per package as a list — never joined into one string (see
@@ -496,6 +501,7 @@ async function rewriteSpecs(
         if (!currentViolatesCaps) {
           recordApplied(applied, name, current);
           recordHeldBack(heldBack, name, current, latest.get(name), capSources.get(name));
+          keptAhead.add(name);
           return acc;
         }
       }

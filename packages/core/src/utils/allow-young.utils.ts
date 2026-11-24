@@ -1,17 +1,19 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { isValid } from 'verkit';
+import { isLessThan, isValid } from 'verkit';
 
 import type { ModuleContext } from '../context/context.types.js';
+import { exec } from './exec.utils.js';
 import { allDependencies, pathExists, readPackageJson } from './fs.utils.js';
 import { publishTimes, viewTool } from './npm-registry.utils.js';
 import { planLine, stepNote } from './output.utils.js';
 import { isExemptFromReleaseAge, releaseAgeCutoff } from './release-age.utils.js';
 import { parseExcludeRule, upsertPnpmExcludeRules } from './release-age-excludes.utils.js';
 
-/** A `--allow-young` package and the versions of it the manifests now pin that are still inside
- * the cooldown — the ones the package manager's install gate would refuse without help. */
+/** A `--allow-young` package (or a pin the bump kept ahead) and the versions of it the manifests
+ * now pin that are still inside the cooldown — the ones the package manager's install gate would
+ * refuse without help. */
 export interface YoungConsumption {
   name: string;
   young: string[];
@@ -37,9 +39,11 @@ async function pinnedVersions(ctx: ModuleContext, name: string): Promise<string[
 }
 
 /**
- * Which `--allow-young` packages ended up on a version the repo's own cooldown would block. Empty
- * without a gate, without allow-young packages, or when every pinned version already cleared it
- * (or is exempt by the repo's own rules) — then nothing needs relaxing.
+ * Which `--allow-young` packages, and which pins the bump kept ahead of their resolved target,
+ * are on a version the repo's own cooldown would block. A pin kept ahead is typically one a
+ * developer set while it was still young: the bump never walks it back, so the clean install has
+ * to accept it. Empty without a gate, without such packages, or when every pinned version already
+ * cleared it (or is exempt by the repo's own rules) — then nothing needs relaxing.
  */
 export async function youngConsumptions(
   ctx: ModuleContext,
@@ -47,12 +51,13 @@ export async function youngConsumptions(
   now: number = Date.now()
 ): Promise<YoungConsumption[]> {
   const cutoff = releaseAgeCutoff(ctx.releaseAge, now);
-  if (cutoff === null || ctx.allowYoung.length === 0) {
+  const names = [...new Set([...ctx.allowYoung, ...(ctx.keptAhead ?? [])])];
+  if (cutoff === null || names.length === 0) {
     return [];
   }
   const tool = viewTool(ctx.packageManager);
   const consumptions = await Promise.all(
-    ctx.allowYoung.map(async name => {
+    names.map(async name => {
       const versions = await pinnedVersions(ctx, name);
       if (versions.length === 0) {
         return null;
@@ -114,25 +119,57 @@ export async function recordYoungConsumptions(
   stepNote(`pinned young versions in minimumReleaseAgeExclude: ${summary.join(', ')}`);
 }
 
+/** The first bun taking `--minimum-release-age-excludes`, which exempts single packages. */
+export const BUN_EXCLUDES_FLAG = '1.4.4';
+
 /**
- * bun: its excludes are plain names (a permanent exemption), so the gate is lifted for this one
- * install instead — `--frozen-lockfile` keeps the versions afterwards, so later installs of the
- * pushed lockfile aren't affected. Empty when nothing young was consumed.
+ * Throws unless the bun in `cwd` can exempt single packages on the command line. Without the flag
+ * the only way past the cooldown is lifting it for the whole install, which lets every young
+ * dependency in along with the pins.
+ */
+export async function assertBunExcludesSupport(
+  cwd: string,
+  run: typeof exec = exec
+): Promise<void> {
+  const result = await run(['bun', '--version'], { cwd }).catch(() => null);
+  const version = result?.exitCode === 0 ? result.stdout.trim() : '';
+  if (!isValid(version)) {
+    throw new Error('bun not found on PATH: install bun to update a bun repo');
+  }
+  if (isLessThan(version, BUN_EXCLUDES_FLAG)) {
+    throw new Error(
+      `bun ${version} can't exempt single packages from the release age, update to ${BUN_EXCLUDES_FLAG} or newer (bun upgrade)`
+    );
+  }
+}
+
+/**
+ * bun: the young packages are exempted by name for this one install, through
+ * `--minimum-release-age-excludes` (bun ≥ 1.4.4); their dependencies stay gated, so an older
+ * version that cleared the cooldown is picked where the ranges allow. bunfig's own excludes are
+ * permanent, and the flag replaces their list, so the repo's excludes are passed along.
+ * `--frozen-lockfile` keeps the versions afterwards. Empty when nothing young was consumed.
  */
 export async function youngInstallArgs(
   ctx: ModuleContext,
   lookup: PublishTimesLookup = publishTimes,
-  now: number = Date.now()
+  now: number = Date.now(),
+  run: typeof exec = exec
 ): Promise<string[]> {
   const consumptions = await youngConsumptions(ctx, lookup, now);
   if (consumptions.length === 0) {
     return [];
   }
-  const names = consumptions.map(entry => entry.name).join(', ');
+  const young = consumptions.map(entry => entry.name);
+  const args = [...new Set([...ctx.releaseAge.excludes, ...young])].flatMap(name => [
+    '--minimum-release-age-excludes',
+    name,
+  ]);
   if (ctx.dryRun) {
-    planLine(`install with --minimum-release-age 0 (young: ${names})`);
-  } else {
-    stepNote(`lifting the release-age gate for this install (young: ${names})`);
+    planLine(`install with ${args.join(' ')} (young: ${young.join(', ')})`);
+    return args;
   }
-  return ['--minimum-release-age', '0'];
+  await assertBunExcludesSupport(ctx.cwd, run);
+  stepNote(`exempting the young pins from the release age for this install: ${young.join(', ')}`);
+  return args;
 }
