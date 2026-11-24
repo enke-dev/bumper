@@ -1,5 +1,19 @@
 # @enke.dev/bumper
 
+# [0.21.0](https://github.com/enke-dev/bumper/compare/0.20.0...0.21.0) (2026-11-24)
+
+### Bug Fixes
+
+* **core:** accept a pin younger than the cooldown on the clean install ([42ff113](https://github.com/enke-dev/bumper/commit/42ff113ec430691f2991f4da7fd02c47e0dfa48d))
+* **core:** retry a registry lag with growing waits, never a cooldown refusal ([921496e](https://github.com/enke-dev/bumper/commit/921496e5dc7db6412aebe01e6cfb5cc55e50e4c1))
+
+### Features
+
+* **action:** set up rust for repos with a cargo lockfile ([11c735d](https://github.com/enke-dev/bumper/commit/11c735db365c5258fabb2f8d90e4b887f1087401))
+* **core:** align tauri crates with their javascript packages ([f4b9878](https://github.com/enke-dev/bumper/commit/f4b98787744bfe86cc87482836a1318c4e74ccea))
+* **core:** opt into install scripts with --run-scripts ([d2f824c](https://github.com/enke-dev/bumper/commit/d2f824cc65517f5d199cc6d7166e8a584f81a541))
+* **core:** update crates with cargo under the release age ([96c31c1](https://github.com/enke-dev/bumper/commit/96c31c1e01c975eb44a300725946e6a9730899ba))
+
 # [0.20.0](https://github.com/enke-dev/bumper/compare/0.19.0...0.20.0) (2026-11-11)
 
 ### Bug Fixes
