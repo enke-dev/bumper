@@ -28,9 +28,10 @@ const PROPAGATION_LAG_MARKERS = [
   'No version matching', // bun
 ];
 
-/** One retry only, and short: propagation is seconds, and CI runner time is the budget. The
- * alternative — failing the bump and rerunning `bumper update` from scratch — costs minutes. */
-const PROPAGATION_RETRY_DELAY_MS = 15_000;
+/** Waits before each retry. Propagation is usually seconds, but a monorepo release can take minutes
+ * to publish all its packages (typescript-eslint once took over three between the umbrella and
+ * its parser), so the waits grow. Still far cheaper than failing the bump and rerunning it. */
+const PROPAGATION_RETRY_DELAYS_MS = [15_000, 45_000, 90_000];
 
 /**
  * Wording every package manager uses when its *minimum release age* gate refuses a version that
@@ -40,10 +41,14 @@ const PROPAGATION_RETRY_DELAY_MS = 15_000;
  */
 const RELEASE_AGE_MARKERS = ['minimum release age', 'minimumReleaseAge', 'minimum-release-age'];
 
-/** Whether a failed install output carries a propagation-lag marker. Exported for tests. */
+/** Whether a failed install output carries a propagation-lag marker. A cooldown refusal is none,
+ * though bun words it as a lag (`No version matching … (blocked by minimum-release-age …)`).
+ * Exported for tests. */
 export function isPropagationLag(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return PROPAGATION_LAG_MARKERS.some(marker => message.includes(marker));
+  return (
+    !isReleaseAgeBlock(error) && PROPAGATION_LAG_MARKERS.some(marker => message.includes(marker))
+  );
 }
 
 /** Whether a failed install was refused by the package manager's release-age cooldown. */
@@ -53,23 +58,27 @@ export function isReleaseAgeBlock(error: unknown): boolean {
 }
 
 /**
- * Run the install, retrying **once** after a short wait if it failed only because a just-published
+ * Run the install, retrying after growing waits while it fails only because a just-published
  * version hasn't propagated across the registry yet (see {@link PROPAGATION_LAG_MARKERS}). Every
- * other failure throws immediately, so a real unsatisfiable range still fails fast. `delayMs` is
- * only overridden by tests, so the retry path runs without the real wait.
+ * other failure throws immediately. A version that never gets published reads the same as a lag
+ * and fails only after the waits (2.5 minutes); bumper resolves every version it writes from the
+ * registry, so that is rare. `delaysMs` is only overridden by tests, so the retry path runs
+ * without the real waits.
  */
 export async function installWithRetry(
   cmd: string[],
   cwd: string,
-  delayMs: number = PROPAGATION_RETRY_DELAY_MS
+  delaysMs: readonly number[] = PROPAGATION_RETRY_DELAYS_MS
 ): Promise<void> {
   try {
     await execOk(cmd, { cwd });
   } catch (error) {
-    if (!isPropagationLag(error)) {
+    const [delayMs, ...later] = delaysMs;
+    if (!isPropagationLag(error) || delayMs === undefined) {
       if (isReleaseAgeBlock(error)) {
-        // bumper normally resolves inside the gate (see ReleaseAgePolicy); landing here means the
-        // cooldown wasn't detected — say so, instead of leaving a bare package-manager error.
+        // bumper resolves inside the gate (see ReleaseAgePolicy) and exempts young pins it kept,
+        // so landing here means a cooldown it didn't detect, or a young pin needing a dependency
+        // as young
         stepNote(
           'the package manager refused a version under its minimum-release-age cooldown; ' +
             'set it explicitly with `--min-release-age <seconds>`'
@@ -81,7 +90,7 @@ export async function installWithRetry(
       `a bumped version is not served by the registry yet; retrying install in ${Math.round(delayMs / 1000)}s`
     );
     await new Promise(resolve => setTimeout(resolve, delayMs));
-    await execOk(cmd, { cwd });
+    await installWithRetry(cmd, cwd, later);
   }
 }
 

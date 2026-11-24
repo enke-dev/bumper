@@ -92,25 +92,31 @@ describe('isPropagationLag', () => {
     assert.equal(isPropagationLag(new Error('ERR_PNPM_PEER_DEP_ISSUES')), false);
     assert.equal(isPropagationLag(new Error('npm error code ERESOLVE')), false);
   });
+
+  test('a cooldown refusal is no lag, though bun words it like one', () => {
+    const bun =
+      'error: No version matching "7.4.13" found for specifier "astro" (blocked by minimum-release-age: 604800 seconds)';
+    assert.equal(isPropagationLag(new Error(bun)), false);
+  });
 });
 
 describe('installWithRetry', () => {
-  test('retries once when the registry has not served a bumped version yet', async () => {
+  test('retries while the registry has not served a bumped version yet', async () => {
     await withTempDir('retry', async dir => {
-      // fails with pnpm's lag code on the first run, succeeds afterwards
+      // fails with pnpm's lag code on the first two runs, succeeds afterwards
       const counter = join(dir, 'runs');
       const script = join(dir, 'install.sh');
       await writeFile(
         script,
         `#!/bin/sh\necho run >> "${counter}"\n` +
-          `test "$(wc -l < "${counter}")" -gt 1 && exit 0\n` +
+          `test "$(wc -l < "${counter}")" -gt 2 && exit 0\n` +
           'echo "Error: ERR_PNPM_NO_MATCHING_VERSION" >&2\nexit 1\n'
       );
       await chmod(script, 0o755);
       out = captureStdout();
-      await installWithRetry([script], dir, 0);
+      await installWithRetry([script], dir, [0, 0, 0]);
       const runs = (await readFile(counter, 'utf8')).trim().split('\n');
-      assert.equal(runs.length, 2, 'install runs a second time after the lag failure');
+      assert.equal(runs.length, 3, 'install runs again after each lag failure');
       assert.ok(out.output().includes('retrying install'), 'the retry is announced');
     });
   });
@@ -124,9 +130,25 @@ describe('installWithRetry', () => {
         `#!/bin/sh\necho run >> "${counter}"\necho "npm error code ERESOLVE" >&2\nexit 1\n`
       );
       await chmod(script, 0o755);
-      await assert.rejects(installWithRetry([script], dir, 0), /ERESOLVE/);
+      await assert.rejects(installWithRetry([script], dir, [0]), /ERESOLVE/);
       const runs = (await readFile(counter, 'utf8')).trim().split('\n');
       assert.equal(runs.length, 1, 'no retry for a genuine resolution failure');
+    });
+  });
+
+  test('gives up once the waits are used up', async () => {
+    await withTempDir('retry-exhausted', async dir => {
+      const counter = join(dir, 'runs');
+      const script = join(dir, 'install.sh');
+      await writeFile(
+        script,
+        `#!/bin/sh\necho run >> "${counter}"\necho "npm error code ETARGET" >&2\nexit 1\n`
+      );
+      await chmod(script, 0o755);
+      out = captureStdout();
+      await assert.rejects(installWithRetry([script], dir, [0, 0]), /ETARGET/);
+      const runs = (await readFile(counter, 'utf8')).trim().split('\n');
+      assert.equal(runs.length, 3, 'the first run plus one per wait');
     });
   });
 });
