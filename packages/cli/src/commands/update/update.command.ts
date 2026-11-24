@@ -73,6 +73,7 @@ async function run({ values, positionals }: CommandContext): Promise<void> {
     ignoreConfig,
     minReleaseAge,
     allowYoung: values['allow-young'],
+    runScripts: values['run-scripts'],
   });
   if (configCreated) {
     process.stdout.write(`${DIM}Discovered new repo, wrote entry to ${configPath()}${RESET}\n`);
@@ -144,6 +145,8 @@ export const updateCommand: Command = {
       "                     (default: the package manager's own cooldown; 0 disables)",
       '--allow-young pkg    Let pkg resolve past the cooldown (repeat for several); pnpm gets a',
       '                     version-pinned minimumReleaseAgeExclude rule, bun exempts it on install',
+      '--run-scripts        Install without --ignore-scripts, lifecycle scripts run as in a plain',
+      "                     install (default: off, or the repo's runScripts in ~/.bumperrc)",
     ],
   }),
 };

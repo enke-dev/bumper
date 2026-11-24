@@ -5,6 +5,7 @@ import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, test } from 'node:test';
 
+import { defaultRepoConfig } from '../config/config.js';
 import type { ModuleContext } from '../context/context.types.js';
 import { PackageManager } from '../context/context.types.js';
 import { withTempDir } from '../testing/with-temp-dir.harness.js';
@@ -17,7 +18,12 @@ import {
 } from './deps.utils.js';
 
 function ctx(overrides: Partial<ModuleContext> = {}): ModuleContext {
-  return { cwd: '/nonexistent-bumper-cwd', dryRun: true, ...overrides } as ModuleContext;
+  return {
+    cwd: '/nonexistent-bumper-cwd',
+    dryRun: true,
+    config: defaultRepoConfig(),
+    ...overrides,
+  } as ModuleContext;
 }
 
 /** Swap `process.stdout.write` for a buffer; runtime-agnostic (no bun/jest spy API). */
@@ -77,6 +83,35 @@ describe('cleanInstall', () => {
       ]);
       const runs = (await readFile(counter, 'utf8')).trim().split('\n');
       assert.equal(runs.length, 2, 'install command runs exactly twice');
+    });
+  });
+
+  test('runScripts drops --ignore-scripts from the install', async () => {
+    out = captureStdout();
+    const config = { ...defaultRepoConfig(), runScripts: true };
+    await cleanInstall(ctx({ packageManager: PackageManager.Bun, config }), ['bun', 'install']);
+    assert.ok(out.output().includes('bun install (run twice'));
+    assert.equal(out.output().includes('--ignore-scripts'), false);
+  });
+
+  test('passes --ignore-scripts to the install unless scripts are opted into', async () => {
+    await withTempDir('clean-scripts', async dir => {
+      const log = join(dir, 'log');
+      // the install records the flags it got, one line per run
+      const script = join(dir, 'install.sh');
+      await writeFile(script, `#!/bin/sh\necho "$*" >> "${log}"\n`);
+      await chmod(script, 0o755);
+      const run = async (runScripts: boolean) => {
+        const config = { ...defaultRepoConfig(), runScripts };
+        await cleanInstall(
+          ctx({ dryRun: false, cwd: dir, packageManager: PackageManager.Bun, config }),
+          [script]
+        );
+      };
+      await run(false);
+      await run(true);
+      const lines = (await readFile(log, 'utf8')).split('\n').slice(0, -1);
+      assert.deepEqual(lines, ['--ignore-scripts', '--ignore-scripts', '', '']);
     });
   });
 });

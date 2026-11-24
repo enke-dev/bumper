@@ -155,6 +155,7 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | `--ignore-config`        |     no     | Ignore `~/.bumperrc` for this run — auto-detect everything, read + write nothing.            |
 | `--min-release-age <s>`  |     no     | Only resolve versions published at least `<s>` seconds ago; `0` disables the cooldown.       |
 | `--allow-young <pkg>`    |    yes     | Let one package resolve past the cooldown; see [Minimum release age](#minimum-release-age).  |
+| `--run-scripts`          |     no     | Install without `--ignore-scripts`; see [Install scripts](#install-scripts).                 |
 | `--json`                 |     no     | `detect` only — emit machine-readable detection output.                                      |
 
 `--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `bun-runtime`,
@@ -291,6 +292,20 @@ A pin someone set while it was still inside the cooldown gets the same treatment
 bumper never walks a pin back, and its clean install re-resolves without a lockfile, which the gate
 would refuse. Such pins are found by their publish time and handled like `--allow-young` packages.
 
+### Install scripts
+
+bumper installs with `--ignore-scripts`: only the resolved lockfile matters, and lifecycle scripts
+routinely fail in a bare CI checkout (missing tokens, unbuilt `dist`). A repo whose lockfile depends
+on a hook opts in with `--run-scripts` (`runScripts` in `~/.bumperrc`, `run-scripts` in the action):
+the install then runs every script a plain install runs, the root `preinstall`, `postinstall` and
+`prepare` as well as the dependency scripts the package manager trusts (bun's `trustedDependencies`,
+pnpm's `allowBuilds`, every one for npm). The typical case is a root `preinstall` generating a
+workspace package from a dependency's version: the first of the two installs runs the hook, the
+second resolves the package it regenerated. Scripts then run with whatever the install can reach,
+in the action the push token in the git config and a registry token in `~/.npmrc`. A `prepare`
+installing git hooks (husky) installs them in the action's checkout too, so bumper's own commit
+runs them, a pre-commit `lint-staged` included, as it does locally.
+
 ## Manage
 
 `bumper manage [path]` scans every git repository under a folder (default `~/Projects`, nested
@@ -416,20 +431,21 @@ the PR), as shown above.
 
 All inputs are optional.
 
-| Input             | Default                      | Description                                                                                                             |
-| ----------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `base`            | repository default branch    | Base branch for the PR.                                                                                                 |
-| `branch`          | `chore/bumper-update`        | Branch name used for the update commit and PR.                                                                          |
-| `pr-title`        | `chore: update dependencies` | Title of the created or updated PR.                                                                                     |
-| `pr-labels`       | _(none)_                     | Comma-separated labels to apply to the PR (labels must already exist in the repo).                                      |
-| `only`            | _(all modules)_              | Run only the listed module ids (comma-separated, e.g. `node,pnpm`).                                                     |
-| `skip`            | _(none)_                     | Skip the listed module ids (comma-separated, e.g. `docker-node`).                                                       |
-| `exclude`         | _(none)_                     | Space-separated repo-relative paths to exclude (e.g. `examples fixtures`).                                              |
-| `min-release-age` | _(package manager's own)_    | Only resolve versions published at least N seconds ago (see [Minimum release age](#minimum-release-age)); `0` disables. |
-| `format`          | `true`                       | Run the repo's formatter after the update (equivalent to `--format` / `-f`).                                            |
-| `approve`         | `true`                       | Approve install scripts after the update, pnpm/npm only (equivalent to `--approve` / `-a`).                             |
-| `token`           | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows).            |
-| `setup`           | _(none)_                     | Shell command run before bumper, e.g. `bun run setup` for a workspace a skipped `preinstall` script would generate.     |
+| Input             | Default                      | Description                                                                                                                |
+| ----------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `base`            | repository default branch    | Base branch for the PR.                                                                                                    |
+| `branch`          | `chore/bumper-update`        | Branch name used for the update commit and PR.                                                                             |
+| `pr-title`        | `chore: update dependencies` | Title of the created or updated PR.                                                                                        |
+| `pr-labels`       | _(none)_                     | Comma-separated labels to apply to the PR (labels must already exist in the repo).                                         |
+| `only`            | _(all modules)_              | Run only the listed module ids (comma-separated, e.g. `node,pnpm`).                                                        |
+| `skip`            | _(none)_                     | Skip the listed module ids (comma-separated, e.g. `docker-node`).                                                          |
+| `exclude`         | _(none)_                     | Space-separated repo-relative paths to exclude (e.g. `examples fixtures`).                                                 |
+| `min-release-age` | _(package manager's own)_    | Only resolve versions published at least N seconds ago (see [Minimum release age](#minimum-release-age)); `0` disables.    |
+| `format`          | `true`                       | Run the repo's formatter after the update (equivalent to `--format` / `-f`).                                               |
+| `approve`         | `true`                       | Approve install scripts after the update, pnpm/npm only (equivalent to `--approve` / `-a`).                                |
+| `run-scripts`     | `false`                      | Install with lifecycle scripts (equivalent to `--run-scripts`); see [Install scripts](#install-scripts).                   |
+| `token`           | `${{ github.token }}`        | Token used to push the branch and open the PR (pass a PAT/app token to have the PR trigger other workflows).               |
+| `setup`           | _(none)_                     | Shell command run before bumper, e.g. `bun run setup` for a workspace the root `preinstall` generates on a fresh checkout. |
 
 Module ids are the values from the `id` column in the [Modules](#modules) table.
 
@@ -440,7 +456,9 @@ Module ids are the values from the `id` column in the [Modules](#modules) table.
 
 > **Note** — the action runs the bumper release its own ref carries: pin the action (to a tag or
 > commit) and the CLI stays on that release; `@main` follows the latest one. Installs run without
-> lifecycle scripts, so a workspace a `preinstall` script generates needs the `setup` input.
+> lifecycle scripts unless `run-scripts` is on (see [Install scripts](#install-scripts)). bumper scans
+> the workspaces before installing, so on a fresh checkout a workspace a hook generates still needs
+> the `setup` input.
 
 ### Outputs
 
@@ -510,6 +528,7 @@ entry, so the next run is already scoped:
   "repos": {
     "/absolute/path/to/repository": {
       "exclude": ["packages/vendored-pkg"], // repo-relative paths skipped everywhere (see below)
+      "runScripts": false, // install with lifecycle scripts, like --run-scripts (default: skipped)
       "modules": { "docker-node": false }, // explicit per-module on/off overrides, keyed by module id
       "branch": "chore/deps", // manage: branch to commit to and push (default: the current one)
       "checks": ["lint", "test"], // manage: run after the update, before the push
@@ -528,6 +547,7 @@ bumper config list
 bumper config get                              # current repo (path defaults to cwd)
 bumper config get /path/to/repo                # another repo
 bumper config set exclude packages/a packages/b  # current repo
+bumper config set runScripts true                 # install with lifecycle scripts
 bumper config set /path/to/repo modules.docker-node false
 bumper config set branch chore/deps               # manage: push branch ("-" removes it)
 bumper config set checks lint test                # manage: checks, in order
@@ -536,7 +556,7 @@ bumper config set waitForRelease false
 ```
 
 `get` and `set` default the path to the current repo — omit it to configure where you're standing.
-For `set` a leading config key (`exclude`, `modules.<id>`, `branch`, `checks`, `push`,
+For `set` a leading config key (`exclude`, `runScripts`, `modules.<id>`, `branch`, `checks`, `push`,
 `waitForRelease`) is
 what signals the path was omitted.
 

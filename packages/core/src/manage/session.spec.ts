@@ -111,6 +111,7 @@ describe('manage session', () => {
     await session.scan();
     const view = await session.updateRepoConfig('utils', {
       exclude: [],
+      runScripts: false,
       modules: {},
       checks: ['lint'],
       push: false,

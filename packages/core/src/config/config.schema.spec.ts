@@ -11,6 +11,7 @@ describe('config schema: defaults', () => {
   test('normalize fills every field with its default and leaves optional ones absent', () => {
     assert.deepEqual(base, {
       exclude: [],
+      runScripts: false,
       modules: {},
       checks: [],
       push: false,
@@ -23,6 +24,7 @@ describe('config schema: defaults', () => {
     const entry = normalizeRepoConfig({ exclude: ['x'], branch: 'main', waitForRelease: false });
     assert.deepEqual(entry, {
       exclude: ['x'],
+      runScripts: false,
       modules: {},
       branch: 'main',
       checks: [],
@@ -43,7 +45,7 @@ describe('config schema: keys', () => {
 
   test('every field appears in the usage lines', () => {
     const usage = configKeysUsage().join('\n');
-    ['exclude', 'modules.<id>', 'branch', 'checks', 'waitForRelease'].forEach(key =>
+    ['exclude', 'runScripts', 'modules.<id>', 'branch', 'checks', 'waitForRelease'].forEach(key =>
       assert.ok(usage.includes(key), `usage lists ${key}`)
     );
   });

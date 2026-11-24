@@ -29,6 +29,14 @@ export const REPO_CONFIG_FIELDS: readonly ConfigField[] = [
     placeholder: 'path...',
   },
   {
+    key: 'runScripts',
+    kind: 'boolean',
+    title: 'Run install scripts',
+    description:
+      'Install without --ignore-scripts: lifecycle scripts run as in a plain install, e.g. a preinstall generating a workspace package. Off: no script runs.',
+    default: false,
+  },
+  {
     key: 'branch',
     kind: 'string',
     title: 'Push branch',

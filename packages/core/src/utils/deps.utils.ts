@@ -113,10 +113,14 @@ export async function installWithRetry(
  * lockfile matters here, and lifecycle scripts (`prepare`/`postinstall`: codegen, workspace
  * builds) don't affect it — but they routinely fail in a bare CI checkout (missing tokens,
  * unbuilt `dist`, nested package-manager version churn), which would abort the bump for no reason.
+ * A repo whose install depends on a hook opts in with `runScripts` (`--run-scripts`): the install
+ * then runs every script a plain install runs. A root `preinstall` generating a workspace package
+ * from a dependency's version needs it: bun reads the workspaces before the hook runs, the second
+ * pass picks up what the first one generated.
  */
 export async function cleanInstall(ctx: ModuleContext, installCmd: string[]): Promise<void> {
   const lockfiles = LOCKFILES[ctx.packageManager] ?? [];
-  const cmd = [...installCmd, '--ignore-scripts'];
+  const cmd = ctx.config.runScripts ? installCmd : [...installCmd, '--ignore-scripts'];
   if (ctx.dryRun) {
     planLine(['rm -rf', 'node_modules', ...lockfiles].join(' '));
     planLine(`${cmd.join(' ')} (run twice to settle the lockfile)`);

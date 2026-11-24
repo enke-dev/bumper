@@ -22,6 +22,8 @@ export interface BuildContextOptions {
    * gates are relaxed for exactly these (see `allow-young.utils.ts`).
    */
   allowYoung?: string[] | undefined;
+  /** Run lifecycle scripts on install (`--run-scripts`), on top of the repo's `runScripts`. */
+  runScripts?: boolean | undefined;
 }
 
 /** Run all detectors + resolve config into a single {@link ModuleContext}. */
@@ -34,8 +36,9 @@ export async function buildContext(
     : await resolveForPath(cwd);
   // fold ephemeral CLI excludes into the persisted list; every exclude consumer (workspace
   // filter + file-based features via ctx.config) then sees one merged list, nothing is saved.
+  // `--run-scripts` likewise turns the stored switch on for this run only.
   const exclude = [...new Set([...stored.exclude, ...(options.exclude ?? [])])];
-  const config = { ...stored, exclude };
+  const config = { ...stored, exclude, runScripts: options.runScripts || stored.runScripts };
   const [runtime, packageManager] = await Promise.all([
     detectRuntime(cwd),
     detectPackageManager(cwd),

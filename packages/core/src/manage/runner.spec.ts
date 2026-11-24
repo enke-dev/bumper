@@ -39,6 +39,7 @@ const repo = (extra: Partial<RepoInfo> = {}): RepoInfo => ({
 
 const config = (extra: Partial<RepoConfig> = {}): RepoConfig => ({
   exclude: [],
+  runScripts: false,
   modules: {},
   checks: ['lint', 'echo free'],
   push: true,

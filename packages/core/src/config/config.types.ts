@@ -2,6 +2,11 @@
 export interface RepoConfig {
   /** Repo-relative paths excluded from workspace operations (e.g. vendored packages). */
   exclude: string[];
+  /**
+   * Whether installs run lifecycle scripts (no `--ignore-scripts`), like a plain install: the
+   * root hooks and whatever dependency scripts the package manager trusts. Off by default.
+   */
+  runScripts: boolean;
   /** Explicit module enable/disable overrides, keyed by module id. */
   modules: Record<string, boolean>;
   /**

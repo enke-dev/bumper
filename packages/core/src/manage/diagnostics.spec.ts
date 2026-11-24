@@ -30,6 +30,7 @@ function repo(
 
 const config = (extra: Partial<RepoConfig> = {}): RepoConfig => ({
   exclude: [],
+  runScripts: false,
   modules: {},
   checks: ['lint'],
   push: false,
