@@ -247,6 +247,12 @@ bumper detect --json | jq .releaseAge
 # { "seconds": 86400, "excludes": [], "strict": false, "ignoreMissingTime": true, "source": "pnpm 11 default" }
 ```
 
+#### Actions
+
+`actions-up` holds back action releases younger than a day on its own. An explicit
+`--min-release-age` replaces that (as `--min-age`, in days), so `0` pins the newest release; the
+package manager's cooldown doesn't apply to actions.
+
 #### Crates
 
 The `cargo` module holds crates to the same cooldown, through cargo's own gate

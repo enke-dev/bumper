@@ -11,6 +11,7 @@ import { withTempDir } from '../testing/with-temp-dir.harness.js';
 import type { ExecResult } from './exec.utils.js';
 import type { ReleaseAgePolicy } from './release-age.utils.js';
 import {
+  actionsReleaseAgeArgs,
   bunReleaseAgeArgs,
   detectReleaseAge,
   isExemptFromReleaseAge,
@@ -182,6 +183,23 @@ describe('bunReleaseAgeArgs', () => {
   test("leaves the repo's own cooldown to bun", () => {
     const policy = { ...NO_RELEASE_AGE, seconds: 86400, source: 'bunfig.toml' };
     assert.deepEqual(bunReleaseAgeArgs(policy), []);
+  });
+});
+
+describe('actionsReleaseAgeArgs', () => {
+  test('carries an override to actions-up, in days', async () => {
+    const policy = await detectReleaseAge('/repo', PackageManager.Npm, 43200);
+    assert.deepEqual(actionsReleaseAgeArgs(policy), ['--min-age', '0.5']);
+  });
+
+  test('lifts the gate on an override of 0', async () => {
+    const policy = await detectReleaseAge('/repo', PackageManager.Npm, 0);
+    assert.deepEqual(actionsReleaseAgeArgs(policy), ['--min-age', '0']);
+  });
+
+  test("leaves the package manager's cooldown out of it", () => {
+    const policy = { ...NO_RELEASE_AGE, seconds: 86400 * 3, source: 'bunfig.toml' };
+    assert.deepEqual(actionsReleaseAgeArgs(policy), []);
   });
 });
 

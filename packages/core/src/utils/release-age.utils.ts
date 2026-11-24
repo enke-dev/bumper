@@ -346,6 +346,15 @@ export function bunReleaseAgeArgs(policy: ReleaseAgePolicy): string[] {
   return policy.source === OVERRIDE_SOURCE ? ['--minimum-release-age', String(policy.seconds)] : [];
 }
 
+/**
+ * actions-up arguments carrying a `--min-release-age` override to the action pins, in days as
+ * actions-up counts them. Empty otherwise: the package manager's cooldown is no policy for
+ * actions, which keep actions-up's own default.
+ */
+export function actionsReleaseAgeArgs(policy: ReleaseAgePolicy): string[] {
+  return policy.source === OVERRIDE_SOURCE ? ['--min-age', String(policy.seconds / 86400)] : [];
+}
+
 /** Newest publish timestamp (epoch ms) a version may carry and still be installable, or null
  * when no gate applies. */
 export function releaseAgeCutoff(

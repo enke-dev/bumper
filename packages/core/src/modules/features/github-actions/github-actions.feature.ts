@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { execOk } from '../../../utils/exec.utils.js';
 import { planLine } from '../../../utils/output.utils.js';
+import { actionsReleaseAgeArgs } from '../../../utils/release-age.utils.js';
 import type { Module } from '../../module.types.js';
 import { ModuleKind } from '../../module.types.js';
 
@@ -30,7 +31,13 @@ export const githubActionsFeature: Module = {
   async update(ctx) {
     // actions-up has no stable programmatic API, so it stays the one non-bundled
     // call (invoked through bun's package runner).
-    const cmd = ['bunx', 'actions-up', '--yes', '--include-branches'];
+    const cmd = [
+      'bunx',
+      'actions-up',
+      '--yes',
+      '--include-branches',
+      ...actionsReleaseAgeArgs(ctx.releaseAge),
+    ];
     if (ctx.dryRun) {
       planLine(cmd.join(' '));
       return;
