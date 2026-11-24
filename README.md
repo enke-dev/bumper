@@ -158,7 +158,7 @@ both. Repeatable flags are given several times — one value each, no comma-sepa
 | `--json`                 |     no     | `detect` only — emit machine-readable detection output.                                      |
 
 `--only` and `--skip` take module ids from the [Modules](#modules) table (`node`, `bun-runtime`,
-`types-node`, `tsconfig-node`, `types-bun`, `bun`, `npm`, `pnpm`, `docker-node`, `devcontainer-node`, `docker-bun`, `docker-images`,
+`types-node`, `tsconfig-node`, `types-bun`, `bun`, `npm`, `pnpm`, `cargo`, `tauri`, `docker-node`, `devcontainer-node`, `docker-bun`, `docker-images`,
 `github-actions`, `github-version-files`).
 
 ```sh
@@ -264,6 +264,16 @@ inside the ranges of the `Cargo.toml`s, a new major remains a manual edit, and s
 dependencies. A `Cargo.toml` requiring a crate younger than the cooldown fails cargo's whole
 resolve, so that crate dir is skipped with a note until it clears.
 
+The `tauri` feature owns the crates of a tauri app's exactly pinned JavaScript packages: the cargo
+update leaves them alone, and the feature locks them after the package manager pinned the
+packages. Each `tauri-plugin-*` crate follows the version of its `@tauri-apps/plugin-*` package: a
+plugin's JavaScript and Rust side exchange IPC payloads, so a pair apart breaks at runtime
+(`@tauri-apps/plugin-http` 2.9 sends bytes a 2.6 crate rejects). The `tauri` crate is versioned
+apart from `@tauri-apps/api` and takes the newest release of its minor, the one the tauri CLI
+requires ("Found version mismatched Tauri packages"). It stays inside the cooldown too: a version
+younger than it gives way to the next older fitting one, or the lock is kept for a later run. A
+`Cargo.toml` requirement the version falls below keeps the lock as well, with a note.
+
 #### Consuming your own fresh releases (`--allow-young`)
 
 The cooldown also bites when a repo should pick up a version _you_ just published from another
@@ -328,7 +338,8 @@ Each concern is a self-detecting, self-updating unit behind a common `Module` in
 three families (mirrored by the `modules/` folder layout): **runtimes**, **package-managers** and
 **features**. The update procedure just runs every module whose detector matches, in registry order
 — runtimes first (pin versions), then dependency-pinning features, then package managers install (crates included),
-then the remaining file-rewriting features:
+then the `tauri` feature aligns crates with the JavaScript packages just pinned, then the remaining
+file-rewriting features:
 
 | id                     | kind            | detects                                                                                                                               | does                                                                                                                                                                                                                                   |
 | ---------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -341,6 +352,7 @@ then the remaining file-rewriting features:
 | `npm`                  | package-manager | npm packageManager / lockfile                                                                                                         | bump specs to latest, clean reinstall, `approve-scripts --all`                                                                                                                                                                         |
 | `pnpm`                 | package-manager | pnpm packageManager / lockfile                                                                                                        | self-update, bump specs to latest, clean reinstall, `approve-builds --all`                                                                                                                                                             |
 | `cargo`                | package-manager | `Cargo.lock` beside a `Cargo.toml`                                                                                                    | refresh the lockfile within the `Cargo.toml` ranges and the release age (cargo ≥ 1.100), moving crates forward only, see [Crates](#crates)                                                                                             |
+| `tauri`                | feature         | exact `@tauri-apps/plugin-*` / `@tauri-apps/api` pins in the package holding a cargo dir                                              | lock each `tauri-plugin-*` crate to its JavaScript package's version, the `tauri` crate to the newest of `@tauri-apps/api`'s minor, see [Crates](#crates); a major apart is reported                                                   |
 | `docker-node`          | feature         | `Dockerfile*` / `compose*.yaml`                                                                                                       | align `node:<ver>` / `NODE_VERSION=` to LTS                                                                                                                                                                                            |
 | `devcontainer-node`    | feature         | a node image / feature in `.devcontainer.json` / `.devcontainer/[*/]devcontainer.json`, or a node devcontainer image in a Docker file | align the `typescript-node`/`javascript-node` image major (only to a published tag; owns these images) and the node feature's `version` to LTS                                                                                         |
 | `github-version-files` | feature         | `actions/setup-node` / `oven-sh/setup-bun` / `pnpm/action-setup` with a hand-written version, and the pin to read                     | point setup-node/setup-bun at `.node-version` / `.bun-version` (`*-version-file`), drop pnpm's `version` so it reads `packageManager`; expressions, lists, `canary`, steps ahead of `actions/checkout` and `# bumper: skip` lines stay |
