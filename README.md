@@ -43,6 +43,10 @@ A package held below `latest` this way is reported with the cause, e.g. `@enke.d
 at 0.6.3, latest 0.7.0 is excluded by ^0.6.2 (@optiscaners/ui.components@0.65.0)`: such a hold
 releases once the capping dependency widens its peer range, `--min-release-age` has no say in it.
 
+A cap never lowers a version though: a package already outside a peer range stays where it is,
+reported as e.g. `foo kept at 3.9.9, never lowered, though outside >=1 <3 (peer-pkg@1.0.0)`. The
+repo runs on that version, and walking it back can break more than the peer mismatch does.
+
 > **Note** — most network runs through subprocesses (`curl` for the Node dist index, `pnpm`/`npm
 view` for versions, `actions-up` via `bunx`), so private-registry auth is handled by the tools
 > that own it — the repo's own `.npmrc` just works. The `docker-images` feature is the exception: it

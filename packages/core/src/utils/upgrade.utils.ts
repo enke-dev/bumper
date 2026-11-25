@@ -364,6 +364,7 @@ export async function upgradeAllWorkspaces(
   const applied = new Map<string, string>();
   const heldBack = new Map<string, HeldBack>();
   const keptAhead = new Set<string>();
+  const outsideCaps = new Map<string, OutsideCaps>();
   const specsChanged = new Map<string, boolean>();
   await Promise.all(
     [...pkgs].map(async ([dir, pkg]) => {
@@ -379,7 +380,8 @@ export async function upgradeAllWorkspaces(
           lookups,
           applied,
           heldBack,
-          keptAhead
+          keptAhead,
+          outsideCaps
         )
       );
     })
@@ -389,6 +391,10 @@ export async function upgradeAllWorkspaces(
   heldBack.forEach(({ version, latest: newest, caps }, name) => {
     const causes = caps.map(({ range, by }) => `${range} (${by})`).join(', ');
     stepNote(`${name} held at ${version}, latest ${newest} is excluded by ${causes}`);
+  });
+  outsideCaps.forEach(({ version, caps }, name) => {
+    const causes = caps.map(({ range, by }) => `${range} (${by})`).join(', ');
+    stepNote(`${name} kept at ${version}, never lowered, though outside ${causes}`);
   });
   // Override trees live in the root manifest only, whichever field spelling is used.
   const resolved = new Map<string, string | null>([...latest, ...applied]);
@@ -436,7 +442,8 @@ function cappedRanges(pkg: PackageJson, managed: ReadonlySet<string>): Map<strin
  * if anything changed. `reduce` (not `some`) so every bucket + entry is visited. Every version an
  * entry ends up on - rewritten or deliberately kept - is recorded in `applied`, the lowest
  * winning when manifests disagree, so the override trees can follow the buckets. A pin kept
- * because it is ahead of its resolved target lands in `keptAhead`. */
+ * because it is ahead of its resolved target lands in `keptAhead`, and one kept although it
+ * violates its caps in `outsideCaps` as well. */
 async function rewriteSpecs(
   pkg: PackageJson,
   managed: ReadonlySet<string>,
@@ -447,7 +454,8 @@ async function rewriteSpecs(
   lookups: RegistryLookups,
   applied: Map<string, string>,
   heldBack: Map<string, HeldBack>,
-  keptAhead: Set<string>
+  keptAhead: Set<string>,
+  outsideCaps: Map<string, OutsideCaps>
 ): Promise<boolean> {
   const present = allDependencies(pkg);
   // Collect every capping range per package as a list — never joined into one string (see
@@ -488,22 +496,26 @@ async function rewriteSpecs(
       if (!version) {
         return acc;
       }
-      // Never walk a pin *backwards* when the current version is already acceptable:
+      // Never walk a pin *backwards*:
       //  - plain path: the `latest` dist-tag can trail a pinned prerelease (e.g.
       //    `vitepress@2.0.0-alpha.13` while `latest` is `1.6.4`, the alpha under the `next` tag).
-      //  - capped path: a peer cap must only lower a version that *violates* the peer ranges. A
-      //    pin still satisfying them — typically a prerelease the stable-only cap resolution
-      //    skipped — must be kept, not downgraded to the newest stable.
+      //  - capped path: a pin satisfying the caps, typically a prerelease the stable-only cap
+      //    resolution skipped, stays. One violating them stays too, reported: the repo already
+      //    runs on it, and lowering it can break more than the peer mismatch does (a codegen
+      //    plugin's peer took urql graphcache from 9 back to 7, which the urql core 6 in use
+      //    does not work with).
       const current = spec.replace(/^[\^~]/, '');
       if (isValid(current) && isLessThan(version, current)) {
-        const currentViolatesCaps =
-          capped_ && !(capRanges.get(name) ?? []).every(range => satisfies(current, range));
-        if (!currentViolatesCaps) {
-          recordApplied(applied, name, current);
-          recordHeldBack(heldBack, name, current, latest.get(name), capSources.get(name));
-          keptAhead.add(name);
-          return acc;
+        const violated = (capSources.get(name) ?? []).filter(
+          ({ range }) => !satisfies(current, range)
+        );
+        if (capped_ && violated.length > 0) {
+          outsideCaps.set(name, { version: current, caps: violated });
         }
+        recordApplied(applied, name, current);
+        recordHeldBack(heldBack, name, current, latest.get(name), capSources.get(name));
+        keptAhead.add(name);
+        return acc;
       }
       recordApplied(applied, name, version);
       recordHeldBack(heldBack, name, version, latest.get(name), capSources.get(name));
@@ -516,6 +528,12 @@ async function rewriteSpecs(
     }, false);
     return bucketChanged || entryChanged;
   }, false);
+}
+
+/** A package kept on a version its caps exclude, with the caps it fails. */
+interface OutsideCaps {
+  version: string;
+  caps: CapRange[];
 }
 
 /** A package a cap kept below `latest`, with the caps `latest` fails. */

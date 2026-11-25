@@ -142,9 +142,10 @@ describe('upgradeAllWorkspaces', () => {
     assert.equal(pkg?.devDependencies?.['vitepress'], '2.0.0-alpha.13', 'prerelease pin kept');
   });
 
-  test('a peer cap still downgrades a version that VIOLATES the peer range', async () => {
-    // The guard must not over-protect: a pin outside every peer range is genuinely broken and
-    // must be capped down. foo@3.9.9 violates the peer `>=1 <3` → capped to the newest in-range.
+  test('a peer cap never lowers a version that violates the peer range, it reports it', async () => {
+    // Regression (Fleet-WebApp): a codegen plugin peering `^7` took urql graphcache from 9 back
+    // to 7, which the urql core in use does not work with. foo@3.9.9 violates the peer `>=1 <3`
+    // and stays, with a note naming the conflict.
     latest = { foo: '3.9.9', 'peer-pkg': '1.0.0' };
     versions = { foo: ['1.0.0', '2.5.0', '3.9.9'] };
     peers = { 'peer-pkg': { foo: '>=1 <3' } };
@@ -152,11 +153,39 @@ describe('upgradeAllWorkspaces', () => {
       name: 'root',
       devDependencies: { foo: '3.9.9', 'peer-pkg': '1.0.0' },
     });
+    const context = ctx();
+
+    const out = captureStdout();
+    try {
+      await upgradeAllWorkspaces(context, lookups);
+    } finally {
+      out.restore();
+    }
+
+    const pkg = await readPackageJson(dir);
+    assert.equal(pkg?.devDependencies?.['foo'], '3.9.9', 'violating pin kept');
+    assert.deepEqual(context.keptAhead, ['foo']);
+    assert.ok(
+      out
+        .output()
+        .includes('foo kept at 3.9.9, never lowered, though outside >=1 <3 (peer-pkg@1.0.0)')
+    );
+  });
+
+  test('a peer cap still raises a version that violates the peer range from below', async () => {
+    // never lowering must not freeze a pin the cap allows to grow: foo@1.0.0 lands on 2.5.0
+    latest = { foo: '3.9.9', 'peer-pkg': '1.0.0' };
+    versions = { foo: ['1.0.0', '2.5.0', '3.9.9'] };
+    peers = { 'peer-pkg': { foo: '>=2 <3' } };
+    await writePkg({
+      name: 'root',
+      devDependencies: { foo: '1.0.0', 'peer-pkg': '1.0.0' },
+    });
 
     await upgradeAllWorkspaces(ctx(), lookups);
 
     const pkg = await readPackageJson(dir);
-    assert.equal(pkg?.devDependencies?.['foo'], '2.5.0', 'violating pin capped down to in-range');
+    assert.equal(pkg?.devDependencies?.['foo'], '2.5.0', 'raised into the peer range');
   });
 
   test('leaves non-pinnable specs (ranges, protocols, tags) untouched', async () => {
@@ -265,7 +294,7 @@ describe('upgradeAllWorkspaces', () => {
     peers = { 'void-html': { prettier: '3.0.0 - 3.8.x' } };
     await writePkg({
       name: 'root',
-      devDependencies: { prettier: '^3.9.6', 'void-html': '2.1.0' },
+      devDependencies: { prettier: '^3.0.0', 'void-html': '2.1.0' },
     });
 
     await upgradeAllWorkspaces(ctx(), lookups);
@@ -409,7 +438,7 @@ describe('upgradeAllWorkspaces', () => {
     latest = { foo: '4.1.0', 'peer-pkg': '1.0.0' };
     versions = { foo: ['3.0.0', '3.7.2', '4.1.0'] };
     peers = { 'peer-pkg': { foo: '3.x' } };
-    await writePkg({ name: 'root', dependencies: { foo: '^4.1.0', 'peer-pkg': '1.0.0' } });
+    await writePkg({ name: 'root', dependencies: { foo: '^3.0.0', 'peer-pkg': '1.0.0' } });
 
     await upgradeAllWorkspaces(ctx(), lookups);
 
