@@ -1,5 +1,11 @@
 # @enke.dev/bumper
 
+## [0.21.3](https://github.com/enke-dev/bumper/compare/0.21.2...0.21.3) (2026-11-25)
+
+### Bug Fixes
+
+* **core:** never lower a version for a peer cap ([3c45ffc](https://github.com/enke-dev/bumper/commit/3c45ffcbb2542800f1c34d86702beea9ac6da10c))
+
 ## [0.21.2](https://github.com/enke-dev/bumper/compare/0.21.1...0.21.2) (2026-11-24)
 
 ### Bug Fixes
